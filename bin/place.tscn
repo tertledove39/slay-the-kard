@@ -1,0 +1,27 @@
+[gd_scene load_steps=4 format=3 uid="uid://cwr8g76tdac2a"]
+
+[ext_resource type="Texture2D" uid="uid://bwmq6vs5k5x1y" path="res://cards/placeBack.png" id="1_x1kp7"]
+[ext_resource type="Script" uid="uid://15y2v1in0hol" path="res://bin/Place.cs" id="2_hq0tb"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_25clg"]
+size = Vector2(180, 240)
+
+[node name="Place" type="Node2D"]
+script = ExtResource("2_hq0tb")
+
+[node name="Control" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 180.0
+offset_bottom = 240.0
+mouse_filter = 2
+
+[node name="Sprite2D" type="Sprite2D" parent="Control"]
+position = Vector2(90, 120)
+texture = ExtResource("1_x1kp7")
+
+[node name="checkBox" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="checkBox"]
+position = Vector2(90, 120)
+shape = SubResource("RectangleShape2D_25clg")

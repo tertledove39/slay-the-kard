@@ -1,0 +1,17 @@
+[remap]
+
+importer="font_data_bmfont"
+type="FontFile"
+uid="uid://dkw8ow84hlcd1"
+path="res://.godot/imported/FRADMCN.font-336ce902f619d2f351d7631d17a25283.fontdata"
+
+[deps]
+
+source_file="res://bin/FRADMCN.font"
+dest_files=["res://.godot/imported/FRADMCN.font-336ce902f619d2f351d7631d17a25283.fontdata"]
+
+[params]
+
+fallbacks=[]
+compress=true
+scaling_mode=2
