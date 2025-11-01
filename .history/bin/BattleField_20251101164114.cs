@@ -195,9 +195,9 @@ public partial class BattleField : Control
     }
 
     /// <summary>
-    /// 如果这条阵线可以被敌方单位进入 就返回1 否则为0<para />
+    /// 如果这条阵线是空的 就返回1 否则为0<para />
     /// </summary>
-    public static int CheckIfALineCanContainEnemyUnit(List<Place> line)
+    public static int CheckIfALineIsEmpty(List<Place> line)
     {
 
         foreach (var place in line)
@@ -208,22 +208,6 @@ public partial class BattleField : Control
             }
         }
         return 1;
-    }
-/// <summary>
-/// 找到第一个空位置 不检查这个阵线是否可以进入
-/// </summary>
-/// <param name="line"></param>
-/// <returns>返回一个位置</returns>
-    public Place GetTheFirstLegalPlace(List<Place> line)
-    {
-        foreach (var place in line)
-        {
-            if (place.myCard == null)
-            {
-                return place;
-            }
-        }
-        return null;
     }
 
     /// <summary>
@@ -238,14 +222,10 @@ public partial class BattleField : Control
         }
         if (unit.attackAble > 0)
         {
-            if (CheckIfALineCanContainEnemyUnit(frontLine) == 1)
+            if (CheckIfALineIsEmpty(frontLine) == 1)
             {
-                unit.Move(GetTheFirstLegalPlace(frontLine));
+
             }
-        }
-        if (unit.attackAble > 0)
-        {
-            
         }
     }
     /// <summary>
@@ -253,20 +233,12 @@ public partial class BattleField : Control
     /// </summary>
     public void EnemyUnitMove()
     {
-        foreach (var place in frontLine)
+        foreach(var place in frontLine)
         {
             if (place.myCard == null)
             {
                 return;
             }
-        }
-    }
-    
-    public void EnemyUnitTryAttack(cardControl from)
-    {
-        List<Place> targetLine;
-        if(enemySupprotLine.Contains(from.myPlace)){
-            
         }
     }
     async public Task EnemyTurn()
@@ -277,7 +249,6 @@ public partial class BattleField : Control
         enemyHQInstance.GetDefence(2 + playerTurn);
 
         EnemyDeployUnit("t70");
-
         if (playerTurn == 3)
         {
             enemyHQInstance.GetDefence(5);

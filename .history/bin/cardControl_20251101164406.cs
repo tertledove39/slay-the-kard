@@ -66,7 +66,7 @@ public partial class cardControl : Control
     public Hand inHand;
     public BattleField battleField;
     private Label costLabel;
-    public Vector2 offset = new Vector2(90, 110);
+
     private Label attackLabel;
     private Label defenceLabel;
     private Label nameLabel;
@@ -385,40 +385,6 @@ public partial class cardControl : Control
             ;
         }
     }
-    /// <summary>
-    /// 攻击一个目标
-    /// </summary>
-    /// <param name="target">攻击目标</param>
-    public void Attack(cardControl target)
-    {
-        EmitSignal(SignalName.AttackSend, this, target);
-        if (cardType == CardTypes.Infantry || cardType == CardTypes.Bomber || cardType == CardTypes.Plane || cardType == CardTypes.Artillery)
-        {
-            attackAble = 0;
-            moveAble = 0;
-        }
-        if (cardType == CardTypes.Tank)
-        {
-            attackAble = 0;
-        }
-    }
-
-    public void Move(Place place)
-    {
-        place.myCard = this;
-        myPlace.myCard = null;
-        myPlace = place;
-        targetPosition = place.GlobalPosition + offset;
-        if (cardType == CardTypes.Infantry)
-        {
-            attackAble = 0;
-            moveAble = 0;
-        }
-        else if (cardType == CardTypes.Tank)
-        {
-            moveAble = 0;
-        }
-    }
     public override void _Input(InputEvent @event)
     {
         //cardControl target;
@@ -428,24 +394,50 @@ public partial class cardControl : Control
             {
                 var battleField = GetTree().Root.GetNode<BattleField>("BattleField");
 
-                            
+                            var offset = new Vector2(90, 110);
 
                             var allPlacesDictionary = battleField.getAllPlacesDictionary;
                             string minPlaceName = GetClostestPlace();
                 if (state == CardState.placed && beingChoosedNow == 1)
                 {
+
+                        {
+
+
                         if (allPlacesDictionary[minPlaceName].myCard != null && allPlacesDictionary[minPlaceName].myCard != this)
                         {
                         if (allPlacesDictionary[minPlaceName].myCard.isFriend != this.isFriend && attackAble == 1)
                         {
-                            Attack(allPlacesDictionary[minPlaceName].myCard);
+                            EmitSignal(SignalName.AttackSend, this, allPlacesDictionary[minPlaceName].myCard);
+                            if (cardType == CardTypes.Infantry)
+                            {
+                                attackAble = 0;
+                                moveAble = 0;
+                            }
+                            if (cardType == CardTypes.Tank)
+                            {
+                                attackAble = 0;
+                            }
                             goto end;
                         }
                     }
-                        if (allPlacesDictionary[minPlaceName].myCard == null && allPlacesDictionary[minPlaceName].line == myPlace.line + 1 && allPlacesDictionary[minPlaceName].line != 2 && moveAble == 1)
+                    if (allPlacesDictionary[minPlaceName].myCard == null && allPlacesDictionary[minPlaceName].line == myPlace.line + 1 && allPlacesDictionary[minPlaceName].line != 2 && moveAble == 1)
+                    {
+                        allPlacesDictionary[minPlaceName].myCard = this;
+                        myPlace.myCard = null;
+                        myPlace = allPlacesDictionary[minPlaceName];
+                        targetPosition = allPlacesDictionary[minPlaceName].GlobalPosition + offset;
+                        if (cardType == CardTypes.Infantry)
                         {
-                            Move(allPlacesDictionary[minPlaceName]);
+                            attackAble = 0;
+                            moveAble = 0;
                         }
+                        else if (cardType == CardTypes.Tank)
+                        {
+                            moveAble = 0;
+                        }
+                    }
+                    }
                 }
                 else if (state == CardState.caught && cardType == CardTypes.Command)
                 {

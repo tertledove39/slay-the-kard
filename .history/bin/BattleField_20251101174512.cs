@@ -243,30 +243,18 @@ public partial class BattleField : Control
                 unit.Move(GetTheFirstLegalPlace(frontLine));
             }
         }
-        if (unit.attackAble > 0)
-        {
-            
-        }
     }
     /// <summary>
     /// 尝试把一个敌方单位移动到第一个可能的位置<para />
     /// </summary>
     public void EnemyUnitMove()
     {
-        foreach (var place in frontLine)
+        foreach(var place in frontLine)
         {
             if (place.myCard == null)
             {
                 return;
             }
-        }
-    }
-    
-    public void EnemyUnitTryAttack(cardControl from)
-    {
-        List<Place> targetLine;
-        if(enemySupprotLine.Contains(from.myPlace)){
-            
         }
     }
     async public Task EnemyTurn()
@@ -277,7 +265,7 @@ public partial class BattleField : Control
         enemyHQInstance.GetDefence(2 + playerTurn);
 
         EnemyDeployUnit("t70");
-
+        
         if (playerTurn == 3)
         {
             enemyHQInstance.GetDefence(5);
