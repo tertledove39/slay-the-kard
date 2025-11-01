@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 public partial class BattleField : Control
 {
-    public int turn = 0;
+
     private CardMaganer cardMaganer = new();
     private PackedScene _card;
     string INIpath = "res://cards/card.ini";
@@ -234,8 +234,9 @@ public partial class BattleField : Control
     /// 一个单位攻击 先检查是否可以移动 再检查是否可以攻击<para />
     /// </summary>
     /// <param name="unit">攻击源</param>
-    public void EnemyUnitAttack(cardControl unit)
+    async public void EnemyUnitAttack(cardControl unit)
     {
+        await ToSignal(GetTree().CreateTimer(0.5f), "timeout");
         if (unit.state != CardState.placed || unit.isFriend != player2.isFriend)
         {
             return;
@@ -326,28 +327,28 @@ public partial class BattleField : Control
         nowStage = Stage.EnemyPrepare;
         nowStage = Stage.EnemyDraw;
         nowStage = Stage.EnemyBattle;
-        enemyHQInstance.GetDefence(2 + turn);
-        
+        enemyHQInstance.GetDefence(2 + playerTurn);
+        playerTurn++;
         foreach(var unit in getAllEnemyUnit())
         {
             unit.Refresh();
         }
         EnemyDeployUnit("t70");
         
-        if (turn == 3)
+        if (playerTurn == 3)
         {
             EnemyDeployUnit("t70");
             EnemyDeployUnit("t70");
             enemyHQInstance.GetDefence(5);
         }
-        if (turn == 5)
+        if (playerTurn == 5)
         {
             EnemyDeployUnit("t70");
             EnemyDeployUnit("t70");
             EnemyDeployUnit("t70");
             enemyHQInstance.GetDefence(10);
         }
-        if (turn == 7)
+        if (playerTurn == 7)
         {
             foreach (var _card in cardInPlaces)
             {
@@ -356,7 +357,7 @@ public partial class BattleField : Control
                     _card.GetDefence(-5);
                 }
             }
-            if (turn == 10)
+            if (playerTurn == 10)
             {
                 foreach (var _card in cardInPlaces)
                 {
@@ -366,7 +367,7 @@ public partial class BattleField : Control
                     }
                 }
             }
-            if (turn == 14)
+            if (playerTurn == 14)
             {
                 foreach (var _card in cardInPlaces)
                 {
@@ -378,12 +379,11 @@ public partial class BattleField : Control
 
         }
         var enemyUnit = getAllEnemyUnit();
-        foreach (var unit in enemyUnit)
+        foreach(var unit in enemyUnit)
         {
-
+            
             EnemyUnitAttack(unit);
         }
-        turn++;
         nowStage = Stage.EnemyEnd;
     }
     public cardControl HQinit(int place,Player player)

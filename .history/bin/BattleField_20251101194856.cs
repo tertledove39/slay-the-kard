@@ -378,12 +378,11 @@ public partial class BattleField : Control
 
         }
         var enemyUnit = getAllEnemyUnit();
-        foreach (var unit in enemyUnit)
+        foreach(var unit in enemyUnit)
         {
-
+            
             EnemyUnitAttack(unit);
         }
-        turn++;
         nowStage = Stage.EnemyEnd;
     }
     public cardControl HQinit(int place,Player player)

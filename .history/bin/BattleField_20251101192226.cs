@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 public partial class BattleField : Control
 {
-    public int turn = 0;
+
     private CardMaganer cardMaganer = new();
     private PackedScene _card;
     string INIpath = "res://cards/card.ini";
@@ -249,7 +249,7 @@ public partial class BattleField : Control
         }
         if (unit.attackAble > 0)
         {
-            EnemyUnitTryAttack(unit);
+            
         }
     }
     /// <summary>
@@ -326,28 +326,24 @@ public partial class BattleField : Control
         nowStage = Stage.EnemyPrepare;
         nowStage = Stage.EnemyDraw;
         nowStage = Stage.EnemyBattle;
-        enemyHQInstance.GetDefence(2 + turn);
-        
-        foreach(var unit in getAllEnemyUnit())
+        enemyHQInstance.GetDefence(2 + playerTurn);
+
+        EnemyDeployUnit("t70");
+        var enemyUnit = getAllEnemyUnit();
+        foreach(var unit in enemyUnit)
         {
             unit.Refresh();
+            EnemyUnitAttack(unit);
         }
-        EnemyDeployUnit("t70");
-        
-        if (turn == 3)
+        if (playerTurn == 3)
         {
-            EnemyDeployUnit("t70");
-            EnemyDeployUnit("t70");
             enemyHQInstance.GetDefence(5);
         }
-        if (turn == 5)
+        if (playerTurn == 5)
         {
-            EnemyDeployUnit("t70");
-            EnemyDeployUnit("t70");
-            EnemyDeployUnit("t70");
             enemyHQInstance.GetDefence(10);
         }
-        if (turn == 7)
+        if (playerTurn == 7)
         {
             foreach (var _card in cardInPlaces)
             {
@@ -356,7 +352,7 @@ public partial class BattleField : Control
                     _card.GetDefence(-5);
                 }
             }
-            if (turn == 10)
+            if (playerTurn == 10)
             {
                 foreach (var _card in cardInPlaces)
                 {
@@ -366,7 +362,7 @@ public partial class BattleField : Control
                     }
                 }
             }
-            if (turn == 14)
+            if (playerTurn == 14)
             {
                 foreach (var _card in cardInPlaces)
                 {
@@ -377,13 +373,6 @@ public partial class BattleField : Control
             await ToSignal(GetTree().CreateTimer(1.0f), "timeout");
 
         }
-        var enemyUnit = getAllEnemyUnit();
-        foreach (var unit in enemyUnit)
-        {
-
-            EnemyUnitAttack(unit);
-        }
-        turn++;
         nowStage = Stage.EnemyEnd;
     }
     public cardControl HQinit(int place,Player player)
@@ -392,15 +381,6 @@ public partial class BattleField : Control
         myHQInstance.myPlayer = player;
         myHQInstance.battleField = this;
         myHQInstance.isFriend = player.isFriend;
-        if (player.isFriend == 0)
-        {
-            myHQInstance.myPlace = allPlaces["13"];
-        }
-        else
-        {
-            myHQInstance.myPlace = allPlaces["3"];
-        }
-        
         AddChild(myHQInstance);
         myHQInstance.targetPosition = allPlaces[place.ToString()].GlobalPosition + new Vector2(90, 110);
         myHQInstance.GlobalPosition = allPlaces[place.ToString()].GlobalPosition + new Vector2(90, 110); ;
@@ -478,13 +458,13 @@ public partial class BattleField : Control
         
         
 
-        player1 = new Player(DrawPile, 0,new Vector2(800,900),this);
+        player1 = new Player(DrawPile, 0,new Vector2(800,800),this);
         player1.DrawCard(4);
         myHQInstance = HQinit(13,player1);
         player1.myHQ = myHQInstance;
 
-        player2 = new Player(DrawPile, 1,new Vector2(800,50),this);
-        //player2.DrawCard(4);
+        player2 = new Player(DrawPile, 1,new Vector2(800,100),this);
+        player2.DrawCard(4);
         player2.isFriend = 1;
         enemyHQInstance = HQinit(3,player2);
         player2.myHQ = enemyHQInstance;

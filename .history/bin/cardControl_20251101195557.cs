@@ -220,24 +220,11 @@ public partial class cardControl : Control
                         {
                             if (battleField.allPlaces[_freePlace].myCard == null)
                             {
-                                battleField.AddCardToPlace(match.Groups[1].Value, _freePlace, battleField.player1);
+                                battleField.AddCardToPlace(match.Groups[1].Value, _freePlace,battleField.player1);
                                 break;
                             }
                         }
                     }
-                }
-                if (part.StartsWith("Heal"))
-                {
-                    Match match = Regex.Match(part, @"\(([^)]*)\)");
-                    if (match.Success)
-                    {
-                        var xStr = match.Groups[1].Value;
-                        if (int.TryParse(xStr, out int x))
-                        {
-                            myPlayer.myHQ.GetDefence(x);
-                        }
-                    }
-
                 }
             }
         }

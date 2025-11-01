@@ -201,11 +201,7 @@ public partial class cardControl : Control
                         {
                             foreach (var _target in targets)
                             {
-                                if (target != null)
-                                {
-                                    _target.GetDefence(-x);
-                                }
-                                
+                                _target.GetDefence(-x);
                             }
                         }
                     }
@@ -220,24 +216,11 @@ public partial class cardControl : Control
                         {
                             if (battleField.allPlaces[_freePlace].myCard == null)
                             {
-                                battleField.AddCardToPlace(match.Groups[1].Value, _freePlace, battleField.player1);
+                                battleField.AddCardToPlace(match.Groups[1].Value, _freePlace,battleField.player1);
                                 break;
                             }
                         }
                     }
-                }
-                if (part.StartsWith("Heal"))
-                {
-                    Match match = Regex.Match(part, @"\(([^)]*)\)");
-                    if (match.Success)
-                    {
-                        var xStr = match.Groups[1].Value;
-                        if (int.TryParse(xStr, out int x))
-                        {
-                            myPlayer.myHQ.GetDefence(x);
-                        }
-                    }
-
                 }
             }
         }
@@ -288,7 +271,7 @@ public partial class cardControl : Control
 
     public void OnButtonDown()
     {
-        if (isFriend == 0 && isHq == HQ.normalCard && battleField.playerTurn == 0)
+        if (isFriend == 0 && isHq == HQ.normalCard)
         {
             ZIndex = 15;
             if (state == CardState.inHand)
