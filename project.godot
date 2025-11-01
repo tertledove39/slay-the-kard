@@ -31,4 +31,5 @@ project/assembly_name="新建游戏项目"
 
 [rendering]
 
+textures/canvas_textures/default_texture_filter=0
 renderer/rendering_method="mobile"

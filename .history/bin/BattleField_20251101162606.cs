@@ -194,12 +194,11 @@ public partial class BattleField : Control
         }
     }
 
-        /// <summary>
-        /// 如果这条阵线是空的 就返回1 否则为0<para />
-        /// </summary>
     public static int CheckIfALineIsEmpty(List<Place> line)
     {
-
+        /// <summary>
+        /// 如果这条阵线是空的 就返回1 否则为0
+        /// </summary>
         foreach (var place in line)
         {
             if (place.myCard != null)

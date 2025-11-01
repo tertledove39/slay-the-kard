@@ -216,7 +216,7 @@ public partial class cardControl : Control
                         {
                             if (battleField.allPlaces[_freePlace].myCard == null)
                             {
-                                battleField.AddCardToPlace(match.Groups[1].Value, _freePlace,battleField.player1);
+                                battleField.AddCardToPlace(match.Groups[1].Value, _freePlace);
                                 break;
                             }
                         }
@@ -309,8 +309,7 @@ public partial class cardControl : Control
     public void OnButtonUp()
     {
 
-        if (isFriend == 0 && battleField.playerTurn == 0)
-        {
+        if(isFriend == 0 && battleField.playerTurn == 0){
             if (state == CardState.caught)
             {
                 var battleField = GetTree().Root.GetNode<BattleField>("BattleField");
@@ -370,7 +369,6 @@ public partial class cardControl : Control
             }
             ZIndex = 10;
         }
-        battleField.RefreshAllCardDisplayOrder();
     }
 
     public override void _Process(double delta)

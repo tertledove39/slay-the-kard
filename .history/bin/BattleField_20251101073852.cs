@@ -76,7 +76,7 @@ public partial class BattleField : Control
     {
         cardControl card;
         card = LoadCard(id);
-        player.AddCard(card);
+        player2.AddCard(card);
         AddChild(card);
         card.targetPosition = allPlaces[place].GlobalPosition + new Vector2(90, 110);
         card.GlobalPosition = allPlaces[place].GlobalPosition + new Vector2(90, 110); ;
@@ -96,8 +96,7 @@ public partial class BattleField : Control
         {
             card.GetParent().MoveChild(card, 17);
         }
-        allPlaces[place].myCard = card;
-        RefreshAllCardDisplayOrder();
+            allPlaces[place].myCard = card;
         }
     
     public Dictionary<string, Place> getAllPlacesDictionary
@@ -168,58 +167,17 @@ public partial class BattleField : Control
                 
     }
 
-    public void RefreshAllCardDisplayOrder()
+public void RefreshAllCardDisplayOrder()
     {
-        int beginPosition = 17;
-        List<cardControl> _cardInPlace = [];
-        foreach (var card in getAllPlacesDictionary.Values)
+        foreach (var card in cardInPlaces)
         {
-            if (card.myCard != null)
-            {
-                _cardInPlace.Add(card.myCard);
-            }
+            card.GetParent().MoveChild(card, 17);
         }
-
-        foreach (var card in _cardInPlace)
+        foreach(var card in player1.myHand.cardInHands)
         {
-            card.GetParent().MoveChild(card, beginPosition);
-            card.ZIndex = 10;
-            beginPosition++;
+            card.GetParent().MoveChild(card, 17);
         }
-        foreach (var card in player1.myHand.cardInHands)
-        {
-            card.GetParent().MoveChild(card, beginPosition);
-            card.ZIndex = 50;
-            beginPosition++;
-        }
-    }
-
-        /// <summary>
-        /// 如果这条阵线是空的 就返回1 否则为0<para />
-        /// </summary>
-    public static int CheckIfALineIsEmpty(List<Place> line)
-    {
-
-        foreach (var place in line)
-        {
-            if (place.myCard != null)
-            {
-                return 0;
-            }
-        }
-        return 1;
-    }
-    
-    public void EnemyUnitAttack(cardControl unit)
-    {
-        if (unit.state != CardState.placed || unit.isFriend != player2.isFriend)
-        {
-            return;
-        }
-        if(unit.attackAble > 0)
-        {
-            
-        }
+        
     }
     async public Task EnemyTurn()
     {
@@ -281,7 +239,7 @@ public partial class BattleField : Control
         myHQInstance.state = CardState.placed;
         myHQInstance.OnButtonUp();
         allPlaces[place.ToString()].myCard = myHQInstance;
-        player.AddCard(myHQInstance);
+        
         return myHQInstance;
     }
 

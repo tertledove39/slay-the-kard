@@ -168,9 +168,14 @@ public partial class BattleField : Control
                 
     }
 
-    public void RefreshAllCardDisplayOrder()
+public void RefreshAllCardDisplayOrder()
     {
         int beginPosition = 17;
+        foreach (var card in player1.myHand.cardInHands)
+        {
+            card.GetParent().MoveChild(card, beginPosition);
+            beginPosition++;
+        }
         List<cardControl> _cardInPlace = [];
         foreach (var card in getAllPlacesDictionary.Values)
         {
@@ -179,47 +184,13 @@ public partial class BattleField : Control
                 _cardInPlace.Add(card.myCard);
             }
         }
-
         foreach (var card in _cardInPlace)
         {
             card.GetParent().MoveChild(card, beginPosition);
-            card.ZIndex = 10;
             beginPosition++;
         }
-        foreach (var card in player1.myHand.cardInHands)
-        {
-            card.GetParent().MoveChild(card, beginPosition);
-            card.ZIndex = 50;
-            beginPosition++;
-        }
-    }
-
-        /// <summary>
-        /// 如果这条阵线是空的 就返回1 否则为0<para />
-        /// </summary>
-    public static int CheckIfALineIsEmpty(List<Place> line)
-    {
-
-        foreach (var place in line)
-        {
-            if (place.myCard != null)
-            {
-                return 0;
-            }
-        }
-        return 1;
-    }
-    
-    public void EnemyUnitAttack(cardControl unit)
-    {
-        if (unit.state != CardState.placed || unit.isFriend != player2.isFriend)
-        {
-            return;
-        }
-        if(unit.attackAble > 0)
-        {
-            
-        }
+        
+        
     }
     async public Task EnemyTurn()
     {
