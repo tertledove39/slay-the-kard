@@ -110,18 +110,12 @@ public partial class cardControl : Control
     async public void Dead()
     {
         state = CardState.destroyed;
-        Visible = false;
-        if (myPlace != null)
-        {
-            myPlace.myCard = null;
-        }
-        
-        cardBase.Visible = false;
+        this.Visible = false;
         await Task.Delay(100);
+        this.QueueFree();
         if(battleField.cardInPlaces.Contains(this)){
             battleField.cardInPlaces.Remove(this);
         }
-        this.QueueFree();
     }
 
     async public void RunEffect(cardControl target)
@@ -527,8 +521,17 @@ public partial class cardControl : Control
         defence -= source.attack;
         RefreshState();
         if (defence <= 0)
-        {         
+        {
+            this.state = CardState.destroyed;
+            this.myPlace.myCard = null;
+            this.cardBase.Visible = false;
+            await Task.Delay(100);
+            soundolayer.Play();
+            await Task.Delay(100);
             Dead();
+            
+
+
         }
 
     }
@@ -543,12 +546,11 @@ public partial class cardControl : Control
         {
             this.defence = 99;
         }
-        RefreshState();
         if (this.defence <= 0)
         {
             this.Dead();
         }
-        
+        RefreshState();
     }
 
     public void GetAttack(int attack)

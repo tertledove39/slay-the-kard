@@ -174,8 +174,7 @@ public partial class BattleField : Control
         List<cardControl> _cardInPlace = [];
         foreach (var card in getAllPlacesDictionary.Values)
         {
-            
-            if (card.myCard != null && IsInstanceValid(card.myCard)!)
+            if (card.myCard != null)
             {
                 _cardInPlace.Add(card.myCard);
             }
@@ -235,9 +234,8 @@ public partial class BattleField : Control
     /// 一个单位攻击 先检查是否可以移动 再检查是否可以攻击<para />
     /// </summary>
     /// <param name="unit">攻击源</param>
-    async public void EnemyUnitAttack(cardControl unit)
+    public void EnemyUnitAttack(cardControl unit)
     {
-        await Task.Delay(110);
         if (unit.state != CardState.placed || unit.isFriend != player2.isFriend)
         {
             return;
@@ -294,7 +292,7 @@ public partial class BattleField : Control
         }
         foreach (var target in possibleTarget)
         {
-            if (from.attack >= target.defence )
+            if (from.attack >= target.defence)
             {
                 from.Attack(target);
                 return;
@@ -358,7 +356,6 @@ public partial class BattleField : Control
                 if (_card.isFriend == 0)
                 {
                     _card.GetDefence(-5);
-                    await Task.Delay(110);
                 }
             }
             }
@@ -370,7 +367,6 @@ public partial class BattleField : Control
                     if (_card.isFriend == 0)
                     {
                         _card.GetDefence(-20);
-                        await Task.Delay(110);
                     }
                 }
             }
@@ -379,7 +375,6 @@ public partial class BattleField : Control
                 foreach (var _card in cardInPlaces)
                 {
                     myHQInstance.GetDefence(-20);
-                    await Task.Delay(110);
                 }
             }
             myHQInstance.GetDefence(-3);
@@ -389,7 +384,7 @@ public partial class BattleField : Control
         var enemyUnit = getAllEnemyUnit();
         foreach (var unit in enemyUnit)
         {
-            await Task.Delay(110);
+
             EnemyUnitAttack(unit);
         }
         turn++;
@@ -507,9 +502,6 @@ public partial class BattleField : Control
         player2.isFriend = 1;
         enemyHQInstance = HQinit(3,player2);
         player2.myHQ = enemyHQInstance;
-        nowStage = Stage.Prepare;
-        nowStage = Stage.Draw;
-        nowStage = Stage.Battle;
     }
 
     public void OnAttackSend(cardControl sender, cardControl target)

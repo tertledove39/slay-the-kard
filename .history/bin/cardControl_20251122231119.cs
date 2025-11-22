@@ -110,13 +110,9 @@ public partial class cardControl : Control
     async public void Dead()
     {
         state = CardState.destroyed;
-        Visible = false;
-        if (myPlace != null)
-        {
-            myPlace.myCard = null;
-        }
-        
-        cardBase.Visible = false;
+        this.Visible = false;
+        this.myPlace.myCard = null;
+        this.cardBase.Visible = false;
         await Task.Delay(100);
         if(battleField.cardInPlaces.Contains(this)){
             battleField.cardInPlaces.Remove(this);

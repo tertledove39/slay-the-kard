@@ -235,9 +235,8 @@ public partial class BattleField : Control
     /// 一个单位攻击 先检查是否可以移动 再检查是否可以攻击<para />
     /// </summary>
     /// <param name="unit">攻击源</param>
-    async public void EnemyUnitAttack(cardControl unit)
+    public void EnemyUnitAttack(cardControl unit)
     {
-        await Task.Delay(110);
         if (unit.state != CardState.placed || unit.isFriend != player2.isFriend)
         {
             return;
@@ -389,7 +388,7 @@ public partial class BattleField : Control
         var enemyUnit = getAllEnemyUnit();
         foreach (var unit in enemyUnit)
         {
-            await Task.Delay(110);
+
             EnemyUnitAttack(unit);
         }
         turn++;

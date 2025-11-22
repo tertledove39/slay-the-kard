@@ -110,14 +110,9 @@ public partial class cardControl : Control
     async public void Dead()
     {
         state = CardState.destroyed;
-        Visible = false;
-        if (myPlace != null)
-        {
-            myPlace.myCard = null;
-        }
-        
-        cardBase.Visible = false;
+        this.Visible = false;
         await Task.Delay(100);
+        
         if(battleField.cardInPlaces.Contains(this)){
             battleField.cardInPlaces.Remove(this);
         }
@@ -527,8 +522,17 @@ public partial class cardControl : Control
         defence -= source.attack;
         RefreshState();
         if (defence <= 0)
-        {         
+        {
+            this.state = CardState.destroyed;
+            this.myPlace.myCard = null;
+            this.cardBase.Visible = false;
+            await Task.Delay(100);
+            soundolayer.Play();
+            await Task.Delay(100);
             Dead();
+            
+
+
         }
 
     }

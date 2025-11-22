@@ -389,7 +389,7 @@ public partial class BattleField : Control
         var enemyUnit = getAllEnemyUnit();
         foreach (var unit in enemyUnit)
         {
-            await Task.Delay(110);
+
             EnemyUnitAttack(unit);
         }
         turn++;
