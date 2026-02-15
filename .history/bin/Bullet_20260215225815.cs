@@ -22,7 +22,7 @@ public partial class Bullet : Control
             _currentTween.Kill(); // 立即停止
         }
         ZIndex = 90;
-        Rotation = (to.GlobalPosition - from.GlobalPosition).Angle() + (float)Math.PI/2;
+        Rotation = (to.GlobalPosition - from.GlobalPosition).Angle();
         GlobalPosition = from.GlobalPosition+offset + GetOffset(30);
         this.Visible = true;
         _currentTween = CreateTween();
