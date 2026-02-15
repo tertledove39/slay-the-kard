@@ -116,7 +116,11 @@ public partial class battlefield_ : Control
             if (card!= cardNowChoose) MoveChild(card,1);
             card.ZIndex = 10;
             
-        } 
+        }
+        
+        
+
+        
     }
 
     /// <summary>
@@ -225,11 +229,6 @@ public CardMaganer GetCardMaganer()
         return cardMaganer;
     }
 
-
-List<Bullet> bullets;
-AudioStreamPlayer2D battleSound;
-AudioStreamPlayer2D deadSound;
-
 /// <summary>
 /// 初始化
 /// </summary>
@@ -242,19 +241,8 @@ AudioStreamPlayer2D deadSound;
         supportLine = [(place_)GetNode("Place11"), (place_)GetNode("Place12"), (place_)GetNode("Place13"), (place_)GetNode("Place14"), (place_)GetNode("Place15")];
         allPlaces = [.. enemySupprotLine, .. frontLine, .. supportLine];
 
-        //子弹效果
-        bullets = new List<Bullet>();
+        //初始化手卡区
         
-        for(int i=0; i < 10; i++)
-        {
-            bullets.Add(GD.Load<PackedScene>("res://bin/bullet.tscn").Instantiate() as Bullet);
-            AddChild(bullets[i]);
-            bullets[i].Visible = false;
-        }
-    
-
-        deadSound = GetNode<AudioStreamPlayer2D>("deadSound");
-        battleSound = GetNode<AudioStreamPlayer2D>("battleSound");
         
         //初始化打牌判定区域
         validArea = GetNode<Control>("validCardArea");
@@ -313,19 +301,6 @@ AudioStreamPlayer2D deadSound;
         AddCardToPlace(enemyHq,enemySupprotLine[2]);
     }
 
-    async Task FlyBullets(cardBase_ from, cardBase_ to)
-    {
-        var rnd = new Random();
-        foreach(var bullet in bullets)
-        {
-            if (!bullet.Visible)
-            {
-                bullet.Fly(from, to);
-                await Task.Delay(rnd.Next(0,100));
-            }
-        }
-    }
-
 /// <summary>
 /// 稀有度->string
 /// </summary>
@@ -343,30 +318,6 @@ AudioStreamPlayer2D deadSound;
                 return Rarity.Epic;
             default:
                 return Rarity.Legendary;
-        }
-    }
-
-/// <summary>
-/// 播放战斗音效
-/// </summary>
-/// <param name="id"></param>
-    void PlayBattleSound(int id)
-    {
-        //if (battleSound.Playing != true)
-        {
-            battleSound.Play();
-        }
-    }
-
-/// <summary>
-/// 播放死亡音效
-/// </summary>
-/// <param name="id"></param>
-    void PlayDeadSound(int id)
-    {
-        //if (deadSound.Playing != true)
-        {
-            deadSound.Play();
         }
     }
 
@@ -531,12 +482,10 @@ AudioStreamPlayer2D deadSound;
 /// </summary>
 /// <param name="from"></param>
 /// <param name="to"></param> 
-    public async Task Attack(cardBase_ from,cardBase_ to)
+    public void Attack(cardBase_ from,cardBase_ to)
     {
         from.LoseDefence(to.ReadAttack());
         to.LoseDefence(from.ReadAttack());
-        PlayBattleSound(1);
-        await FlyBullets(from,to);
         CheckIfAnyUnitDied();
     }
 
@@ -552,7 +501,6 @@ AudioStreamPlayer2D deadSound;
                 {
                     cardInPlaces.Remove(units[i]);
                     units[i].Dead();
-                    PlayDeadSound(1);
                 }
             }
     }

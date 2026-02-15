@@ -70,8 +70,6 @@ public partial class cardBase_ : Control
         return isFriend;
     }
 
-
-
 /// <summary>
 /// 获得防御力
 /// </summary>
@@ -308,11 +306,6 @@ public partial class cardBase_ : Control
 
         // 等待 Tween 完成
         await ToSignal(tween, Tween.SignalName.Finished);
-    }
-
-    async public Task AttackInf(cardBase_ target)
-    {
-        
     }
 }
 

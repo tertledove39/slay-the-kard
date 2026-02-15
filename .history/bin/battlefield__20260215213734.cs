@@ -227,8 +227,8 @@ public CardMaganer GetCardMaganer()
 
 
 List<Bullet> bullets;
-AudioStreamPlayer2D battleSound;
-AudioStreamPlayer2D deadSound;
+AudioStreamPlayer battleSound;
+AudioStreamPlayer deadSound;
 
 /// <summary>
 /// 初始化
@@ -253,8 +253,8 @@ AudioStreamPlayer2D deadSound;
         }
     
 
-        deadSound = GetNode<AudioStreamPlayer2D>("deadSound");
-        battleSound = GetNode<AudioStreamPlayer2D>("battleSound");
+        deadSound = GetNode<AudioStreamPlayer>("deadSound");
+        battleSound = GetNode<AudioStreamPlayer>("battleSound");
         
         //初始化打牌判定区域
         validArea = GetNode<Control>("validCardArea");
@@ -352,7 +352,7 @@ AudioStreamPlayer2D deadSound;
 /// <param name="id"></param>
     void PlayBattleSound(int id)
     {
-        //if (battleSound.Playing != true)
+        if (battleSound.Playing != true)
         {
             battleSound.Play();
         }
@@ -364,7 +364,7 @@ AudioStreamPlayer2D deadSound;
 /// <param name="id"></param>
     void PlayDeadSound(int id)
     {
-        //if (deadSound.Playing != true)
+        if (deadSound.Playing != true)
         {
             deadSound.Play();
         }

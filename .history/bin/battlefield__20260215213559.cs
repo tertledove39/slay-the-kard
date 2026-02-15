@@ -227,8 +227,8 @@ public CardMaganer GetCardMaganer()
 
 
 List<Bullet> bullets;
-AudioStreamPlayer2D battleSound;
-AudioStreamPlayer2D deadSound;
+AudioStreamPlayer battleSound;
+AudioStreamPlayer deadSound;
 
 /// <summary>
 /// 初始化
@@ -253,8 +253,8 @@ AudioStreamPlayer2D deadSound;
         }
     
 
-        deadSound = GetNode<AudioStreamPlayer2D>("deadSound");
-        battleSound = GetNode<AudioStreamPlayer2D>("battleSound");
+        deadSound = GetNode<AudioStreamPlayer>("deadSound");
+        battleSound = GetNode<AudioStreamPlayer>("battleSound");
         
         //初始化打牌判定区域
         validArea = GetNode<Control>("validCardArea");
@@ -350,9 +350,9 @@ AudioStreamPlayer2D deadSound;
 /// 播放战斗音效
 /// </summary>
 /// <param name="id"></param>
-    void PlayBattleSound(int id)
+    void PlayBattleSound(string id)
     {
-        //if (battleSound.Playing != true)
+        if (battleSound.Playing != true)
         {
             battleSound.Play();
         }
@@ -362,9 +362,9 @@ AudioStreamPlayer2D deadSound;
 /// 播放死亡音效
 /// </summary>
 /// <param name="id"></param>
-    void PlayDeadSound(int id)
+    void PlayDeadSound(string id)
     {
-        //if (deadSound.Playing != true)
+        if (deadSound.Playing != true)
         {
             deadSound.Play();
         }
@@ -535,7 +535,6 @@ AudioStreamPlayer2D deadSound;
     {
         from.LoseDefence(to.ReadAttack());
         to.LoseDefence(from.ReadAttack());
-        PlayBattleSound(1);
         await FlyBullets(from,to);
         CheckIfAnyUnitDied();
     }
@@ -552,7 +551,6 @@ AudioStreamPlayer2D deadSound;
                 {
                     cardInPlaces.Remove(units[i]);
                     units[i].Dead();
-                    PlayDeadSound(1);
                 }
             }
     }

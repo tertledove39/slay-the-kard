@@ -70,8 +70,6 @@ public partial class cardBase_ : Control
         return isFriend;
     }
 
-
-
 /// <summary>
 /// 获得防御力
 /// </summary>
@@ -80,58 +78,12 @@ public partial class cardBase_ : Control
     {
         if(defence+n <= 99) defence += n;
         else defence = 99; 
-        RefreshState();
     }
 
-/// <summary>
-/// 失去防御力
-/// </summary>
-/// <param name="n"></param>
     public void LoseDefence(int n)
     {
         if (defence - n >= 0) defence -= n;
         else defence = 0;
-        RefreshState();
-    }
-
-/// <summary>
-/// 增加攻击力
-/// </summary>
-/// <param name="n"></param>
-    public void GetAttack(int n)
-    {
-        if (attack + n <= 99) attack += n;
-        else attack = 99;
-        RefreshState();
-    }
-
-/// <summary>
-/// 减少攻击力
-/// </summary>
-/// <param name="n"></param>
-    public void LoseAttack(int n)
-    {
-        if (attack - n >= 0) attack -= n;
-        else attack = 0;
-        RefreshState();
-    }
-
-/// <summary>
-/// 读取防御力
-/// </summary>
-/// <returns></returns>
-    public int ReadDefence()
-    {
-        return defence;
-    }
-
-/// <summary>
-/// 读取攻击力
-/// </summary>
-/// <returns></returns>
-    public int ReadAttack()
-    {
-        return attack;
     }
 
     public void _ready()
@@ -308,11 +260,6 @@ public partial class cardBase_ : Control
 
         // 等待 Tween 完成
         await ToSignal(tween, Tween.SignalName.Finished);
-    }
-
-    async public Task AttackInf(cardBase_ target)
-    {
-        
     }
 }
 

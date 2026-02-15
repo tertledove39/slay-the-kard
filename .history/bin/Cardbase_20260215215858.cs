@@ -55,10 +55,18 @@ public override void _Draw()
     // 获取贝塞尔曲线点
     var curvePoints1 = BezierCurve(p1, a1, ctl_1, ctl_2, 50);
     var curvePoints2 = BezierCurve(p1, a2, ctl_1, ctl_2, 50);
+
+        // 绘制填充区域
+        //DrawCurvesFill(curvePoints1, curvePoints2, Colors.Black);
+        try
+        {
+            DrawSimpleCurvesFill(curvePoints1, curvePoints2, Colors.Black);
+        }
+        catch(Exception e)
+        {
+            ;
+        }
     
-    // 绘制填充区域
-    //DrawCurvesFill(curvePoints1, curvePoints2, Colors.Black);
-    DrawSimpleCurvesFill(curvePoints1, curvePoints2, Colors.Black);
     
     // 绘制边框
     DrawBezierCurve(p1, a1, ctl_1, ctl_2, 20);
@@ -117,19 +125,30 @@ private void DrawSimpleCurvesFill(Vector2[] curve1, Vector2[] curve2, Color fill
             curve2[i],      // 下边的点
             curve1[i + 1]   // 上边的下一个点
         };
-        
+        if (triangle == null || triangle.Length < 3)
+        return;
         // 绘制三角形
+        if (!Geometry2D.IsPolygonClockwise(triangle))
+    {
+        // 如果不是顺时针，反转多边形
+        Array.Reverse(triangle);
+    }
+    
         DrawColoredPolygon(triangle, fillColor);
+
+
         
-        // 创建第二个三角形
-        triangle = new Vector2[] {
-            curve1[i + 1],  // 上边的下一个点
-            curve2[i],      // 下边的点
-            curve2[i + 1]   // 下边的下一个点
-        };
         
-        // 绘制三角形
-        DrawColoredPolygon(triangle, fillColor);
+        //
+        //// 创建第二个三角形
+        //triangle = new Vector2[] {
+        //    curve1[i + 1],  // 上边的下一个点
+        //    curve2[i],      // 下边的点
+        //    curve2[i + 1]   // 下边的下一个点
+        //};
+        //
+        //// 绘制三角形
+        //DrawColoredPolygon(triangle, fillColor);
     }
 }
 

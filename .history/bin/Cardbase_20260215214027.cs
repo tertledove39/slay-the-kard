@@ -55,10 +55,15 @@ public override void _Draw()
     // 获取贝塞尔曲线点
     var curvePoints1 = BezierCurve(p1, a1, ctl_1, ctl_2, 50);
     var curvePoints2 = BezierCurve(p1, a2, ctl_1, ctl_2, 50);
+
+        // 绘制填充区域
+        //DrawCurvesFill(curvePoints1, curvePoints2, Colors.Black);
+        try
+        {
+            DrawSimpleCurvesFill(curvePoints1, curvePoints2, Colors.Black);
+        }
+        catch{}
     
-    // 绘制填充区域
-    //DrawCurvesFill(curvePoints1, curvePoints2, Colors.Black);
-    DrawSimpleCurvesFill(curvePoints1, curvePoints2, Colors.Black);
     
     // 绘制边框
     DrawBezierCurve(p1, a1, ctl_1, ctl_2, 20);

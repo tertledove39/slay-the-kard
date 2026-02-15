@@ -352,7 +352,7 @@ AudioStreamPlayer2D deadSound;
 /// <param name="id"></param>
     void PlayBattleSound(int id)
     {
-        //if (battleSound.Playing != true)
+        if (battleSound.Playing != true)
         {
             battleSound.Play();
         }
@@ -364,7 +364,7 @@ AudioStreamPlayer2D deadSound;
 /// <param name="id"></param>
     void PlayDeadSound(int id)
     {
-        //if (deadSound.Playing != true)
+        if (deadSound.Playing != true)
         {
             deadSound.Play();
         }

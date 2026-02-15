@@ -401,10 +401,12 @@ script = ExtResource("1_068hq")
 metadata/_edit_use_anchors_ = true
 
 [node name="cardbase" type="Sprite2D" parent="."]
+modulate = Color(1.0309138, 1.0309138, 1.0309138, 1)
 position = Vector2(90, 120)
 texture = ExtResource("1_54gmk")
 
 [node name="icon" type="Sprite2D" parent="."]
+modulate = Color(1.0309138, 1.0309138, 1.0309138, 1)
 position = Vector2(90, 93)
 texture = ExtResource("3_q3cvq")
 

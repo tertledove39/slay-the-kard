@@ -70,8 +70,6 @@ public partial class cardBase_ : Control
         return isFriend;
     }
 
-
-
 /// <summary>
 /// 获得防御力
 /// </summary>
@@ -80,7 +78,6 @@ public partial class cardBase_ : Control
     {
         if(defence+n <= 99) defence += n;
         else defence = 99; 
-        RefreshState();
     }
 
 /// <summary>
@@ -91,7 +88,6 @@ public partial class cardBase_ : Control
     {
         if (defence - n >= 0) defence -= n;
         else defence = 0;
-        RefreshState();
     }
 
 /// <summary>
@@ -102,7 +98,6 @@ public partial class cardBase_ : Control
     {
         if (attack + n <= 99) attack += n;
         else attack = 99;
-        RefreshState();
     }
 
 /// <summary>
@@ -113,7 +108,6 @@ public partial class cardBase_ : Control
     {
         if (attack - n >= 0) attack -= n;
         else attack = 0;
-        RefreshState();
     }
 
 /// <summary>
@@ -308,11 +302,6 @@ public partial class cardBase_ : Control
 
         // 等待 Tween 完成
         await ToSignal(tween, Tween.SignalName.Finished);
-    }
-
-    async public Task AttackInf(cardBase_ target)
-    {
-        
     }
 }
 
