@@ -1,0 +1,11 @@
+[times]
+BeingAddToPlace           target: 被加入的单位
+Deployed                  target: 被部署的单位
+FriendlyUnitBeingAttacked target: to, from
+FriendlyUnitAttacking     target: to, from
+Moving                    target: 移动的单位
+
+[keys]
+Heal()
+myHq
+

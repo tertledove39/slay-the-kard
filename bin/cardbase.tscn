@@ -1,7 +1,7 @@
-[gd_scene load_steps=22 format=4 uid="uid://bc1bwysmnoo2o"]
+[gd_scene load_steps=24 format=4 uid="uid://bc1bwysmnoo2o"]
 
-[ext_resource type="Texture2D" uid="uid://dhnbjk28k7o0f" path="res://cards/cardbase.png" id="1_54gmk"]
 [ext_resource type="Script" uid="uid://c717nlrmhinj2" path="res://bin/cardBase_.cs" id="1_068hq"]
+[ext_resource type="Texture2D" uid="uid://c7cdfutbtsx01" path="res://cards/卡背1.png" id="2_bwqk7"]
 [ext_resource type="FontFile" uid="uid://cbd2hbmqcbhup" path="res://bin/FRADMCN.TTF" id="2_n0o8o"]
 [ext_resource type="Texture2D" uid="uid://dqixqxurc6jp5" path="res://cards/轻步兵.png" id="3_q3cvq"]
 [ext_resource type="Texture2D" uid="uid://cfb0hmxtemnou" path="res://cards/inf.png" id="4_gf004"]
@@ -252,6 +252,11 @@ cache/0/31/0/glyphs/69/offset = Vector2(0, -22)
 cache/0/31/0/glyphs/69/size = Vector2(15, 23)
 cache/0/31/0/glyphs/69/uv_rect = Rect2(123, 1, 15, 23)
 cache/0/31/0/glyphs/69/texture_idx = 0
+cache/0/31/0/glyphs/3/advance = Vector2(6, 28)
+cache/0/31/0/glyphs/3/offset = Vector2(0, 0)
+cache/0/31/0/glyphs/3/size = Vector2(0, 0)
+cache/0/31/0/glyphs/3/uv_rect = Rect2(0, 0, 0, 0)
+cache/0/31/0/glyphs/3/texture_idx = -1
 cache/0/29/0/ascent = 27.0
 cache/0/29/0/descent = 7.0
 cache/0/29/0/underline_position = 2.90625
@@ -377,18 +382,27 @@ cache/0/23/0/glyphs/3/size = Vector2(0, 0)
 cache/0/23/0/glyphs/3/uv_rect = Rect2(0, 0, 0, 0)
 cache/0/23/0/glyphs/3/texture_idx = -1
 
-[sub_resource type="LabelSettings" id="LabelSettings_q3cvq"]
+[sub_resource type="LabelSettings" id="LabelSettings_bwqk7"]
+resource_local_to_scene = true
 font = SubResource("FontFile_u3nyg")
 font_size = 28
-font_color = Color(0, 0, 0, 1)
 
-[sub_resource type="LabelSettings" id="LabelSettings_gf004"]
+[sub_resource type="LabelSettings" id="LabelSettings_pqwk4"]
 line_spacing = 0.0
 font = ExtResource("2_n0o8o")
-font_size = 22
-font_color = Color(0, 0, 0, 1)
-outline_size = 1
+font_size = 23
+outline_size = 2
 outline_color = Color(0, 0, 0, 1)
+
+[sub_resource type="LabelSettings" id="LabelSettings_spis8"]
+resource_local_to_scene = true
+font = SubResource("FontFile_u3nyg")
+font_size = 28
+
+[sub_resource type="LabelSettings" id="LabelSettings_olk5p"]
+resource_local_to_scene = true
+font = SubResource("FontFile_u3nyg")
+font_size = 28
 
 [node name="Control" type="Control"]
 layout_mode = 3
@@ -401,9 +415,9 @@ script = ExtResource("1_068hq")
 metadata/_edit_use_anchors_ = true
 
 [node name="cardbase" type="Sprite2D" parent="."]
-modulate = Color(1.0309138, 1.0309138, 1.0309138, 1)
+modulate = Color(1.0954857, 1.0954857, 1.0954857, 1)
 position = Vector2(90, 120)
-texture = ExtResource("1_54gmk")
+texture = ExtResource("2_bwqk7")
 
 [node name="icon" type="Sprite2D" parent="."]
 modulate = Color(1.0309138, 1.0309138, 1.0309138, 1)
@@ -417,66 +431,70 @@ texture = ExtResource("4_gf004")
 [node name="cost" type="Label" parent="."]
 layout_mode = 1
 anchors_preset = -1
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
+anchor_left = 0.50555557
+anchor_top = 0.50416666
+anchor_right = 0.50555557
+anchor_bottom = 0.50416666
 offset_left = -89.0
 offset_top = -119.0
 offset_right = -52.0
 offset_bottom = -82.0
 text = "1"
-label_settings = SubResource("LabelSettings_q3cvq")
+label_settings = SubResource("LabelSettings_bwqk7")
 horizontal_alignment = 1
 metadata/_edit_use_anchors_ = true
 
 [node name="name" type="Label" parent="."]
 layout_mode = 1
 anchors_preset = -1
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
+anchor_left = 0.49444443
+anchor_top = 0.50416666
+anchor_right = 0.49444443
+anchor_bottom = 0.50416666
 offset_left = -51.0
 offset_top = -119.0
 offset_right = 89.0
 offset_bottom = -82.0
 theme_override_font_sizes/font_size = 28
 text = "轻步兵"
-label_settings = SubResource("LabelSettings_gf004")
+label_settings = SubResource("LabelSettings_pqwk4")
 horizontal_alignment = 1
 metadata/_edit_use_anchors_ = true
 
 [node name="attack" type="Label" parent="."]
 layout_mode = 1
 anchors_preset = -1
-anchor_left = 0.5
-anchor_top = 0.50416666
-anchor_right = 0.5
-anchor_bottom = 0.50416666
+anchor_left = 0.5277778
+anchor_top = 0.49583334
+anchor_right = 0.5277778
+anchor_bottom = 0.49583334
 offset_left = -89.0
 offset_top = 86.0
 offset_right = -58.0
 offset_bottom = 119.0
 text = "1"
-label_settings = SubResource("LabelSettings_q3cvq")
+label_settings = SubResource("LabelSettings_spis8")
 horizontal_alignment = 1
+visible_characters = 2
+visible_ratio = 2.0
 metadata/_edit_use_anchors_ = true
 
 [node name="defence" type="Label" parent="."]
 layout_mode = 1
 anchors_preset = -1
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
+anchor_left = 0.47777778
+anchor_top = 0.49166667
+anchor_right = 0.47777778
+anchor_bottom = 0.49166667
 offset_left = 58.0
 offset_top = 87.0
 offset_right = 89.0
 offset_bottom = 120.0
 text = "1"
-label_settings = SubResource("LabelSettings_q3cvq")
+label_settings = SubResource("LabelSettings_olk5p")
 horizontal_alignment = 1
+visible_characters = 2
+visible_ratio = 2.0
 metadata/_edit_use_anchors_ = true
 
 [node name="description" type="RichTextLabel" parent="."]

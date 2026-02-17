@@ -10,29 +10,30 @@
 [ext_resource type="Texture2D" uid="uid://d2k1mkjvg72u6" path="res://assest/nextTurnDisable.png" id="7_lxbgj"]
 [ext_resource type="PackedScene" uid="uid://bqw3sp6xgknb" path="res://bin/place.tscn" id="8_r58wv"]
 [ext_resource type="Script" uid="uid://ceefw2hlywr3l" path="res://bin/Cardbase.cs" id="9_uwbmh"]
-[ext_resource type="PackedScene" uid="uid://bjwmdcdnkulf" path="res://bin/bullet.tscn" id="10_q0b8f"]
+[ext_resource type="Script" uid="uid://fcjignj7pq5c" path="res://End.cs" id="11_h5p18"]
 
 [sub_resource type="Gradient" id="Gradient_8yftg"]
 
 [sub_resource type="GradientTexture2D" id="GradientTexture2D_h5p18"]
 gradient = SubResource("Gradient_8yftg")
+fill_to = Vector2(1, 0.34700856)
 
 [sub_resource type="Environment" id="Environment_8yftg"]
 background_mode = 3
 background_energy_multiplier = 1.16
 tonemap_mode = 1
-tonemap_exposure = 1.15
-tonemap_white = 6.52
+tonemap_exposure = 0.83
+tonemap_white = 4.38
 glow_enabled = true
 glow_intensity = 8.0
-glow_strength = 0.66
+glow_strength = 0.7
 glow_bloom = 0.5
 glow_hdr_threshold = 0.9
 glow_hdr_scale = 2.16
 glow_hdr_luminance_cap = 256.0
 glow_map_strength = 0.82
 adjustment_enabled = true
-adjustment_brightness = 0.79
+adjustment_brightness = 0.95
 adjustment_contrast = 1.04
 adjustment_color_correction = SubResource("GradientTexture2D_h5p18")
 
@@ -107,7 +108,7 @@ text = "/"
 label_settings = SubResource("LabelSettings_ac2xb")
 
 [node name="NextTurnButton" type="TextureButton" parent="."]
-modulate = Color(1.353256, 1.353256, 1.353256, 1)
+modulate = Color(2.170161, 2.170161, 2.170161, 1)
 z_index = 100
 layout_mode = 0
 offset_left = 1392.0
@@ -179,11 +180,9 @@ script = ExtResource("9_uwbmh")
 [node name="Camera" type="Camera2D" parent="."]
 position = Vector2(804, 437)
 
-[node name="Bullet" parent="." instance=ExtResource("10_q0b8f")]
-layout_mode = 1
-offset_left = 205.6
-offset_top = 428.6
-offset_right = 206.4
-offset_bottom = 428.19998
+[node name="end" type="CanvasLayer" parent="."]
+script = ExtResource("11_h5p18")
+
+[node name="img" type="Sprite2D" parent="end"]
 
 [connection signal="pressed" from="NextTurnButton" to="." method="OnNextTurnButtonPressed"]
