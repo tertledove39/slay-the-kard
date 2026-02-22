@@ -219,9 +219,6 @@ public partial class battlefield_ : Control
         //RefreshAllCardDisplayOrder();
         await card.MoveToPosition(place.GetPlaceGlobalPosition());
         
-        // 闪击特性：单位被加入战场时刷新
-        if(card.HasTrait(UnitTraits.Blitz)) card.RefreshUnit();
-
                       // 触发被加入战场的效果
         await TriggerUnitEffects("BeingAddedToField", card, new List<cardBase_>(), checkOnlySourceCard: true);
         ResumeDeathCheck(); // 恢复死亡检查
@@ -399,7 +396,6 @@ TextureButton buttonNextTurn;
 
         //初始化敌人
         EnemyInit();
-        
         GetNode<End>("end").Visible = false;
 
         player1.DrawCard(5);
@@ -1034,9 +1030,6 @@ TextureButton buttonNextTurn;
         
         PlayBattleSound(1);
         await FlyBullets(from,to);
-
-        // 标记单位已经攻击，减少可攻击次数
-        from.HaveAttacked();
 
         // 步兵、火炮、战斗机和轰炸机攻击后不能移动
         if (from.cardType == CardTypes.Infantry || from.cardType == CardTypes.Artillery || 
@@ -1851,7 +1844,7 @@ TextureButton buttonNextTurn;
             TriggerUnitEffects("Dead", deadUnit, checkOnlySourceCard:true);
             RemoveCard(deadUnit);
             PlayDeadSound(1);
-            CheckIfAnyUnitDied(); // 递归检查是否有新的死亡单位
+            CheckIfAnyUnitDied();
         }
     }
 

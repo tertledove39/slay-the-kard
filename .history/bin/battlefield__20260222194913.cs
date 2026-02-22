@@ -219,9 +219,6 @@ public partial class battlefield_ : Control
         //RefreshAllCardDisplayOrder();
         await card.MoveToPosition(place.GetPlaceGlobalPosition());
         
-        // 闪击特性：单位被加入战场时刷新
-        if(card.HasTrait(UnitTraits.Blitz)) card.RefreshUnit();
-
                       // 触发被加入战场的效果
         await TriggerUnitEffects("BeingAddedToField", card, new List<cardBase_>(), checkOnlySourceCard: true);
         ResumeDeathCheck(); // 恢复死亡检查
@@ -399,7 +396,6 @@ TextureButton buttonNextTurn;
 
         //初始化敌人
         EnemyInit();
-        
         GetNode<End>("end").Visible = false;
 
         player1.DrawCard(5);

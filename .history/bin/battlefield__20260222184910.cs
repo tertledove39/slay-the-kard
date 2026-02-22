@@ -219,9 +219,6 @@ public partial class battlefield_ : Control
         //RefreshAllCardDisplayOrder();
         await card.MoveToPosition(place.GetPlaceGlobalPosition());
         
-        // 闪击特性：单位被加入战场时刷新
-        if(card.HasTrait(UnitTraits.Blitz)) card.RefreshUnit();
-
                       // 触发被加入战场的效果
         await TriggerUnitEffects("BeingAddedToField", card, new List<cardBase_>(), checkOnlySourceCard: true);
         ResumeDeathCheck(); // 恢复死亡检查
@@ -399,7 +396,6 @@ TextureButton buttonNextTurn;
 
         //初始化敌人
         EnemyInit();
-        
         GetNode<End>("end").Visible = false;
 
         player1.DrawCard(5);
@@ -920,6 +916,7 @@ TextureButton buttonNextTurn;
         // 检查目标是否被守护
         if (IsTargetProtectedByGuardian(to, from))
         {
+            GD.Print($"Attack failed: Target {to} is protected by guardian");
             AllowControl();
             ResumeDeathCheck(); // 恢复死亡检查
             return;
@@ -1034,9 +1031,6 @@ TextureButton buttonNextTurn;
         
         PlayBattleSound(1);
         await FlyBullets(from,to);
-
-        // 标记单位已经攻击，减少可攻击次数
-        from.HaveAttacked();
 
         // 步兵、火炮、战斗机和轰炸机攻击后不能移动
         if (from.cardType == CardTypes.Infantry || from.cardType == CardTypes.Artillery || 
@@ -1443,6 +1437,8 @@ TextureButton buttonNextTurn;
             return results;
         }
 
+        GD.Print($"GetAllowedTargets: Attacker={attacker}, Type={attacker.cardType}, IsFriend={attacker.GetIsFriend()}, Place={attacker.GetMyPlace()}");
+
         // 战斗机、火炮和轰炸机可以攻击任意位置的敌军
         if (attacker.cardType == CardTypes.Plane || attacker.cardType == CardTypes.Bomber || attacker.cardType == CardTypes.Artillery)
         {
@@ -1450,8 +1446,10 @@ TextureButton buttonNextTurn;
             
             // 应用烟幕和守护特性限制
             var filteredTargets = new List<cardBase_>();
+            GD.Print($"GetAllowedTargets: Checking {allEnemyUnits.Count} enemy units");
             foreach (var unit in allEnemyUnits)
             {
+                GD.Print($"GetAllowedTargets: Checking unit={unit}, hasSmoke={unit.HasSmokeScreenActive()}");
                 // 烟幕特性：具有烟幕的单位不能成为攻击的目标
                 if (unit.HasSmokeScreenActive())
                 {
@@ -1460,6 +1458,7 @@ TextureButton buttonNextTurn;
                 
                 // 守护特性：检查目标是否被守护
                 bool isProtected = IsTargetProtectedByGuardian(unit, attacker);
+                GD.Print($"GetAllowedTargets: Unit {unit} is protected={isProtected}");
                 if (isProtected)
                 {
                     continue;
@@ -1550,7 +1549,9 @@ TextureButton buttonNextTurn;
     /// </summary>
     private bool IsTargetProtectedByGuardian(cardBase_ target, cardBase_ attacker)
     {
+        GD.Print($"IsTargetProtectedByGuardian: target={target}, attacker={attacker}");
         if (target == null || attacker == null) return false;
+        
         // 具有烟幕的单位，守护不生效
         if (target.HasSmokeScreenActive())
         {
@@ -1585,12 +1586,17 @@ TextureButton buttonNextTurn;
         
         // 检查目标左侧是否有守护单位（在同一阵线中）
         int targetIndex = targetLine.IndexOf(targetPlace);
+        GD.Print($"IsTargetProtectedByGuardian: targetIndex={targetIndex}, targetLine.Count={targetLine.Count}");
         if (targetIndex > 0)
         {
             var leftPlace = targetLine[targetIndex - 1];
             var leftCard = leftPlace.GetMyCard();
-            if (leftCard != null && leftCard.HasTrait(UnitTraits.Guardian))
+            GD.Print($"IsTargetProtectedByGuardian: leftCard={leftCard}, hasGuardian={leftCard?.HasTrait(UnitTraits.Guardian)}, leftFriend={leftCard?.GetIsFriend()}, targetFriend={target.GetIsFriend()}, attackerFriend={attacker.GetIsFriend()}");
+            if (leftCard != null && leftCard.HasTrait(UnitTraits.Guardian) && 
+                leftCard.GetIsFriend() == target.GetIsFriend() && 
+                attacker.GetIsFriend() != target.GetIsFriend())
             {
+                GD.Print($"IsTargetProtectedByGuardian: Left guardian protects target");
                 return true;
             }
         }
@@ -1600,8 +1606,12 @@ TextureButton buttonNextTurn;
         {
             var rightPlace = targetLine[targetIndex + 1];
             var rightCard = rightPlace.GetMyCard();
-            if (rightCard != null && rightCard.HasTrait(UnitTraits.Guardian))
+            GD.Print($"IsTargetProtectedByGuardian: rightCard={rightCard}, hasGuardian={rightCard?.HasTrait(UnitTraits.Guardian)}, rightFriend={rightCard?.GetIsFriend()}, targetFriend={target.GetIsFriend()}, attackerFriend={attacker.GetIsFriend()}");
+            if (rightCard != null && rightCard.HasTrait(UnitTraits.Guardian) && 
+                rightCard.GetIsFriend() == target.GetIsFriend() && 
+                attacker.GetIsFriend() != target.GetIsFriend())
             {
+                GD.Print($"IsTargetProtectedByGuardian: Right guardian protects target");
                 return true;
             }
         }
@@ -1851,7 +1861,6 @@ TextureButton buttonNextTurn;
             TriggerUnitEffects("Dead", deadUnit, checkOnlySourceCard:true);
             RemoveCard(deadUnit);
             PlayDeadSound(1);
-            CheckIfAnyUnitDied(); // 递归检查是否有新的死亡单位
         }
     }
 

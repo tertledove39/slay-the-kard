@@ -51,4 +51,3 @@ GetAllEnemyTargets() 获得所有敌方目标(目标=单位+总部)
 GetAllFriendTargets() 获得所有友方目标(目标=单位+总部)
 GetEnemyHq() 获得敌方总部
 GetFriendHq() 获得友方总部
-setDefence(int) 将对象的防御力设置为i

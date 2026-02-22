@@ -23,11 +23,6 @@ public partial class battlefield_ : Control
     int allowControl = 0;
 
     /// <summary>
-    /// 是否暂停死亡检查 0 不暂停 1 暂停
-    /// </summary>
-    int pauseDeathCheck = 0;
-
-    /// <summary>
     /// 允许控制输入
     /// </summary>
     void AllowControl()
@@ -51,30 +46,6 @@ public partial class battlefield_ : Control
     int ReadControlState()
     {
         return allowControl;
-    }
-
-    /// <summary>
-    /// 暂停死亡检查
-    /// </summary>
-    void PauseDeathCheck()
-    {
-        pauseDeathCheck = 1;
-    }
-
-    /// <summary>
-    /// 恢复死亡检查
-    /// </summary>
-    void ResumeDeathCheck()
-    {
-        pauseDeathCheck = 0;
-    }
-
-    /// <summary>
-    /// 读取死亡检查状态
-    /// </summary>
-    int ReadDeathCheckState()
-    {
-        return pauseDeathCheck;
     }
 
     /// <summary>
@@ -117,9 +88,6 @@ public partial class battlefield_ : Control
     /// </summary>
     List<place_> enemySupprotLine = [];
     List<place_> allPlaces = [];
-    
-    // 敌方行动队列：key为回合数或"ADD"，value为效果字符串列表
-    Dictionary<string, List<string>> enemyActionQueue = new Dictionary<string, List<string>>();
 
 /// <summary>
 /// 根据id返回一个place的引用
@@ -209,7 +177,6 @@ public partial class battlefield_ : Control
     async Task AddCardToPlace(cardBase_ card, place_ place)
     {
         if (place.GetMyCard()!= null) return;
-        PauseDeathCheck(); // 暂停死亡检查
         if (!cardInPlaces.Contains(card))
         {
             AddToBattleField(card);
@@ -219,13 +186,8 @@ public partial class battlefield_ : Control
         //RefreshAllCardDisplayOrder();
         await card.MoveToPosition(place.GetPlaceGlobalPosition());
         
-        // 闪击特性：单位被加入战场时刷新
-        if(card.HasTrait(UnitTraits.Blitz)) card.RefreshUnit();
-
                       // 触发被加入战场的效果
         await TriggerUnitEffects("BeingAddedToField", card, new List<cardBase_>(), checkOnlySourceCard: true);
-        ResumeDeathCheck(); // 恢复死亡检查
-        CheckIfAnyUnitDied(); // 检查死亡
     }
 
 /// <summary>
@@ -308,7 +270,6 @@ TextureButton buttonNextTurn;
 /// </summary>
     public override void _Ready()
     {
-        GD.Print("_Ready method called");
         cardInPlaces = new List<cardBase_>();
         //初始化各个阵线
         enemySupprotLine = [(place_)GetNode("Place1"), (place_)GetNode("Place2"), (place_)GetNode("Place3"), (place_)GetNode("Place4"), (place_)GetNode("Place5")];
@@ -392,14 +353,11 @@ TextureButton buttonNextTurn;
 
 
         enemyHq = cardMaganer.LoadHq(2);
+        enemyHq.SetHqImage(1);
         AddCardToPlace(enemyHq,enemySupprotLine[2]);
-        
-        // 加载敌方行动队列
-        LoadEnemyActionQueue("berlin");
 
         //初始化敌人
         EnemyInit();
-        
         GetNode<End>("end").Visible = false;
 
         player1.DrawCard(5);
@@ -489,8 +447,6 @@ TextureButton buttonNextTurn;
                 return Rarity.Rare;
             case "epic":
                 return Rarity.Epic;
-            case "unobtainable":
-                return Rarity.Unobtainable;
             default:
                 return Rarity.Legendary;
         }
@@ -610,16 +566,6 @@ TextureButton buttonNextTurn;
                 //场上的
                 if (card != null && card.getState() == CardState.placed)
                 {
-                    // 检查是否是友方单位，如果是敌方单位则不允许拖动
-                    if (card.GetIsFriend() != IsFriend.friend)
-                    {
-                        return;  // 敌方单位不能被拖动
-                    }
-                    // 检查是否是总部，总部不能被移动
-                    if (card.isHq == HQ.hq)
-                    {
-                        return;  // 总部不能被移动
-                    }
                     
                     cardNowChoose = card;
                     card.setState(CardState.inplaceAndCaught);
@@ -628,9 +574,6 @@ TextureButton buttonNextTurn;
                     arrowFrom.GlobalPosition = card.GetGlobalPosition() + arrowOffset;
                     cardBase.ProcessMode = Node.ProcessModeEnum.Inherit;
                     cardBase.Visible = true;
-                    
-                    // 高亮合法攻击目标（敌方单位）
-                    HighlightValidAttackTargets(card);
                 }
                 //RefreshAllCardDisplayOrder();
                 
@@ -661,7 +604,6 @@ TextureButton buttonNextTurn;
                             _ = ParseAndExecuteEffect(cardNowChoose.effect, cardNowChoose, null);
                             player1.RemoveFromHand(cardNowChoose);
                             RemoveCard(cardNowChoose);
-                            CheckIfAnyUnitDied(); // 结算单位变化
                         }
                         else
                         {
@@ -732,7 +674,6 @@ TextureButton buttonNextTurn;
                                                 player1.RemoveFromHand(cardNowChoose);
                                                     // 彻底删除这张卡（会调用Dead()）
                                                 RemoveCard(cardNowChoose);
-                                                CheckIfAnyUnitDied(); // 结算单位变化
                                                 
                                                 // 隐藏箭头
                                                 cardBase.ProcessMode = Node.ProcessModeEnum.Disabled;
@@ -835,7 +776,6 @@ TextureButton buttonNextTurn;
                     cardBase.Visible     = false;
                     
                     RestoreAllTargetsColor(); // 取消高亮，恢复所有单位的原始颜色
-                    CheckIfAnyUnitDied();
                 }
             }
         }
@@ -900,28 +840,9 @@ TextureButton buttonNextTurn;
     public async Task Attack(cardBase_ from,cardBase_ to)
     {
         ForbidControl();
-        PauseDeathCheck(); // 暂停死亡检查
         if (!from.CheckIfCanAttack())
         {
             AllowControl();
-            ResumeDeathCheck(); // 恢复死亡检查
-            return;
-        }
-
-        // 检查目标是否具有烟幕特性
-        if (to.HasSmokeScreenActive())
-        {
-            GD.Print($"Attack failed: Target {to} has smoke screen active");
-            AllowControl();
-            ResumeDeathCheck(); // 恢复死亡检查
-            return;
-        }
-
-        // 检查目标是否被守护
-        if (IsTargetProtectedByGuardian(to, from))
-        {
-            AllowControl();
-            ResumeDeathCheck(); // 恢复死亡检查
             return;
         }
 
@@ -1034,19 +955,7 @@ TextureButton buttonNextTurn;
         
         PlayBattleSound(1);
         await FlyBullets(from,to);
-
-        // 标记单位已经攻击，减少可攻击次数
-        from.HaveAttacked();
-
-        // 步兵、火炮、战斗机和轰炸机攻击后不能移动
-        if (from.cardType == CardTypes.Infantry || from.cardType == CardTypes.Artillery || 
-            from.cardType == CardTypes.Plane || from.cardType == CardTypes.Bomber)
-        {
-            from.HaveMoved();
-        }
-
-        ResumeDeathCheck(); // 恢复死亡检查
-        CheckIfAnyUnitDied(); // 统一检查死亡
+        CheckIfAnyUnitDied();
         AllowControl();
     }
 
@@ -1061,11 +970,9 @@ TextureButton buttonNextTurn;
         {
             return;
         }
-        PauseDeathCheck(); // 暂停死亡检查
 
         if(position.GetMyCard()!= null)
         {
-            ResumeDeathCheck();
             return;
         }
         
@@ -1078,13 +985,11 @@ TextureButton buttonNextTurn;
             {
                 if(!frontLine.Contains(position) || CheckIfFrontLineIsFriend()== IsFriend.enemy||card.CheckIfCanMove() == false)
                 {
-                    ResumeDeathCheck();
                     return;
                 }
             }
             else if(frontLine.Contains(card.GetMyPlace()))
             {
-                ResumeDeathCheck();
                 return;
             }
             else if( card.GetMyPlace()==null)
@@ -1105,13 +1010,11 @@ TextureButton buttonNextTurn;
             {
                 if(!frontLine.Contains(position))
                 {
-                    ResumeDeathCheck();
                     return;
                 }
             }
             else if(frontLine.Contains(card.GetMyPlace()))
             {
-                ResumeDeathCheck();
                 return;
             }
         }
@@ -1143,8 +1046,6 @@ TextureButton buttonNextTurn;
             // 否则触发移动单位的 Moving 效果
             await TriggerUnitEffects("Moving", card, new List<cardBase_> { card }, checkOnlySourceCard: true);
         }
-        ResumeDeathCheck(); // 恢复死亡检查
-        CheckIfAnyUnitDied(); // 统一检查死亡
     }
 
     IsFriend CheckIfFrontLineIsFriend()
@@ -1191,229 +1092,40 @@ TextureButton buttonNextTurn;
     /// </summary>
     async Task EnemyTurnAsync()
     {
-        turn++;
         ForbidControl();
         RefreshAllCardInField();
-        
-        // 执行敌方行动队列
-        await ExecuteEnemyActionQueue();
+        enemyHq.GetDefence(5);
+        turn++;
+        switch(turn)
+        {
+            case 1: 
+                await enemySummonAsync("t70");
+                break;
+            case 2:
+                break;
+            case 3: 
+            await enemySummonAsync("t70");
+                break;
+            case 5: 
+            await enemySummonAsync("i17");
+            break;
+            case 7:
+            await enemySummonAsync("smileBro");
+            break;
+            case 9:
+            await enemySummonAsync("is2");
+            break;
+            default: 
+            await enemySummonAsync("t70");
 
+                break;
+        }
         // 敌人行动 AI：移动并攻击
         await EnemyPerformActionsAsync();
 
+        
+
         AllowControl();
-    }
-
-    /// <summary>
-    /// 敌方执行效果
-    /// </summary>
-    /// <param name="effectString">效果字符串，语法同指令的效果</param>
-    /// <param name="sourceCard">效果发起者（可选）</param>
-    /// <param name="targetCards">效果目标列表（可选）</param>
-    public async Task EnemyExecuteEffect(string effectString, cardBase_ sourceCard = null, List<cardBase_> targetCards = null)
-    {
-        if (string.IsNullOrEmpty(effectString))
-        {
-            return;
-        }
-        
-        // 如果没有指定sourceCard，使用敌方HQ作为默认发起者
-        if (sourceCard == null)
-        {
-            sourceCard = enemyHq;
-        }
-        
-        await ParseAndExecuteEffect(effectString, sourceCard, targetCards);
-        CheckIfAnyUnitDied(); // 检查死亡
-    }
-
-    /// <summary>
-    /// 从enemyTurn.ini文件加载敌方行动队列
-    /// </summary>
-    /// <param name="enemyHqName">敌方总部名称，用于确定读取哪个节</param>
-    void LoadEnemyActionQueue(string enemyHqName)
-    {
-        GD.Print($"LoadEnemyActionQueue called with enemyHqName: {enemyHqName}");
-        enemyActionQueue.Clear(); // 清空现有队列
-        
-        var iniPath = "res://cards/enemyTurn.ini";
-        
-        if (!Godot.FileAccess.FileExists(iniPath))
-        {
-            GD.Print($"Enemy turn config file not found: {iniPath}");
-            return;
-        }
-        
-        var configFile = new IniFile();
-        
-        // 使用Godot.FileAccess读取文件内容
-        using (var file = Godot.FileAccess.Open(iniPath, Godot.FileAccess.ModeFlags.Read))
-        {
-            if (file == null)
-            {
-                GD.Print($"Failed to open file: {iniPath}");
-                return;
-            }
-            
-            string content = file.GetAsText();
-            GD.Print($"File content:\n{content}");
-            using (var stream = new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(content)))
-            {
-                configFile.Load(stream);
-            }
-        }
-        
-        // 检查是否存在指定节
-        GD.Print($"Checking for section: {enemyHqName}");
-        GD.Print($"HasSection result: {configFile.HasSection(enemyHqName)}");
-        
-        // 打印所有节
-        GD.Print("All sections in config file:");
-        foreach (var section in configFile)
-        {
-            GD.Print($"  - {section.Key}");
-        }
-        
-        if (!configFile.HasSection(enemyHqName))
-        {
-            GD.Print($"Enemy HQ section not found in config: {enemyHqName}");
-            return;
-        }
-        
-        // 读取该节下的所有键值对
-        var keys = configFile.GetSectionKeys(enemyHqName);
-        GD.Print($"GetSectionKeys returned {keys.Count} keys");
-        foreach (var key in keys)
-        {
-            GD.Print($"  Key: {key}");
-        }
-        
-        foreach (var key in keys)
-        {
-            var value = configFile[enemyHqName][key].ToString().Trim();
-            GD.Print($"Loading action: key={key}, value={value}");
-            
-
-            
-            // 确定实际要添加到的队列
-            string actualQueueKey = key;
-            string actualValue = value;
-            
-
-            // 添加到对应的队列
-            if (!enemyActionQueue.ContainsKey(actualQueueKey))
-            {
-                enemyActionQueue[actualQueueKey] = new List<string>();
-            }
-            GD.Print($"Adding to queue: {actualQueueKey} = {actualValue}");
-            enemyActionQueue[actualQueueKey].Add(actualValue);
-        }
-        
-        GD.Print($"Loaded enemy action queue for {enemyHqName}: {enemyActionQueue.Count} entries");
-    }
-
-    /// <summary>
-    /// 执行敌方行动队列中的行动
-    /// </summary>
-    async Task ExecuteEnemyActionQueue()
-    {
-        GD.Print($"ExecuteEnemyActionQueue called at turn {turn}");
-        bool hasAction = false;
-        
-        // 执行当前回合的行动
-        string currentTurnKey = $"t{turn}";
-        if (enemyActionQueue.ContainsKey(currentTurnKey))
-        {
-            foreach (var action in enemyActionQueue[currentTurnKey])
-            {
-                await ExecuteEnemyAction(action);
-                hasAction = true;
-            }
-        }
-        
-        // 如果当前回合没有行动，执行default行动
-        if (!hasAction && enemyActionQueue.ContainsKey("default"))
-        {
-            foreach (var action in enemyActionQueue["default"])
-            {
-                await ExecuteEnemyAction(action);
-            }
-        }
-        
-        // 执行everyXXt格式的行动（如every5t、every10t等）
-        foreach (var key in enemyActionQueue.Keys)
-        {
-            if (key.StartsWith("every") && key.EndsWith("t"))
-            {
-                // 提取数字部分
-                string numberStr = key.Substring(5, key.Length - 6); // "every"长度为5，"t"长度为1
-                if (int.TryParse(numberStr, out int interval))
-                {
-                    if (interval > 0 && turn % interval == 0)
-                    {
-                        foreach (var action in enemyActionQueue[key])
-                        {
-                            await ExecuteEnemyAction(action);
-                        }
-                    }
-                }
-            }
-        }
-        
-        // 执行ADD行动（每回合都执行）
-        if (enemyActionQueue.ContainsKey("ADD"))
-        {
-            foreach (var action in enemyActionQueue["ADD"])
-            {
-                await ExecuteEnemyAction(action);
-            }
-        }
-    }
-
-    /// <summary>
-    /// 执行单个敌方行动
-    /// </summary>
-    /// <param name="action">行动字符串，格式如：addToSupportLine(t70) 或 EXEC:enemyHq|heal(20)</param>
-    async Task ExecuteEnemyAction(string action)
-    {
-        if (string.IsNullOrEmpty(action))
-        {
-            return;
-        }
-        
-        action = action.Trim();
-        GD.Print($"ExecuteEnemyAction: {action}");
-        
-        // 检查是否是ADD:格式的行动（添加到每回合执行的列表）
-        if (action.StartsWith("ADD:"))
-        {
-            // ADD:addToEnemySupportLine(t34_1943) 格式
-            string effectString = action.Substring(4); // 移除"ADD:"前缀
-
-            // 将效果添加到每回合执行的列表中
-            if (!enemyActionQueue.ContainsKey("ADD"))
-            {
-                enemyActionQueue["ADD"] = new List<string>();
-            }
-            enemyActionQueue["ADD"].Add(effectString);
-            GD.Print($"Added effect to ADD queue: {effectString}");
-            return;
-        }
-
-        // 检查是否是EXEC:格式的行动
-        if (action.StartsWith("EXEC:"))
-        {
-            // EXEC:enemyHq|heal(20) 格式
-            string effectString = action.Substring(5); // 移除"EXEC:"前缀
-
-                
-                await EnemyExecuteEffect(effectString);
-        }
-        else
-        {
-            // 直接效果格式，如 addToSupportLine(t70)
-            await EnemyExecuteEffect(action);
-        }
     }
 
     void DarkenScreen()
@@ -1437,11 +1149,7 @@ TextureButton buttonNextTurn;
     private List<cardBase_> GetAllowedTargets(cardBase_ attacker)
     {
         var results = new List<cardBase_>();
-        if (attacker == null) 
-        {
-            GD.Print("GetAllowedTargets: Attacker is null");
-            return results;
-        }
+        if (attacker == null) return results;
 
         // 战斗机、火炮和轰炸机可以攻击任意位置的敌军
         if (attacker.cardType == CardTypes.Plane || attacker.cardType == CardTypes.Bomber || attacker.cardType == CardTypes.Artillery)
@@ -1459,8 +1167,7 @@ TextureButton buttonNextTurn;
                 }
                 
                 // 守护特性：检查目标是否被守护
-                bool isProtected = IsTargetProtectedByGuardian(unit, attacker);
-                if (isProtected)
+                if (IsTargetProtectedByGuardian(unit))
                 {
                     continue;
                 }
@@ -1479,18 +1186,14 @@ TextureButton buttonNextTurn;
         // 步兵和坦克：如果在支援阵线，只能攻击前线单位；反之亦然
         if (attacker.cardType == CardTypes.Infantry || attacker.cardType == CardTypes.Tank)
         {
-            GD.Print($"GetAllowedTargets: Infantry/Tank unit. enemySupprotLine.Contains={enemySupprotLine.Contains(myPlace)}, supportLine.Contains={supportLine.Contains(myPlace)}, frontLine.Contains={frontLine.Contains(myPlace)}");
-
             if (enemySupprotLine.Contains(myPlace))
             {
                 // 敌方支援阵线 -> 只能攻击前线
-                GD.Print("  Enemy support line -> Can attack front line");
                 allowedPlaces.AddRange(frontLine);
             }
             else if (supportLine.Contains(myPlace))
             {
                 // 友方支援阵线 -> 只能攻击前线
-                GD.Print("  Friend support line -> Can attack front line");
                 allowedPlaces.AddRange(frontLine);
             }
             else if (frontLine.Contains(myPlace))
@@ -1500,29 +1203,19 @@ TextureButton buttonNextTurn;
                 if (attacker.GetIsFriend() == IsFriend.enemy)
                 {
                     // 敌方单位在前线 -> 攻击友方支援阵线
-                    GD.Print("  Enemy in front line -> Can attack friend support line");
                     allowedPlaces.AddRange(supportLine);
                 }
                 else
                 {
                     // 友方单位在前线 -> 攻击敌方支援阵线
-                    GD.Print("  Friend in front line -> Can attack enemy support line");
                     allowedPlaces.AddRange(enemySupprotLine);
                 }
             }
-            else
-            {
-                // 如果单位不在任何阵线中，添加调试信息
-                GD.Print($"Warning: Unit {attacker} is not in any place. myPlace: {myPlace}");
-            }
         }
 
-        GD.Print($"GetAllowedTargets: Checking {allowedPlaces.Count} allowed places");
         foreach (var place in allowedPlaces)
         {
             var c = place.GetMyCard();
-            GD.Print($"  Place: {place}, Card: {c}, State: {c?.getState()}, IsFriend: {c?.GetIsFriend()}");
-
             if (c != null && c.getState() == CardState.placed && c.GetIsFriend() != attacker.GetIsFriend())
             {
                 // 烟幕特性：具有烟幕的单位不能成为攻击的目标
@@ -1532,7 +1225,7 @@ TextureButton buttonNextTurn;
                 }
                 
                 // 守护特性：检查目标是否被守护
-                if (IsTargetProtectedByGuardian(c, attacker))
+                if (IsTargetProtectedByGuardian(c))
                 {
                     continue;
                 }
@@ -1541,16 +1234,16 @@ TextureButton buttonNextTurn;
             }
         }
 
-        GD.Print($"GetAllowedTargets: Returning {results.Count} targets");
         return results;
     }
     
     /// <summary>
     /// 检查目标是否被守护单位保护
     /// </summary>
-    private bool IsTargetProtectedByGuardian(cardBase_ target, cardBase_ attacker)
+    private bool IsTargetProtectedByGuardian(cardBase_ target)
     {
-        if (target == null || attacker == null) return false;
+        if (target == null) return false;
+        
         // 具有烟幕的单位，守护不生效
         if (target.HasSmokeScreenActive())
         {
@@ -1565,42 +1258,24 @@ TextureButton buttonNextTurn;
         
         var targetPlace = target.GetMyPlace();
         if (targetPlace == null) return false;
-
-        // 确定目标所在的阵线
-        List<place_> targetLine = null;
-        if (frontLine.Contains(targetPlace))
-        {
-            targetLine = frontLine;
-        }
-        else if (supportLine.Contains(targetPlace))
-        {
-            targetLine = supportLine;
-        }
-        else if (enemySupprotLine.Contains(targetPlace))
-        {
-            targetLine = enemySupprotLine;
-        }
         
-        if (targetLine == null) return false;
-        
-        // 检查目标左侧是否有守护单位（在同一阵线中）
-        int targetIndex = targetLine.IndexOf(targetPlace);
-        if (targetIndex > 0)
+        // 检查目标左侧是否有守护单位
+        var leftPlace = GetLeftPlace(targetPlace);
+        if (leftPlace != null)
         {
-            var leftPlace = targetLine[targetIndex - 1];
             var leftCard = leftPlace.GetMyCard();
-            if (leftCard != null && leftCard.HasTrait(UnitTraits.Guardian))
+            if (leftCard != null && leftCard.HasTrait(UnitTraits.Guardian) && leftCard.GetIsFriend() == target.GetIsFriend())
             {
                 return true;
             }
         }
         
-        // 检查目标右侧是否有守护单位（在同一阵线中）
-        if (targetIndex < targetLine.Count - 1)
+        // 检查目标右侧是否有守护单位
+        var rightPlace = GetRightPlace(targetPlace);
+        if (rightPlace != null)
         {
-            var rightPlace = targetLine[targetIndex + 1];
             var rightCard = rightPlace.GetMyCard();
-            if (rightCard != null && rightCard.HasTrait(UnitTraits.Guardian))
+            if (rightCard != null && rightCard.HasTrait(UnitTraits.Guardian) && rightCard.GetIsFriend() == target.GetIsFriend())
             {
                 return true;
             }
@@ -1664,41 +1339,19 @@ TextureButton buttonNextTurn;
         if (!frontHasFriend)
         {
             var enemyUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy).ToList();
-            foreach (var eCard in enemyUnits.Where(x=>x.isHq!=HQ.hq && x.CheckIfCanMove()))
+            foreach (var eCard in enemyUnits)
             {
                 // 总部不能移动
                 if (eCard.isHq == HQ.hq) continue;
 
-                // 空军单位和炮兵单位不会主动上前线
-                if (eCard.cardType == CardTypes.Plane || eCard.cardType == CardTypes.Bomber || 
-                    eCard.cardType == CardTypes.Artillery)
-                {
-                    continue;
-                }
-
-                if (frontLine.Contains(eCard.GetMyPlace()))
-                {
-                    continue;
-                }
-        // ============ 修复
+                // 只有当单位还能移动时才尝试移动（CheckIfCanMove 会减少 moveAble）
+                if (!eCard.CheckIfCanMove()) continue;
 
                 // 找到第一个空的前线格子
                 var place = frontLine.FirstOrDefault(p => p.GetMyCard() == null);
                 if (place == null) break;
 
-                // 只有当单位还能移动时才尝试移动（CheckIfCanMove 会减少 moveAble）
-                if (!eCard.CheckIfCanMove()) continue;
-
                 await Move(eCard, place);
-                eCard.HaveMoved();
-
-                // 步兵、火炮、战斗机和轰炸机移动后不能攻击
-                if (eCard.cardType == CardTypes.Infantry || eCard.cardType == CardTypes.Artillery || 
-                    eCard.cardType == CardTypes.Plane || eCard.cardType == CardTypes.Bomber)
-                {
-                    eCard.HaveAttacked();
-                }
-
                 await Task.Delay(300);
             }
         }
@@ -1706,46 +1359,22 @@ TextureButton buttonNextTurn;
         // 2) 攻击阶段：按优先级对每个敌方单位尝试攻击
         var rnd = new Random();
         var attackers = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy).ToList();
-        GD.Print($"Enemy attack phase: Found {attackers.Count} enemy units");
-
         for (int i = 0; i < attackers.Count; i++)
         {
             var attacker = attackers[i];
             if (attacker == null) continue;
 
-            GD.Print($"Processing enemy unit: {attacker}, Type: {attacker.cardType}, Attack: {attacker.ReadAttack()}, Place: {attacker.GetMyPlace()}");
-
             // 如果是总部或攻击力为0则不主动攻击
-            if (attacker.isHq == HQ.hq)
-            {
-                GD.Print($"  Skipped: Is HQ");
-                continue;
-            }
-
-            // 如果攻击次数已用完，则不能攻击
-            if (attacker.ReadAttackable() <= 0)
-            {
-                continue;
-            } 
-            if (attacker.ReadAttack() <= 0) 
-            {
-                continue;
-            }
+            if (attacker.isHq == HQ.hq) continue;
+            if (attacker.ReadAttack() <= 0) continue;
 
             // 获取允许的目标（遵守阵线限制，某些单位类型除外）
             var allowedTargets = GetAllowedTargets(attacker);
-            GD.Print($"  Allowed targets count: {allowedTargets?.Count ?? 0}");
-            if (allowedTargets == null || allowedTargets.Count == 0) 
-            {
-                GD.Print($"  Skipped: No valid targets");
-                continue;
-            }
+            if (allowedTargets == null || allowedTargets.Count == 0) continue;
 
             // 优先：如果能破坏总部且总部在允许目标中，攻击总部
-            GD.Print($"  Checking HQ attack: myHq={myHq}, inTargets={allowedTargets.Contains(myHq)}, canDestroy={myHq != null && CanDestroyTarget(attacker, myHq)}");
             if (myHq != null && allowedTargets.Contains(myHq) && CanDestroyTarget(attacker, myHq))
             {
-                GD.Print($"  Attacking HQ");
                 await Attack(attacker, myHq);
                 continue;
             }
@@ -1826,60 +1455,42 @@ TextureButton buttonNextTurn;
 /// </summary>
     void CheckIfAnyUnitDied()
     {
-        // 如果死亡检查被暂停，则不执行
-        if (pauseDeathCheck == 1)
-        {
-            return;
-        }
-
         var units = ReadCardInPlaces().Where(x=>x.getState()==CardState.placed).ToList();
-        List<cardBase_> deadUnits = new List<cardBase_>();
-        
-        // 第一遍：收集所有死亡的单位
         for (int i = units.Count - 1; i >= 0; i--)
-        {
-            units[i].ExecChangeList();
-            if (units[i].ReadDefence()<=0)
             {
-                deadUnits.Add(units[i]);
+                units[i].ExecChangeList();
+                if (units[i].ReadDefence()==0)
+                {
+                    TriggerUnitEffects("Dead",units[i],checkOnlySourceCard:true);
+                    RemoveCard(units[i]);
+                    PlayDeadSound(1);
+                }
             }
-        }
-        
-        // 第二遍：处理所有死亡单位的Dead效果
-        foreach (var deadUnit in deadUnits)
-        {
-            TriggerUnitEffects("Dead", deadUnit, checkOnlySourceCard:true);
-            RemoveCard(deadUnit);
-            PlayDeadSound(1);
-            CheckIfAnyUnitDied(); // 递归检查是否有新的死亡单位
-        }
     }
 
 
             /// <summary>
             /// 暂时用作测试
             /// </summary>
-    public async void OnNextTurnButtonPressed()
+    public void OnNextTurnButtonPressed()
     {
         // 触发友方回合结束时点
-        await TriggerUnitEffects("FriendlyTurnEnd", null);
+        TriggerUnitEffects("FriendlyTurnEnd", null);
         
         // 触发双方回合结束时点
-        await TriggerUnitEffects("TurnEnd", null);
-        CheckIfAnyUnitDied(); // 检查死亡
+        TriggerUnitEffects("TurnEnd", null);
         
         
         // 触发敌方回合开始时点
-        await TriggerUnitEffects("EnemyTurnBegin", null);
+        TriggerUnitEffects("EnemyTurnBegin", null);
         
         // 触发双方回合开始时点
-        await TriggerUnitEffects("TurnBegin", null);
+        TriggerUnitEffects("TurnBegin", null);
         
         // 触发友方回合开始时点
-        await TriggerUnitEffects("FriendlyTurnBegin", null);
-        CheckIfAnyUnitDied(); // 检查死亡
+        TriggerUnitEffects("FriendlyTurnBegin", null);
 
-        await EnemyTurnAsync();
+        EnemyTurnAsync();
         
         _ = player1.DrawCard();
         player1.AddPointMaxNatural();
@@ -1902,25 +1513,6 @@ TextureButton buttonNextTurn;
         }
         cardInPlaces.Remove(card);
         card.Dead();
-    }
-
-    /// <summary>
-    /// 高亮合法的攻击目标，其他单位变成灰色
-    /// </summary>
-    public void HighlightValidAttackTargets(cardBase_ attacker)
-    {
-        var validTargets = GetAllowedTargets(attacker);
-        foreach (var card in cardInPlaces.Where(x=>x.getState()==CardState.placed).ToList())
-        {
-            if (validTargets.Contains(card))
-            {
-                card.RestoreColor();
-            }
-            else
-            {
-                card.SetGrayscale();
-            }
-        }
     }
 
     /// <summary>
@@ -1998,7 +1590,6 @@ TextureButton buttonNextTurn;
     /// - getCount(${selector}) - 获取符合条件的单位数量 设置为result
     /// - setTarget - 设置targets为传入的targetCard
     /// - addToSupportLine(cardId) - 向友方支援阵线添加卡
-    /// - addToDeck(cardId) - 将指定卡牌洗入卡组
     /// - this - 指代执行效果的单位本身（目标列表）
     /// - target - 指代触发此效果的单位或目标（可以是列表）
     /// - if(条件)标签 - 条件跳转，满足条件时跳转到指定标签处执行
@@ -2140,7 +1731,7 @@ TextureButton buttonNextTurn;
                 }
 
                 // Heal(n) - 使用AddChange增加防御力
-                if (instruction.StartsWith("Heal", StringComparison.OrdinalIgnoreCase))
+                if (instruction.StartsWith("Heal"))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\((\d+)\)");
                     if (match.Success && int.TryParse(match.Groups[1].Value, out int healAmount))
@@ -2166,22 +1757,6 @@ TextureButton buttonNextTurn;
                             if (target != null)
                             {
                                 target.AddChange(ChangeType.GetAttack, GetAttackAmount);
-                                
-                            }
-                        }
-                    }
-                }
-
-                if (instruction.StartsWith("SetDefence"))
-                {
-                    var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\((\d+)\)");
-                    if (match.Success && int.TryParse(match.Groups[1].Value, out int GetAttackAmount))
-                    {
-                        foreach (var target in targets)
-                        {
-                            if (target != null)
-                            {
-                                target.AddChange(ChangeType.SetDefence, GetAttackAmount);
                                 
                             }
                         }
@@ -2282,56 +1857,16 @@ TextureButton buttonNextTurn;
                     }
                 }
 
-                // addToEnemySupportLine(cardId) - 添加卡到敌方支援阵线
-                if (instruction.StartsWith("addToEnemySupportLine"))
-                {
-                    var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
-                    if (match.Success)
-                    {
-                        string cardId = match.Groups[1].Value.Trim();
-                        var newCardData = GetCardMaganer().GetCard(cardId);
-                        if (newCardData != null)
-                        {
-                            var place = GetTheFirstValidEnemySupportPlace();
-                            if (place != null)
-                            {
-                                var newCard = cardRes.Instantiate() as cardBase_;
-                                newCard.SetCardInformation(newCardData);
-                                newCard.SetIsFriend(IsFriend.enemy);
-                                await AddCardToPlace(newCard, place);
-                            }
-                        }
-                    }
-                }
-
-                // addToDeck(cardId) - 将指定卡牌洗入卡组
-                if (instruction.StartsWith("addToDeck"))
-                {
-                    var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
-                    if (match.Success)
-                    {
-                        string cardId = match.Groups[1].Value.Trim();
-                        if (sourceCard?.GetIsFriend() == IsFriend.friend)
-                        {
-                            player1.AddCardToDeck(cardId);
-                        }
-                        else if (sourceCard?.GetIsFriend() == IsFriend.enemy)
-                        {
-                            player2.AddCardToDeck(cardId);
-                        }
-                    }
-                }
-
                 // GetPoint() - 获得指挥点
                 if (instruction == "GetPoint")
                 {
                     if (sourceCard?.GetIsFriend() == IsFriend.friend)
                     {
-                        result = player1.ReadPoint();
+                        result = player1.point;
                     }
                     else if (sourceCard?.GetIsFriend() == IsFriend.enemy)
                     {
-                        result = player2.ReadPoint();
+                        result = player2.point;
                     }
                 }
 
@@ -2340,11 +1875,11 @@ TextureButton buttonNextTurn;
                 {
                     if (sourceCard?.GetIsFriend() == IsFriend.friend)
                     {
-                        result = player1.ReadPointMax();
+                        result = player1.pointMax;
                     }
                     else if (sourceCard?.GetIsFriend() == IsFriend.enemy)
                     {
-                        result = player2.ReadPointMax();
+                        result = player2.pointMax;
                     }
                 }
 
@@ -2373,11 +1908,15 @@ TextureButton buttonNextTurn;
                     {
                         if (sourceCard?.GetIsFriend() == IsFriend.friend)
                         {
-                            player1.AddPoint(value);
+                            player1.point += value;
+                            if (player1.point > player1.pointMax) player1.point = player1.pointMax;
+                            player1.RefreshPointLabel();
                         }
                         else if (sourceCard?.GetIsFriend() == IsFriend.enemy)
                         {
-                            player2.AddPoint(value);
+                            player2.point += value;
+                            if (player2.point > player2.pointMax) player2.point = player2.pointMax;
+                            player2.RefreshPointLabel();
                         }
                     }
                 }
@@ -2385,7 +1924,7 @@ TextureButton buttonNextTurn;
                 // GetRandomFriendUnit() - 随机获得一个友方单位
                 if (instruction == "GetRandomFriendUnit")
                 {
-                    var friendUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.friend && x.isHq != HQ.hq).ToList();
+                    var friendUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.friend).ToList();
                     if (friendUnits.Count > 0)
                     {
                         var rnd = new Random();
@@ -2396,7 +1935,7 @@ TextureButton buttonNextTurn;
                 // GetRandomEnemyUnit() - 随机获得一个敌方单位
                 if (instruction == "GetRandomEnemyUnit")
                 {
-                    var enemyUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy && x.isHq != HQ.hq).ToList();
+                    var enemyUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy).ToList();
                     if (enemyUnits.Count > 0)
                     {
                         var rnd = new Random();
@@ -2468,55 +2007,11 @@ TextureButton buttonNextTurn;
                         }
                     }
                 }
-
-                // GetAllEnemyUnits() - 获得所有敌方单位
-                if (instruction == "GetAllEnemyUnits")
-                {
-                    var enemyUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy).ToList();
-                    targets = enemyUnits;
-                }
-
-                // GetAllFriendUnits() - 获得所有友方单位
-                if (instruction == "GetAllFriendUnits")
-                {
-                    var friendUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.friend).ToList();
-                    targets = friendUnits;
-                }
-
-                // GetAllEnemyTargets() - 获得所有敌方目标(目标=单位+总部)
-                if (instruction == "GetAllEnemyTargets")
-                {
-                    var enemyTargets = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy).ToList();
-                    targets = enemyTargets;
-                }
-
-                // GetAllFriendTargets() - 获得所有友方目标(目标=单位+总部)
-                if (instruction == "GetAllFriendTargets")
-                {
-                    var friendTargets = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.friend).ToList();
-                    targets = friendTargets;
-                }
-
-                // GetEnemyHq() - 获得敌方总部
-                if (instruction == "GetEnemyHq")
-                {
-                    if (enemyHq != null && enemyHq.getState() == CardState.placed)
-                    {
-                        targets = new List<cardBase_> { enemyHq };
-                    }
-                }
-
-                // GetFriendHq() - 获得友方总部
-                if (instruction == "GetFriendHq")
-                {
-                    if (myHq != null && myHq.getState() == CardState.placed)
-                    {
-                        targets = new List<cardBase_> { myHq };
-                    }
-                }
             }
         }
 
+        // 执行所有累积的改变 并检查死亡
+        CheckIfAnyUnitDied();
     }
 
     /// <summary>
@@ -2567,21 +2062,6 @@ TextureButton buttonNextTurn;
     place_ GetTheFirstValidFriendlyPlace()
     {
         foreach (var place in supportLine)
-        {
-            if (place.GetMyCard() == null)
-            {
-                return place;
-            }
-        }
-        return null;
-    }
-
-    /// <summary>
-    /// 获取第一个有效的敌方支援阵线位置
-    /// </summary>
-    place_ GetTheFirstValidEnemySupportPlace()
-    {
-        foreach (var place in enemySupprotLine)
         {
             if (place.GetMyCard() == null)
             {
@@ -2899,7 +2379,7 @@ public class Player
     Label pointLabel;
     Label pointMaxLabel;
 
-    int      point              = 1;
+    int      point              = 0;
     int      pointMax           = 1;
     readonly int pointMaxMax    = 12;
     readonly int pointMaxMaxMax = 24;
@@ -2916,16 +2396,14 @@ public class Player
 
     public void AddPoint(int i = 1)
     {
-        if(point + i >= pointMaxMaxMax) {point = pointMaxMaxMax;}
-        else point += i;
-        
+        if(point + i >= pointMaxMaxMax) {point = pointMaxMaxMax;return;}
+        point += i;
     }
 
     public void AddPointMax(int i = 1)
     {
-        if(pointMax + i >= pointMaxMaxMax) {pointMax = pointMaxMaxMax;}
-        else pointMax += i;
-        RefreshPointLabel();
+        if(pointMax + i >= pointMaxMaxMax) {pointMax = pointMaxMaxMax;return;}
+        pointMax += i;
     }
     
     public Boolean UsePoint(int x)
@@ -2973,6 +2451,18 @@ public class Player
         RefreshPointLabel();
     }
 
+    public void AddPointMax(int x)
+    {
+        if (pointMax + x <= pointMaxMaxMax)
+        {
+            pointMax += x;
+        }
+        else
+        {
+            pointMax = pointMaxMaxMax;
+        }
+        RefreshPointLabel();
+    }
 
     public void AddPointMaxNatural()
     {
@@ -3024,13 +2514,8 @@ public class Player
         for(int i = 0; i < 30; i++)
         {        
             var card = cardRes.Instantiate() as cardBase_;
-            var cardResources = battlefield.GetCardMaganer().GetRandomCard();
-            if(cardResources.Rarity == Rarity.Unobtainable)
-            {
-                 i--;
-                 continue;
-            }
-            card.SetCardInformation(cardResources);
+            
+            card.SetCardInformation(battlefield.GetCardMaganer().GetRandomCard());
             card.SetIsFriend(isFriend);
             deck.Add(card);
         }
@@ -3087,46 +2572,6 @@ public class Player
         {
             await DrawCard();
         }
-    }
-
-    /// <summary>
-    /// 将指定卡牌加入卡组
-    /// </summary>
-    /// <param name="cardId">卡牌ID</param>
-    public void AddCardToDeck(string cardId)
-    {
-        var cardData = battlefield.GetCardMaganer().GetCard(cardId);
-        if (cardData != null)
-        {
-            PackedScene cardRes = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
-            var card = cardRes.Instantiate() as cardBase_;
-            card.SetCardInformation(cardData);
-            card.SetIsFriend(isFriend);
-            deck.Add(card);
-        }
-        ShuffleDeck();
-    }
-
-    /// <summary>
-    /// 洗牌 - 使用Fisher-Yates算法随机打乱卡组
-    /// </summary>
-    public void ShuffleDeck()
-    {
-        Random random = new Random();
-        int n = deck.Count;
-
-        // 从后向前遍历
-        for (int i = n - 1; i > 0; i--)
-        {
-            // 生成0到i之间的随机索引
-            int j = random.Next(i + 1);
-
-            // 交换deck[i]和deck[j]
-            cardBase_ temp = deck[i];
-            deck[i] = deck[j];
-            deck[j] = temp;
-        }
-
     }
 
 
@@ -3189,19 +2634,18 @@ public class CardMaganer
     {
         PackedScene cardRes = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
             var card = cardRes.Instantiate() as cardBase_; 
-            // 根据isFriend参数加载不同的HQ卡牌数据
-            if(isFriend == 1)
-            {
-                card.SetCardInformation(GetCard("moscow"));
-                card.SetIsFriend(IsFriend.friend);
-            }
-            else
-            {
-                card.SetCardInformation(GetCard("berlin"));
-                card.SetIsFriend(IsFriend.enemy);
-            }
-            return card;
+            card.SetCardInformation(GetCard("moscow"));
 
+        if(isFriend == 1)
+        {
+            card.SetIsFriend(IsFriend.friend);
+        }
+        else
+        {
+            card.SetIsFriend(IsFriend.enemy);
+        }
+        return card;
+        
     }
 
 }

@@ -58,10 +58,8 @@ public partial class cardBase_ : Control
 
     public void RefreshUnit()
     {
-        GD.Print($"RefreshUnit: {this}, Type={cardType}, Before: moveAble={moveAble}, attackAble={attackAble}");
         moveAble = 1;
         attackAble = 1;
-        GD.Print($"  After: moveAble={moveAble}, attackAble={attackAble}");
         
         // 奋战特性：单位部署后可立刻战斗
         if (HasTrait(UnitTraits.Determination))
@@ -135,44 +133,35 @@ public partial class cardBase_ : Control
         /// <returns></returns>
     public Boolean CheckIfCanMove()
     {
-        if(moveAble >= 1){
-           return true;
+        if(cardType == CardTypes.Infantry||cardType == CardTypes.Artillery||cardType == CardTypes.Plane||cardType == CardTypes.Bomber)
+        {
+            attackAble = 0;
+        }
+            if(moveAble >= 1){
+            moveAble--;
+            return true;
         }
         return false;
     }
 
-    public void HaveMoved()
-    {
-        moveAble = 0;
-    }
-
     public Boolean CheckIfCanAttack()
     {
-        GD.Print($"CheckIfCanAttack: {this}, Type={cardType}, attackAble={attackAble}, moveAble={moveAble}");
-
-        // 移除了将moveAble设置为0的逻辑，因为步兵移动后应该能够攻击
+        if (cardType == CardTypes.Infantry || cardType == CardTypes.Artillery || cardType == CardTypes.Plane || cardType == CardTypes.Bomber)
+        {
+            moveAble = 0;
+        }
         
         // 检查正常攻击次数
         if (attackAble >= 1)
         {
+            attackAble--;
             return true;
         }
         
         // 检查奋战特性提供的额外攻击次数
 
         
-        GD.Print($"  attackAble < 1, returning false");
         return false;
-    }
-
-    public void HaveAttacked()
-    {
-        attackAble --;
-    }
-
-    public int ReadAttackable()
-    {
-        return attackAble;
     }
 
 
@@ -231,10 +220,6 @@ public partial class cardBase_ : Control
                 case ChangeType.LoseDefence:
                     LoseDefence(change.Value);
                     break;
-                case ChangeType.SetDefence:
-                    SetDefence(change.Value);
-                    break;
-                
             }
         }
         ChangeList.Clear();
@@ -255,26 +240,13 @@ public partial class cardBase_ : Control
     }
 
 /// <summary>
-/// 设置防御力为指定值
-/// </summary>
-/// <param name="n">要设置的防御力值</param>
-    public void SetDefence(int n)
-    {
-        if(n <= 99) defence = n;
-        else defence = 99;
-        // 更新历史最大值并触发闪烁效果
-        if (defence > maxHistoryDefence) maxHistoryDefence = defence;
-        FlashAttributeWithColor("defence", defence, initialDefence, maxHistoryDefence, isInverted: false);
-        RefreshState();
-    }
-
-/// <summary>
 /// 失去防御力
 /// </summary>
 /// <param name="n"></param>
     public void LoseDefence(int n)
     {
-        defence -= n;
+        if (defence - n >= 0) defence -= n;
+        else defence = 0;
         // 触发闪烁效果
         if(defence > 0 )FlashAttributeWithColor("defence", defence, initialDefence, maxHistoryDefence, isInverted: false);
         RefreshState();
@@ -764,8 +736,7 @@ public enum Rarity
     Common,
     Rare,
     Epic,
-    Legendary,
-    Unobtainable
+    Legendary
 }
 
 public enum Stage
@@ -856,7 +827,6 @@ public enum ChangeType
     LoseAttack,
     GetDefence,
     LoseDefence,
-    SetDefence,
 
 }
 

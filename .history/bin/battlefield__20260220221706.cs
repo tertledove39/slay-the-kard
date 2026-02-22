@@ -219,9 +219,6 @@ public partial class battlefield_ : Control
         //RefreshAllCardDisplayOrder();
         await card.MoveToPosition(place.GetPlaceGlobalPosition());
         
-        // 闪击特性：单位被加入战场时刷新
-        if(card.HasTrait(UnitTraits.Blitz)) card.RefreshUnit();
-
                       // 触发被加入战场的效果
         await TriggerUnitEffects("BeingAddedToField", card, new List<cardBase_>(), checkOnlySourceCard: true);
         ResumeDeathCheck(); // 恢复死亡检查
@@ -399,7 +396,6 @@ TextureButton buttonNextTurn;
 
         //初始化敌人
         EnemyInit();
-        
         GetNode<End>("end").Visible = false;
 
         player1.DrawCard(5);
@@ -628,9 +624,6 @@ TextureButton buttonNextTurn;
                     arrowFrom.GlobalPosition = card.GetGlobalPosition() + arrowOffset;
                     cardBase.ProcessMode = Node.ProcessModeEnum.Inherit;
                     cardBase.Visible = true;
-                    
-                    // 高亮合法攻击目标（敌方单位）
-                    HighlightValidAttackTargets(card);
                 }
                 //RefreshAllCardDisplayOrder();
                 
@@ -908,23 +901,6 @@ TextureButton buttonNextTurn;
             return;
         }
 
-        // 检查目标是否具有烟幕特性
-        if (to.HasSmokeScreenActive())
-        {
-            GD.Print($"Attack failed: Target {to} has smoke screen active");
-            AllowControl();
-            ResumeDeathCheck(); // 恢复死亡检查
-            return;
-        }
-
-        // 检查目标是否被守护
-        if (IsTargetProtectedByGuardian(to, from))
-        {
-            AllowControl();
-            ResumeDeathCheck(); // 恢复死亡检查
-            return;
-        }
-
         // 触发攻击者的 Attacking 效果
         await TriggerUnitEffects("Attacking", from, new List<cardBase_> { to }, checkOnlySourceCard: true);
         
@@ -1034,9 +1010,6 @@ TextureButton buttonNextTurn;
         
         PlayBattleSound(1);
         await FlyBullets(from,to);
-
-        // 标记单位已经攻击，减少可攻击次数
-        from.HaveAttacked();
 
         // 步兵、火炮、战斗机和轰炸机攻击后不能移动
         if (from.cardType == CardTypes.Infantry || from.cardType == CardTypes.Artillery || 
@@ -1443,6 +1416,8 @@ TextureButton buttonNextTurn;
             return results;
         }
 
+        GD.Print($"GetAllowedTargets: Attacker={attacker}, Type={attacker.cardType}, IsFriend={attacker.GetIsFriend()}, Place={attacker.GetMyPlace()}");
+
         // 战斗机、火炮和轰炸机可以攻击任意位置的敌军
         if (attacker.cardType == CardTypes.Plane || attacker.cardType == CardTypes.Bomber || attacker.cardType == CardTypes.Artillery)
         {
@@ -1459,8 +1434,7 @@ TextureButton buttonNextTurn;
                 }
                 
                 // 守护特性：检查目标是否被守护
-                bool isProtected = IsTargetProtectedByGuardian(unit, attacker);
-                if (isProtected)
+                if (IsTargetProtectedByGuardian(unit))
                 {
                     continue;
                 }
@@ -1532,7 +1506,7 @@ TextureButton buttonNextTurn;
                 }
                 
                 // 守护特性：检查目标是否被守护
-                if (IsTargetProtectedByGuardian(c, attacker))
+                if (IsTargetProtectedByGuardian(c))
                 {
                     continue;
                 }
@@ -1548,9 +1522,10 @@ TextureButton buttonNextTurn;
     /// <summary>
     /// 检查目标是否被守护单位保护
     /// </summary>
-    private bool IsTargetProtectedByGuardian(cardBase_ target, cardBase_ attacker)
+    private bool IsTargetProtectedByGuardian(cardBase_ target)
     {
-        if (target == null || attacker == null) return false;
+        if (target == null) return false;
+        
         // 具有烟幕的单位，守护不生效
         if (target.HasSmokeScreenActive())
         {
@@ -1565,42 +1540,24 @@ TextureButton buttonNextTurn;
         
         var targetPlace = target.GetMyPlace();
         if (targetPlace == null) return false;
-
-        // 确定目标所在的阵线
-        List<place_> targetLine = null;
-        if (frontLine.Contains(targetPlace))
-        {
-            targetLine = frontLine;
-        }
-        else if (supportLine.Contains(targetPlace))
-        {
-            targetLine = supportLine;
-        }
-        else if (enemySupprotLine.Contains(targetPlace))
-        {
-            targetLine = enemySupprotLine;
-        }
         
-        if (targetLine == null) return false;
-        
-        // 检查目标左侧是否有守护单位（在同一阵线中）
-        int targetIndex = targetLine.IndexOf(targetPlace);
-        if (targetIndex > 0)
+        // 检查目标左侧是否有守护单位
+        var leftPlace = GetLeftPlace(targetPlace);
+        if (leftPlace != null)
         {
-            var leftPlace = targetLine[targetIndex - 1];
             var leftCard = leftPlace.GetMyCard();
-            if (leftCard != null && leftCard.HasTrait(UnitTraits.Guardian))
+            if (leftCard != null && leftCard.HasTrait(UnitTraits.Guardian) && leftCard.GetIsFriend() == target.GetIsFriend())
             {
                 return true;
             }
         }
         
-        // 检查目标右侧是否有守护单位（在同一阵线中）
-        if (targetIndex < targetLine.Count - 1)
+        // 检查目标右侧是否有守护单位
+        var rightPlace = GetRightPlace(targetPlace);
+        if (rightPlace != null)
         {
-            var rightPlace = targetLine[targetIndex + 1];
             var rightCard = rightPlace.GetMyCard();
-            if (rightCard != null && rightCard.HasTrait(UnitTraits.Guardian))
+            if (rightCard != null && rightCard.HasTrait(UnitTraits.Guardian) && rightCard.GetIsFriend() == target.GetIsFriend())
             {
                 return true;
             }
@@ -1752,23 +1709,29 @@ TextureButton buttonNextTurn;
 
             // 其次：能破坏任一单位则攻击该单位（仅在允许目标中寻找）
             var killable = allowedTargets.FirstOrDefault(u => CanDestroyTarget(attacker, u));
+            GD.Print($"  Checking killable unit: found={killable != null}");
             if (killable != null)
             {
+                GD.Print($"  Attacking killable unit: {killable}");
                 await Attack(attacker, killable);
                 continue;
             }
 
             // 其后：能攻击总部（非必定破坏，且总部在允许目标中）
+            GD.Print($"  Checking HQ attack (non-lethal): inTargets={allowedTargets.Contains(myHq)}");
             if (myHq != null && allowedTargets.Contains(myHq))
             {
+                GD.Print($"  Attacking HQ (non-lethal)");
                 await Attack(attacker, myHq);
                 continue;
             }
 
             // 最后：随机攻击一个允许的单位
+            GD.Print($"  Random attack from {allowedTargets.Count} targets");
             var targetRandom = allowedTargets[rnd.Next(allowedTargets.Count)];
             if (targetRandom != null)
             {
+                GD.Print($"  Attacking random target: {targetRandom}");
                 await Attack(attacker, targetRandom);
                 continue;
             }
@@ -1851,7 +1814,6 @@ TextureButton buttonNextTurn;
             TriggerUnitEffects("Dead", deadUnit, checkOnlySourceCard:true);
             RemoveCard(deadUnit);
             PlayDeadSound(1);
-            CheckIfAnyUnitDied(); // 递归检查是否有新的死亡单位
         }
     }
 
@@ -1859,27 +1821,27 @@ TextureButton buttonNextTurn;
             /// <summary>
             /// 暂时用作测试
             /// </summary>
-    public async void OnNextTurnButtonPressed()
+    public void OnNextTurnButtonPressed()
     {
         // 触发友方回合结束时点
-        await TriggerUnitEffects("FriendlyTurnEnd", null);
+        TriggerUnitEffects("FriendlyTurnEnd", null);
         
         // 触发双方回合结束时点
-        await TriggerUnitEffects("TurnEnd", null);
+        TriggerUnitEffects("TurnEnd", null);
         CheckIfAnyUnitDied(); // 检查死亡
         
         
         // 触发敌方回合开始时点
-        await TriggerUnitEffects("EnemyTurnBegin", null);
+        TriggerUnitEffects("EnemyTurnBegin", null);
         
         // 触发双方回合开始时点
-        await TriggerUnitEffects("TurnBegin", null);
+        TriggerUnitEffects("TurnBegin", null);
         
         // 触发友方回合开始时点
-        await TriggerUnitEffects("FriendlyTurnBegin", null);
+        TriggerUnitEffects("FriendlyTurnBegin", null);
         CheckIfAnyUnitDied(); // 检查死亡
 
-        await EnemyTurnAsync();
+        EnemyTurnAsync();
         
         _ = player1.DrawCard();
         player1.AddPointMaxNatural();
@@ -1902,25 +1864,6 @@ TextureButton buttonNextTurn;
         }
         cardInPlaces.Remove(card);
         card.Dead();
-    }
-
-    /// <summary>
-    /// 高亮合法的攻击目标，其他单位变成灰色
-    /// </summary>
-    public void HighlightValidAttackTargets(cardBase_ attacker)
-    {
-        var validTargets = GetAllowedTargets(attacker);
-        foreach (var card in cardInPlaces.Where(x=>x.getState()==CardState.placed).ToList())
-        {
-            if (validTargets.Contains(card))
-            {
-                card.RestoreColor();
-            }
-            else
-            {
-                card.SetGrayscale();
-            }
-        }
     }
 
     /// <summary>
@@ -2140,7 +2083,7 @@ TextureButton buttonNextTurn;
                 }
 
                 // Heal(n) - 使用AddChange增加防御力
-                if (instruction.StartsWith("Heal", StringComparison.OrdinalIgnoreCase))
+                if (instruction.StartsWith("Heal"))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\((\d+)\)");
                     if (match.Success && int.TryParse(match.Groups[1].Value, out int healAmount))
@@ -3127,6 +3070,7 @@ public class Player
             deck[j] = temp;
         }
 
+        GD.Print($"Deck shuffled. Total cards: {deck.Count}");
     }
 
 

@@ -155,6 +155,7 @@ public partial class cardBase_ : Control
         // 检查正常攻击次数
         if (attackAble >= 1)
         {
+            attackAble--;
             return true;
         }
         

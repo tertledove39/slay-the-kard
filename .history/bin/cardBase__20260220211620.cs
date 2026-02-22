@@ -155,6 +155,7 @@ public partial class cardBase_ : Control
         // 检查正常攻击次数
         if (attackAble >= 1)
         {
+            attackAble--;
             return true;
         }
         
@@ -167,7 +168,7 @@ public partial class cardBase_ : Control
 
     public void HaveAttacked()
     {
-        attackAble --;
+        attackAble = 0;
     }
 
     public int ReadAttackable()
