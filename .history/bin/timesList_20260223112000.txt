@@ -1,0 +1,84 @@
+[times]
+BeingAddedToField        target: 被加入战场的单位
+Deployed                 target: 从手牌部署的单位
+FriendlyTankDeployed     target: 部署的友方坦克
+FriendlyInfantryDeployed target: 部署的友方步兵
+Moving                   target: 移动的单位
+Attacking                target: 攻击目标(to)
+BeingAttacked            target: 被攻击单位(to), 攻击者(from)
+BecomingAttackTarget     target: 成为敌方攻击目标的友方单位, 攻击者(from)
+FightingInfantry         target: 被攻击的步兵单位(to)
+AttackingHq              target: 被攻击的总部(to)
+FriendlyUnitAttacking    target: 攻击目标(to), 攻击者(from)
+EnemyUnitAttacking       target: 攻击目标(to), 攻击者(from)
+FriendlyUnitBeingAttacked target: 被攻击的友方单位(to), 攻击者(from)
+EnemyUnitBeingAttacked   target: 被攻击的敌方单位(to), 攻击者(from)
+Dead                     target: 死亡的单位
+FriendlyTurnEnd          
+TurnEnd                  
+EnemyTurnBegin           
+TurnBegin                
+FriendlyTurnBegin        
+
+[keys]
+Heal(n)                 增加目标防御力n点
+damage(n)               减少目标防御力n点，不带参数时使用result值
+GetAttack(n)            增加目标攻击力n点
+LoseAttack(n)           减少目标攻击力n点
+SetDefence(n)           设置目标防御力为n点
+myHq                    友方总部
+enemyHq                 敌方总部
+this                    执行效果的单位本身
+target                  目标单位
+setResult(n)            将内存(result)设置为n
+drawCard                抽等于result值的卡，默认抽1张
+DrawACard(s,i)          尝试从卡组中抽出i张名字含s字符串的单位
+DrawACardWithType(u,i)  从卡组中抽出i张类型为u的卡
+DiscardRandomly(i)      随机弃置i张卡
+GetCardsBeingTreated    获得刚刚被抽到的卡的引用
+AddToHand(s)            将名字为s的卡加入手牌
+DiscardWithName(s,i)    弃置i张名字含s的卡(若可能)
+addToSupportLine(s)      添加卡id为s的卡到支援阵线
+addToEnemySupportLine(s) 添加卡id为s的卡到敌方支援阵线
+addToDeck(s)            将卡id为s的卡洗入卡组
+GetPoint()              获得指挥点，存入result
+GetPointMax()           获得指挥点槽，存入result
+AddPointMax(n)          增加指挥点槽n点
+AddPoint(n)             增加指挥点n点
+getCount(${selector})    获取符合选择器条件的单位数量，存入result
+GetTargetByIndex(n)      获得target中第n位的单位
+if(condition)A|A:       条件跳转，满足条件则跳转到标签A
+Jump&标签               跳转到指定标签
+setTarget               设置目标为传入的targetCard
+GetRandomFriendUnit()    随机获得一个友方单位
+GetRandomEnemyUnit()     随机获得一个敌方单位
+GetRandomFriendTarget()  随机获得一个友方目标(目标=单位+总部)
+GetRandomEnemyTarget()   随机获得一个敌方目标(目标=单位+总部)
+GetRandomNumber(min,max) 随机获得一个数字(包括两个参数,min,max)
+KillAllTargets()        消灭列表上的所有单位
+HealAllTargets()        完全修复单位，将列表上所有单位的防御力设置为历史最大值
+GetAllEnemyUnits()      获得所有敌方单位
+GetAllFriendUnits()     获得所有友方单位
+GetAllEnemyTargets()    获得所有敌方目标(目标=单位+总部)
+GetAllFriendTargets()   获得所有友方目标(目标=单位+总部)
+GetEnemyHq()            获得敌方总部
+GetFriendHq()           获得友方总部
+
+[conditions]
+result>n, result>=n, result<n, result<=n, result==n, result!=n
+targets.count>n, targets.count>=n, targets.count<n, targets.count<=n, targets.count==n, targets.count!=n
+target.isFriend, target.isEnemy
+target.cardType==类型名, target.cardType!=类型名
+target.cost>n, target.cost>=n, target.cost<n, target.cost<=n, target.cost==n, target.cost!=n
+target.attack>n, target.attack>=n, target.attack<n, target.attack<=n, target.attack==n, target.attack!=n
+target.defence>n, target.defence>=n, target.defence<n, target.defence<=n, target.defence==n, target.defence!=n
+source.isFriend, source.isEnemy
+
+[selectors]
+allTargets              所有目标
+allTargets.unit          所有单位
+allTargets.unit.friend   所有友方单位
+allTargets.unit.enemy    所有敌方单位
+allTargets.hq            所有总部
+allTargets.hq.friend     友方总部
+allTargets.hq.enemy      敌方总部

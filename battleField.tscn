@@ -185,4 +185,13 @@ script = ExtResource("11_h5p18")
 
 [node name="img" type="Sprite2D" parent="end"]
 
+[node name="Button" type="Button" parent="."]
+layout_mode = 0
+offset_left = 1427.0
+offset_top = 268.0
+offset_right = 1535.0
+offset_bottom = 360.0
+text = "test"
+
 [connection signal="pressed" from="NextTurnButton" to="." method="OnNextTurnButtonPressed"]
+[connection signal="pressed" from="Button" to="." method="TestButtonPressed"]
