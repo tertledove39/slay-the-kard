@@ -86,6 +86,7 @@ public partial class battlefield_ : Control
     private CanvasLayer choiceLayer;
     private ColorRect choiceDim;
     private HBoxContainer choiceContainer;
+    private TaskCompletionSource<cardBase_> choiceTaskSource;
     private List<cardBase_> choiceCards = new List<cardBase_>();
 
     /// <summary>
@@ -181,36 +182,21 @@ public partial class battlefield_ : Control
 
         cardInPlaces = SortCardList(cardInPlaces).AsEnumerable().Reverse().ToList();
 
-        if (cardNowChoose != null)
+
+        
+        
+
+        if(cardNowChoose!= null)
         {
             MoveChild(cardNowChoose,1);
             cardNowChoose.ZIndex = 15;
         }
-
-        if (cardInPlaces != null)
+        foreach (var card in cardInPlaces)
         {
-            foreach (var card in cardInPlaces)
-            {
-                if (card == null)
-                    continue;
-
-                if (card == cardNowChoose)
-                {
-                    continue;
-                }
-
-                MoveChild(card, 1);
-
-                if (isShowingChoiceUI && choiceCards != null && choiceCards.Contains(card))
-                {
-                    card.ZIndex = 40;
-                }
-                else
-                {
-                    card.ZIndex = 10;
-                }
-            }
-        }
+            if (card!= cardNowChoose) MoveChild(card,1);
+            card.ZIndex = 10;
+            
+        } 
 
         foreach (var card in player1.GetCardsInHand())
         {
@@ -465,149 +451,70 @@ TextureButton buttonNextTurn;
         choiceLayer.AddChild(choiceDim);
 
         choiceContainer = new HBoxContainer();
+        choiceContainer.Separation = 30;
         choiceContainer.Alignment = BoxContainer.AlignmentMode.Center;
         choiceContainer.SetAnchorsPreset(Control.LayoutPreset.Center);
         choiceContainer.SetCustomMinimumSize(new Vector2(900, 420));
-        choiceContainer.MouseFilter = Control.MouseFilterEnum.Ignore;
         choiceContainer.Visible = false;
         choiceLayer.AddChild(choiceContainer);
     }
 
-    private async Task<cardBase_> ShowCardChoice(List<cardBase_> cards, bool animateExit = true)
+    private async Task<cardBase_> ShowCardChoice(List<cardBase_> cards)
     {
         if (cards == null || cards.Count == 0)
             return null;
 
+        choiceTaskSource = new TaskCompletionSource<cardBase_>();
         choiceCards = new List<cardBase_>(cards);
 
+        foreach (var child in choiceContainer.GetChildren())
+        {
+            choiceContainer.RemoveChild(child);
+            child.QueueFree();
+        }
 
-
-        Vector2 screenSize = GetViewportRect().Size;
-        float cardWidth = 240f; // 卡牌宽度
-        float cardSpacing = 10f; // 卡牌间距
-        float totalWidth = choiceCards.Count * cardWidth + (choiceCards.Count - 1) * cardSpacing;
-        float startX = (screenSize.X - totalWidth) / 2 + cardWidth / 2-40; // 起始x坐标，确保居中
-
-        // 设置所有卡牌在最上层显示，并添加到选择层中
         foreach (var card in choiceCards)
         {
-            card.ZIndex = 100;
+            var cardNode = card;
+            cardNode.Scale = new Vector2(0.85f, 0.85f);
+            cardNode.MouseFilter = Control.MouseFilterEnum.Stop;
+            cardNode.SetCustomMinimumSize(new Vector2(260, 380));
+            cardNode.SizeFlagsHorizontal = (int)SizeFlags.ExpandFill;
+            cardNode.SizeFlagsVertical = (int)SizeFlags.ExpandFill;
+
+            cardNode.Connect("gui_input", Callable.From<InputEvent>((input) => OnChoiceCardClicked(cardNode, input)));
+
+            var wrapper = new CenterContainer();
+            wrapper.SetCustomMinimumSize(new Vector2(260, 380));
+            wrapper.SizeFlagsHorizontal = (int)SizeFlags.ExpandFill;
+            wrapper.SizeFlagsVertical = (int)SizeFlags.ExpandFill;
+            wrapper.AddChild(cardNode);
+            choiceContainer.AddChild(wrapper);
         }
 
-        for (int i = 0; i < choiceCards.Count; i++)
-        {
-            var card = choiceCards[i];
-            AddToBattleField(card);
-            choiceLayer.AddChild(card);
-        
-            // 计算卡牌目标位置：屏幕中心水平排列，垂直居中
-            float xPos = startX + i * (cardWidth + cardSpacing) - 90;
-            float yPos = screenSize.Y / 2 - 120;
-
-            // 从屏幕左侧外部开始飞入，并确保卡牌直立
-            card.ResetVisualsInstant();
-            card.Rotation = 0f;
-            card.GlobalPosition = new Vector2(-cardWidth - 100, yPos);
-            
-            await card.MoveToPosition(new Vector2(xPos, yPos), 0.5f);
-            
-            // 可以移除或减少延迟时间
-            await Task.Delay(20); // 从10000减少到500毫秒
-        }
-
+        choiceDim.Visible = true;
+        choiceDim.Color = new Color(0, 0, 0, 0.55f);
         choiceContainer.Visible = true;
-        isShowingChoiceUI = true;
 
-        // 等待玩家选择一张卡牌
-        selectedChoiceCard = null;
-        while (selectedChoiceCard == null)
-        {
-            await Task.Delay(50); // 异步等待，避免忙等待阻塞游戏
-        }
+        var selectedCard = await choiceTaskSource.Task;
 
         choiceContainer.Visible = false;
-        isShowingChoiceUI = false;
+        choiceDim.Visible = false;
 
-        if (animateExit)
-        {
-            // Choose模式：被选择的卡飞出屏幕
-            if (selectedChoiceCard != null)
-            {
-                selectedChoiceCard.ResetVisualsInstant();
-                var exitY = selectedChoiceCard.GlobalPosition.Y;
-                var exitPos = new Vector2(-cardWidth - 200, exitY);
-                await selectedChoiceCard.MoveToPosition(exitPos, 0.25f);
-            }
-
-            // 清理用于选择的临时卡牌
-            foreach (var card in choiceCards)
-            {
-                if (card == null)
-                    continue;
-
-                if (card.GetParent() != null)
-                {
-                    RemoveCard(card);
-                }
-            }
-        }
-        else
-        {
-            // Develop模式：被选择的卡回到正常亮度并正常加入手中，多余的卡飞出屏幕并被移除
-            if (selectedChoiceCard != null)
-            {
-                selectedChoiceCard.ResetVisualsInstant();
-                selectedChoiceCard.RestoreColor(); // 恢复正常亮度
-                selectedChoiceCard.ZIndex = 10; // 恢复正常层级
-            }
-
-            // 多余的卡飞出屏幕并被移除
-            foreach (var card in choiceCards)
-            {
-                if (card == null)
-                    continue;
-
-                if (card != selectedChoiceCard)
-                {
-                    var exitY = card.GlobalPosition.Y;
-                    var exitPos = new Vector2(-cardWidth - 200, exitY);
-                    await card.MoveToPosition(exitPos, 0.25f);
-
-                    // 使用RemoveCard正确清理卡牌
-                    RemoveCard(card);
-                }
-            }
-        }
-
-        choiceCards.Clear();
-
-        return selectedChoiceCard;
+        return selectedCard;
     }
 
-    private cardBase_ selectedChoiceCard;
-    private bool isShowingChoiceUI = false;
-
-    /// <summary>
-    /// 处理卡牌选择界面的点击
-    /// </summary>
-    private void HandleChoiceCardClick(Vector2 mousePosition)
+    private void OnChoiceCardClicked(cardBase_ clickedCard, InputEvent inputEvent)
     {
-        if (!isShowingChoiceUI || choiceCards == null || choiceCards.Count == 0)
-            return;
-
-        foreach (var card in choiceCards)
+        if (inputEvent is InputEventMouseButton mouseEvent && mouseEvent.Pressed && mouseEvent.ButtonIndex == MouseButton.Left)
         {
-            if (card == null)
-                continue;
-
-            if (card.GetGlobalRect().HasPoint(mousePosition))
+            var originalCard = choiceCards.Find(c => c.name == clickedCard.name && c.id == clickedCard.id);
+            if (originalCard != null)
             {
-                selectedChoiceCard = card;
-                return;
+                choiceTaskSource?.SetResult(originalCard);
             }
         }
     }
-
 
     UnitTraits GetTraitList(string s)
     {
@@ -774,19 +681,8 @@ TextureButton buttonNextTurn;
     public override void _Input(InputEvent @event)
     {
         if (ReadControlState() == 1) return;
-        
-        if (@event is InputEventMouseButton mouseButton)
+         if (@event is InputEventMouseButton mouseButton)
         {
-            // 处理卡牌选择界面的输入
-            if (mouseButton.Pressed && mouseButton.ButtonIndex == MouseButton.Left)
-            {
-                if (isShowingChoiceUI)
-                {
-                    HandleChoiceCardClick(GetGlobalMousePosition());
-                    return; // 选择界面中不要处理其他输入
-                }
-            }
-            
             var mousePosition = GetGlobalMousePosition();
             //选择卡
             if (mouseButton.Pressed)
@@ -3308,27 +3204,12 @@ TextureButton buttonNextTurn;
                     
                     if (instruction.Contains("&"))
                     {
-                        // 解析&selector 或 &targets
-                        var selectorMatch = System.Text.RegularExpressions.Regex.Match(instruction, @"&([A-Za-z0-9_\.]+)");
+                        // 解析&selector
+                        var selectorMatch = System.Text.RegularExpressions.Regex.Match(instruction, @"&\{([^}]*)\}");
                         if (selectorMatch.Success)
                         {
-                            string selector = selectorMatch.Groups[1].Value.Trim();
-                            if (selector.Equals("targets", StringComparison.OrdinalIgnoreCase))
-                            {
-                                cardsToPlay = new List<cardBase_>(targets);
-                            }
-                            else if (selector.StartsWith("$"))
-                            {
-                                cardsToPlay = GetTargetsFromSelector(selector.Substring(1));
-                            }
-                            else
-                            {
-                                cardsToPlay = GetTargetsFromSelector(selector);
-                            }
-                        }
-                        else
-                        {
-                            cardsToPlay = new List<cardBase_>(targets);
+                            string selector = selectorMatch.Groups[1].Value;
+                            cardsToPlay = GetTargetsFromSelector(selector);
                         }
                     }
                     else
@@ -3378,7 +3259,7 @@ TextureButton buttonNextTurn;
                             cardBInstance.SetIsFriend(sourceCard?.GetIsFriend() ?? IsFriend.friend);
 
                             // 显示选择界面
-                            var selectedCard = await ShowCardChoice(new List<cardBase_> { cardAInstance, cardBInstance }, true);
+                            var selectedCard = await End.Instance.ShowCardChoice(new List<cardBase_> { cardAInstance, cardBInstance });
                             
                             // 执行选中卡牌的效果
                             if (selectedCard != null)
@@ -3396,7 +3277,7 @@ TextureButton buttonNextTurn;
                 // Develop 或 Develop($selector) 或 Develop(name1,name2,...) - 开发效果
                 if (instruction.StartsWith("Develop"))
                 {
-                    List<cardBase_> cardsToShow = new List<cardBase_>();
+                    List<cardBase_> candidateCards = new List<cardBase_>();
 
                     if (instruction.Contains("(") && instruction.Contains(")"))
                     {
@@ -3407,24 +3288,14 @@ TextureButton buttonNextTurn;
                             
                             if (param.StartsWith("$"))
                             {
-                                // 使用选择器，从池中随机选择3张
+                                // 使用选择器
                                 var selector = param.Substring(1);
-                                var candidateCards = GetTargetsFromSelector(selector);
-                                
-                                var randomCards = new List<cardBase_>();
-                                var rnd = new Random();
-                                var shuffled = candidateCards.OrderBy(x => rnd.Next()).ToList();
-                                for (int idx = 0; idx < Math.Min(3, shuffled.Count); idx++)
-                                {
-                                    randomCards.Add(shuffled[idx]);
-                                }
-                                cardsToShow = randomCards;
+                                candidateCards = GetTargetsFromSelector(selector);
                             }
                             else
                             {
-                                // 使用名字列表，直接实例化这些卡，如果多于3张则随机选择3张
+                                // 使用名字列表
                                 var names = param.Split(',');
-                                var candidateCards = new List<cardBase_>();
                                 foreach (var name in names)
                                 {
                                     var cardData = GetCardMaganer().GetCard(name.Trim());
@@ -3436,40 +3307,28 @@ TextureButton buttonNextTurn;
                                         candidateCards.Add(cardInstance);
                                     }
                                 }
-                                
-                                // 如果多于3张，随机选择3张
-                                if (candidateCards.Count > 3)
-                                {
-                                    var rnd = new Random();
-                                    candidateCards = candidateCards.OrderBy(x => rnd.Next()).Take(3).ToList();
-                                }
-                                
-                                cardsToShow = candidateCards;
                             }
                         }
                     }
                     else
                     {
                         // 默认使用targets
-                        cardsToShow = targets.Select(t =>
-                        {
-                            var cardData = GetCardMaganer().GetCard(t.name);
-                            if (cardData != null)
-                            {
-                                PackedScene cardRes = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
-                                var newCard = cardRes.Instantiate() as cardBase_;
-                                newCard.SetCardInformation(cardData);
-                                newCard.SetIsFriend(t.GetIsFriend());
-                                return newCard;
-                            }
-                            return null;
-                        }).Where(c => c != null).ToList();
+                        candidateCards = new List<cardBase_>(targets);
                     }
 
-                    if (cardsToShow.Count > 0)
+                    // 从候选卡中随机选择3张
+                    var randomCards = new List<cardBase_>();
+                    var rnd = new Random();
+                    var shuffled = candidateCards.OrderBy(x => rnd.Next()).ToList();
+                    for (int idx = 0; idx < Math.Min(3, shuffled.Count); idx++)
+                    {
+                        randomCards.Add(shuffled[idx]);
+                    }
+
+                    if (randomCards.Count > 0)
                     {
                         // 显示选择界面
-                        var selectedCard = await ShowCardChoice(cardsToShow, false);
+                        var selectedCard = await End.Instance.ShowCardChoice(randomCards);
                         
                         // 将选中卡加入手牌
                         if (selectedCard != null && sourceCard?.GetIsFriend() == IsFriend.friend)
@@ -3482,13 +3341,13 @@ TextureButton buttonNextTurn;
                         }
 
                         // 释放未选择的卡牌回到池中
-                        //foreach (var card in cardsToShow)
-                        //{
-                        //    if (card != selectedCard)
-                        //    {
-                        //        RemoveCard(card);
-                        //    }
-                        //}
+                        foreach (var card in randomCards)
+                        {
+                            if (card != selectedCard)
+                            {
+                                ResourceManager.Instance.ReleaseEmptyCard(card);
+                            }
+                        }
                     }
                 }
 

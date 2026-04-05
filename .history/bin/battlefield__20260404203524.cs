@@ -83,11 +83,6 @@ public partial class battlefield_ : Control
     /// </summary>
     private List<cardBase_> cardInPlaces = new List<cardBase_>();
 
-    private CanvasLayer choiceLayer;
-    private ColorRect choiceDim;
-    private HBoxContainer choiceContainer;
-    private List<cardBase_> choiceCards = new List<cardBase_>();
-
     /// <summary>
     /// 自定义内存变量：在当前战场场景中持久保存
     /// </summary>
@@ -181,43 +176,25 @@ public partial class battlefield_ : Control
 
         cardInPlaces = SortCardList(cardInPlaces).AsEnumerable().Reverse().ToList();
 
-        if (cardNowChoose != null)
+
+        
+        foreach (var card in player1.GetCardsInHand())
+        {
+            MoveChild(card,1);
+            card.ZIndex = 20;
+        }
+
+        if(cardNowChoose!= null)
         {
             MoveChild(cardNowChoose,1);
             cardNowChoose.ZIndex = 15;
         }
-
-        if (cardInPlaces != null)
+        foreach (var card in cardInPlaces)
         {
-            foreach (var card in cardInPlaces)
-            {
-                if (card == null)
-                    continue;
-
-                if (card == cardNowChoose)
-                {
-                    continue;
-                }
-
-                MoveChild(card, 1);
-
-                if (isShowingChoiceUI && choiceCards != null && choiceCards.Contains(card))
-                {
-                    card.ZIndex = 40;
-                }
-                else
-                {
-                    card.ZIndex = 10;
-                }
-            }
-        }
-
-        foreach (var card in player1.GetCardsInHand())
-        {
-            MoveChild(card,1);
-            int cardIndex = player1.GetCardsInHand().IndexOf(card);
-            card.ZIndex = (cardIndex == player1.GetHoveredHandIndex()) ? 30 : 20;
-        }
+            if (card!= cardNowChoose) MoveChild(card,1);
+            card.ZIndex = 10;
+            
+        } 
     }
 
     /// <summary>
@@ -262,7 +239,7 @@ public partial class battlefield_ : Control
                       // 触发被加入战场的效果
         await TriggerUnitEffects("BeingAddedToField", card, new List<cardBase_>(), checkOnlySourceCard: true);
         ResumeDeathCheck(); // 恢复死亡检查
-        CheckIfAnyUnitDiedAsync(); // 检查死亡
+        CheckIfAnyUnitDied(); // 检查死亡
     }
 
 /// <summary>
@@ -351,8 +328,6 @@ TextureButton buttonNextTurn;
         var resourceManager = new ResourceManager();
         AddChild(resourceManager);
         resourceManager.Initialize();
-
-        CreateChoiceOverlay();
 
         // 保证卡牌列表立刻可用，避免 Sort/Refresh 时出现 null
         cardInPlaces = new List<cardBase_>();
@@ -451,163 +426,6 @@ TextureButton buttonNextTurn;
 
         player1.DrawCard(5);
     }
-
-    private void CreateChoiceOverlay()
-    {
-        choiceLayer = new CanvasLayer();
-        AddChild(choiceLayer);
-
-        choiceDim = new ColorRect();
-        choiceDim.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        choiceDim.Color = new Color(0, 0, 0, 0);
-        choiceDim.MouseFilter = Control.MouseFilterEnum.Stop;
-        choiceDim.Visible = false;
-        choiceLayer.AddChild(choiceDim);
-
-        choiceContainer = new HBoxContainer();
-        choiceContainer.Alignment = BoxContainer.AlignmentMode.Center;
-        choiceContainer.SetAnchorsPreset(Control.LayoutPreset.Center);
-        choiceContainer.SetCustomMinimumSize(new Vector2(900, 420));
-        choiceContainer.MouseFilter = Control.MouseFilterEnum.Ignore;
-        choiceContainer.Visible = false;
-        choiceLayer.AddChild(choiceContainer);
-    }
-
-    private async Task<cardBase_> ShowCardChoice(List<cardBase_> cards, bool animateExit = true)
-    {
-        if (cards == null || cards.Count == 0)
-            return null;
-
-        choiceCards = new List<cardBase_>(cards);
-
-
-
-        Vector2 screenSize = GetViewportRect().Size;
-        float cardWidth = 240f; // 卡牌宽度
-        float cardSpacing = 10f; // 卡牌间距
-        float totalWidth = choiceCards.Count * cardWidth + (choiceCards.Count - 1) * cardSpacing;
-        float startX = (screenSize.X - totalWidth) / 2 + cardWidth / 2-40; // 起始x坐标，确保居中
-
-        // 设置所有卡牌在最上层显示，并添加到选择层中
-        foreach (var card in choiceCards)
-        {
-            card.ZIndex = 100;
-        }
-
-        for (int i = 0; i < choiceCards.Count; i++)
-        {
-            var card = choiceCards[i];
-            AddToBattleField(card);
-            choiceLayer.AddChild(card);
-        
-            // 计算卡牌目标位置：屏幕中心水平排列，垂直居中
-            float xPos = startX + i * (cardWidth + cardSpacing) - 90;
-            float yPos = screenSize.Y / 2 - 120;
-
-            // 从屏幕左侧外部开始飞入，并确保卡牌直立
-            card.ResetVisualsInstant();
-            card.Rotation = 0f;
-            card.GlobalPosition = new Vector2(-cardWidth - 100, yPos);
-            
-            await card.MoveToPosition(new Vector2(xPos, yPos), 0.5f);
-            
-            // 可以移除或减少延迟时间
-            await Task.Delay(20); // 从10000减少到500毫秒
-        }
-
-        choiceContainer.Visible = true;
-        isShowingChoiceUI = true;
-
-        // 等待玩家选择一张卡牌
-        selectedChoiceCard = null;
-        while (selectedChoiceCard == null)
-        {
-            await Task.Delay(50); // 异步等待，避免忙等待阻塞游戏
-        }
-
-        choiceContainer.Visible = false;
-        isShowingChoiceUI = false;
-
-        if (animateExit)
-        {
-            // Choose模式：被选择的卡飞出屏幕
-            if (selectedChoiceCard != null)
-            {
-                selectedChoiceCard.ResetVisualsInstant();
-                var exitY = selectedChoiceCard.GlobalPosition.Y;
-                var exitPos = new Vector2(-cardWidth - 200, exitY);
-                await selectedChoiceCard.MoveToPosition(exitPos, 0.25f);
-            }
-
-            // 清理用于选择的临时卡牌
-            foreach (var card in choiceCards)
-            {
-                if (card == null)
-                    continue;
-
-                if (card.GetParent() != null)
-                {
-                    RemoveCard(card);
-                }
-            }
-        }
-        else
-        {
-            // Develop模式：被选择的卡回到正常亮度并正常加入手中，多余的卡飞出屏幕并被移除
-            if (selectedChoiceCard != null)
-            {
-                selectedChoiceCard.ResetVisualsInstant();
-                selectedChoiceCard.RestoreColor(); // 恢复正常亮度
-                selectedChoiceCard.ZIndex = 10; // 恢复正常层级
-            }
-
-            // 多余的卡飞出屏幕并被移除
-            foreach (var card in choiceCards)
-            {
-                if (card == null)
-                    continue;
-
-                if (card != selectedChoiceCard)
-                {
-                    var exitY = card.GlobalPosition.Y;
-                    var exitPos = new Vector2(-cardWidth - 200, exitY);
-                    await card.MoveToPosition(exitPos, 0.25f);
-
-                    // 使用RemoveCard正确清理卡牌
-                    RemoveCard(card);
-                }
-            }
-        }
-
-        choiceCards.Clear();
-
-        return selectedChoiceCard;
-    }
-
-    private cardBase_ selectedChoiceCard;
-    private bool isShowingChoiceUI = false;
-
-    /// <summary>
-    /// 处理卡牌选择界面的点击
-    /// </summary>
-    private void HandleChoiceCardClick(Vector2 mousePosition)
-    {
-        if (!isShowingChoiceUI || choiceCards == null || choiceCards.Count == 0)
-            return;
-
-        foreach (var card in choiceCards)
-        {
-            if (card == null)
-                continue;
-
-            if (card.GetGlobalRect().HasPoint(mousePosition))
-            {
-                selectedChoiceCard = card;
-                return;
-            }
-        }
-    }
-
 
     UnitTraits GetTraitList(string s)
     {
@@ -774,19 +592,8 @@ TextureButton buttonNextTurn;
     public override void _Input(InputEvent @event)
     {
         if (ReadControlState() == 1) return;
-        
-        if (@event is InputEventMouseButton mouseButton)
+         if (@event is InputEventMouseButton mouseButton)
         {
-            // 处理卡牌选择界面的输入
-            if (mouseButton.Pressed && mouseButton.ButtonIndex == MouseButton.Left)
-            {
-                if (isShowingChoiceUI)
-                {
-                    HandleChoiceCardClick(GetGlobalMousePosition());
-                    return; // 选择界面中不要处理其他输入
-                }
-            }
-            
             var mousePosition = GetGlobalMousePosition();
             //选择卡
             if (mouseButton.Pressed)
@@ -882,7 +689,7 @@ TextureButton buttonNextTurn;
                             _ = ParseAndExecuteEffect(cardNowChoose.effect, cardNowChoose, null);
                             player1.RemoveFromHand(cardNowChoose);
                             RemoveCard(cardNowChoose);
-                            CheckIfAnyUnitDiedAsync(); // 结算单位变化
+                            CheckIfAnyUnitDied(); // 结算单位变化
                         }
                         else
                         {
@@ -953,7 +760,7 @@ TextureButton buttonNextTurn;
                                                 player1.RemoveFromHand(cardNowChoose);
                                                     // 彻底删除这张卡（会调用Dead()）
                                                 RemoveCard(cardNowChoose);
-                                                CheckIfAnyUnitDiedAsync(); // 结算单位变化
+                                                CheckIfAnyUnitDied(); // 结算单位变化
                                                 
                                                 // 隐藏箭头
                                                 cardBase.ProcessMode = Node.ProcessModeEnum.Disabled;
@@ -1056,7 +863,7 @@ TextureButton buttonNextTurn;
                     cardBase.Visible     = false;
                     
                     RestoreAllTargetsColor(); // 取消高亮，恢复所有单位的原始颜色
-                    CheckIfAnyUnitDiedAsync();
+                    CheckIfAnyUnitDied();
                 }
             }
         }
@@ -1538,7 +1345,7 @@ TextureButton buttonNextTurn;
         }
 
         ResumeDeathCheck(); // 恢复死亡检查
-        CheckIfAnyUnitDiedAsync(); // 统一检查死亡
+        CheckIfAnyUnitDied(); // 统一检查死亡
         AllowControl();
     }
 
@@ -1649,7 +1456,7 @@ TextureButton buttonNextTurn;
             await TriggerUnitEffects("Moving", card, new List<cardBase_> { card }, checkOnlySourceCard: true);
         }
         ResumeDeathCheck(); // 恢复死亡检查
-        CheckIfAnyUnitDiedAsync(); // 统一检查死亡
+        CheckIfAnyUnitDied(); // 统一检查死亡
     }
 
     IsFriend CheckIfFrontLineIsFriend()
@@ -1729,7 +1536,7 @@ TextureButton buttonNextTurn;
         }
         
         await ParseAndExecuteEffect(effectString, sourceCard, targetCards);
-        CheckIfAnyUnitDiedAsync(); // 检查死亡
+        CheckIfAnyUnitDied(); // 检查死亡
     }
 
     /// <summary>
@@ -2329,7 +2136,7 @@ TextureButton buttonNextTurn;
 /// <summary>
 /// 检查场上是否有没血的单位 如果有就让它去死!!!
 /// </summary>
-    async Task CheckIfAnyUnitDiedAsync()
+    void CheckIfAnyUnitDied()
     {
         // 如果死亡检查被暂停，则不执行
         if (pauseDeathCheck == 1)
@@ -2337,22 +2144,18 @@ TextureButton buttonNextTurn;
             return;
         }
 
-        var allCards = ReadCardInPlaces().ToList();
-        foreach (var c in allCards)
+        foreach(var c in ReadCardInPlaces())
         {
-            if (c == null)
-                continue;
-
             c.ExecChangeList();
         }
 
-        var units = ReadCardInPlaces().Where(x => x.getState() == CardState.placed).ToList();
+        var units = ReadCardInPlaces().Where(x=>x.getState()==CardState.placed).ToList();
         List<cardBase_> deadUnits = new List<cardBase_>();
         
         // 第一遍：收集所有死亡的单位
         for (int i = units.Count - 1; i >= 0; i--)
         {
-            if (units[i].ReadDefence() <= 0)
+            if (units[i].ReadDefence()<=0)
             {
                 deadUnits.Add(units[i]);
             }
@@ -2365,21 +2168,7 @@ TextureButton buttonNextTurn;
             RemoveCard(deadUnit);
             PlayDeadSound(1);
         }
-
-        foreach (var c in allCards.Where(x=>x.shouldBeRemoved == 1).ToList())
-        {
-            if (c == null)
-                continue;
-            else
-            {
-                c.DisableCombatAbility();
-                await c.DiscardCard();
-                RemoveCard(c);
-            }
-        }
-
-        if (deadUnits.Count > 0)
-            CheckIfAnyUnitDiedAsync(); // 递归检查是否有新的死亡单位
+        if(deadUnits.Count>0)             CheckIfAnyUnitDied(); // 递归检查是否有新的死亡单位
     }
 
 
@@ -2393,7 +2182,7 @@ TextureButton buttonNextTurn;
         
         // 触发双方回合结束时点
         await TriggerUnitEffects("TurnEnd", null);
-        CheckIfAnyUnitDiedAsync(); // 检查死亡
+        CheckIfAnyUnitDied(); // 检查死亡
         
         
         // 触发敌方回合开始时点
@@ -2404,7 +2193,7 @@ TextureButton buttonNextTurn;
         
         // 触发友方回合开始时点
         await TriggerUnitEffects("FriendlyTurnBegin", null);
-        CheckIfAnyUnitDiedAsync(); // 检查死亡
+        CheckIfAnyUnitDied(); // 检查死亡
 
         await EnemyTurnAsync();
         
@@ -3016,30 +2805,6 @@ TextureButton buttonNextTurn;
                     }
                 }
 
-                // Retreat(list) - 使单位撤退
-                if (instruction.StartsWith("Retreat"))
-                {
-                    foreach (var target in targets)
-                    {
-                        if (target != null)
-                        {
-                            await RetreatUnit(target);
-                        }
-                    }
-                }
-
-                // Discard(list) - 挂起弃置操作
-                if (instruction.StartsWith("Discard"))
-                {
-                    foreach (var target in targets)
-                    {
-                        if (target != null)
-                        {
-                            target.AddPendingDiscard();
-                        }
-                    }
-                }
-
                 // getCount(${selector}) - 获取符合条件的单位数量
                 if (instruction.StartsWith("getCount"))
                 {
@@ -3289,209 +3054,6 @@ TextureButton buttonNextTurn;
                     }
                 }
 
-                // Play 或 Play(u) - 打出一张卡，不消耗指挥点
-                if (instruction.StartsWith("Play"))
-                {
-                    // 解析参数，如果有的话
-                    string targetType = "";
-                    if (instruction.Contains("(") && instruction.Contains(")"))
-                    {
-                        var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
-                        if (match.Success)
-                        {
-                            targetType = match.Groups[1].Value.Trim();
-                        }
-                    }
-
-                    // 获取要打出的卡牌列表：优先使用&selector指定的，否则使用targets
-                    List<cardBase_> cardsToPlay = new List<cardBase_>();
-                    
-                    if (instruction.Contains("&"))
-                    {
-                        // 解析&selector 或 &targets
-                        var selectorMatch = System.Text.RegularExpressions.Regex.Match(instruction, @"&([A-Za-z0-9_\.]+)");
-                        if (selectorMatch.Success)
-                        {
-                            string selector = selectorMatch.Groups[1].Value.Trim();
-                            if (selector.Equals("targets", StringComparison.OrdinalIgnoreCase))
-                            {
-                                cardsToPlay = new List<cardBase_>(targets);
-                            }
-                            else if (selector.StartsWith("$"))
-                            {
-                                cardsToPlay = GetTargetsFromSelector(selector.Substring(1));
-                            }
-                            else
-                            {
-                                cardsToPlay = GetTargetsFromSelector(selector);
-                            }
-                        }
-                        else
-                        {
-                            cardsToPlay = new List<cardBase_>(targets);
-                        }
-                    }
-                    else
-                    {
-                        // 使用targets
-                        cardsToPlay = new List<cardBase_>(targets);
-                    }
-
-                    // 从手牌中找到这些卡并打出
-                    var handCards = player1.GetCardsInHand();
-                    foreach (var cardToPlay in cardsToPlay)
-                    {
-                        var handCard = handCards.Find(c => c.id == cardToPlay.id && c.name == cardToPlay.name);
-                        if (handCard != null)
-                        {
-                            // 从手牌移除
-                            player1.RemoveFromHand(handCard);
-                            
-                            // 不消耗指挥点，直接打出
-                            await PlayCardWithoutCost(handCard, targetType);
-                        }
-                    }
-                }
-
-                // Choose(cardA,cardB) - 显示两张卡让玩家选择
-                if (instruction.StartsWith("Choose"))
-                {
-                    var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^,]+),([^)]+)\)");
-                    if (match.Success)
-                    {
-                        string cardAName = match.Groups[1].Value.Trim();
-                        string cardBName = match.Groups[2].Value.Trim();
-
-                        var cardA = GetCardMaganer().GetCard(cardAName);
-                        var cardB = GetCardMaganer().GetCard(cardBName);
-
-                        if (cardA != null && cardB != null)
-                        {
-                            // 创建卡牌实例
-                            var cardAInstance = ResourceManager.Instance.AcquireEmptyCard();
-                            var cardBInstance = ResourceManager.Instance.AcquireEmptyCard();
-                            
-                            cardAInstance.SetCardInformation(cardA);
-                            cardBInstance.SetCardInformation(cardB);
-                            
-                            cardAInstance.SetIsFriend(sourceCard?.GetIsFriend() ?? IsFriend.friend);
-                            cardBInstance.SetIsFriend(sourceCard?.GetIsFriend() ?? IsFriend.friend);
-
-                            // 显示选择界面
-                            var selectedCard = await ShowCardChoice(new List<cardBase_> { cardAInstance, cardBInstance }, true);
-                            
-                            // 执行选中卡牌的效果
-                            if (selectedCard != null)
-                            {
-                                await ParseAndExecuteEffect(selectedCard.effect, selectedCard, null);
-                            }
-
-                            // 释放卡牌回到池中
-                            ResourceManager.Instance.ReleaseEmptyCard(cardAInstance);
-                            ResourceManager.Instance.ReleaseEmptyCard(cardBInstance);
-                        }
-                    }
-                }
-
-                // Develop 或 Develop($selector) 或 Develop(name1,name2,...) - 开发效果
-                if (instruction.StartsWith("Develop"))
-                {
-                    List<cardBase_> cardsToShow = new List<cardBase_>();
-
-                    if (instruction.Contains("(") && instruction.Contains(")"))
-                    {
-                        var paramMatch = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
-                        if (paramMatch.Success)
-                        {
-                            string param = paramMatch.Groups[1].Value.Trim();
-                            
-                            if (param.StartsWith("$"))
-                            {
-                                // 使用选择器，从池中随机选择3张
-                                var selector = param.Substring(1);
-                                var candidateCards = GetTargetsFromSelector(selector);
-                                
-                                var randomCards = new List<cardBase_>();
-                                var rnd = new Random();
-                                var shuffled = candidateCards.OrderBy(x => rnd.Next()).ToList();
-                                for (int idx = 0; idx < Math.Min(3, shuffled.Count); idx++)
-                                {
-                                    randomCards.Add(shuffled[idx]);
-                                }
-                                cardsToShow = randomCards;
-                            }
-                            else
-                            {
-                                // 使用名字列表，直接实例化这些卡，如果多于3张则随机选择3张
-                                var names = param.Split(',');
-                                var candidateCards = new List<cardBase_>();
-                                foreach (var name in names)
-                                {
-                                    var cardData = GetCardMaganer().GetCard(name.Trim());
-                                    if (cardData != null)
-                                    {
-                                        var cardInstance = ResourceManager.Instance.AcquireEmptyCard();
-                                        cardInstance.SetCardInformation(cardData);
-                                        cardInstance.SetIsFriend(sourceCard?.GetIsFriend() ?? IsFriend.friend);
-                                        candidateCards.Add(cardInstance);
-                                    }
-                                }
-                                
-                                // 如果多于3张，随机选择3张
-                                if (candidateCards.Count > 3)
-                                {
-                                    var rnd = new Random();
-                                    candidateCards = candidateCards.OrderBy(x => rnd.Next()).Take(3).ToList();
-                                }
-                                
-                                cardsToShow = candidateCards;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // 默认使用targets
-                        cardsToShow = targets.Select(t =>
-                        {
-                            var cardData = GetCardMaganer().GetCard(t.name);
-                            if (cardData != null)
-                            {
-                                PackedScene cardRes = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
-                                var newCard = cardRes.Instantiate() as cardBase_;
-                                newCard.SetCardInformation(cardData);
-                                newCard.SetIsFriend(t.GetIsFriend());
-                                return newCard;
-                            }
-                            return null;
-                        }).Where(c => c != null).ToList();
-                    }
-
-                    if (cardsToShow.Count > 0)
-                    {
-                        // 显示选择界面
-                        var selectedCard = await ShowCardChoice(cardsToShow, false);
-                        
-                        // 将选中卡加入手牌
-                        if (selectedCard != null && sourceCard?.GetIsFriend() == IsFriend.friend)
-                        {
-                            await player1.AddCardToHand(selectedCard);
-                        }
-                        else if (selectedCard != null && sourceCard?.GetIsFriend() == IsFriend.enemy)
-                        {
-                            await player2.AddCardToHand(selectedCard);
-                        }
-
-                        // 释放未选择的卡牌回到池中
-                        //foreach (var card in cardsToShow)
-                        //{
-                        //    if (card != selectedCard)
-                        //    {
-                        //        RemoveCard(card);
-                        //    }
-                        //}
-                    }
-                }
-
                 // HealAllTargets() - 完全修复单位，将列表上所有单位的防御力设置为历史最大值
                 if (instruction == "HealAllTargets")
                 {
@@ -3598,122 +3160,6 @@ TextureButton buttonNextTurn;
             }
         }
 
-        // 执行所有挂起的弃置操作
-        await ExecuteChangeLists();
-
-    }
-
-
-    /// <summary>
-    /// 使单位撤退
-    /// 如果单位在前线，尝试将其移动到对应阵营的支援阵线
-    /// 如果单位在支援阵线，直接返回手牌（友方）或弃置（敌方）
-    /// </summary>
-    /// <param name="unit">要撤退的单位</param>
-    private async Task RetreatUnit(cardBase_ unit)
-    {
-        if (unit == null || unit.getState() != CardState.placed)
-            return;
-
-        var unitPlace = unit.GetMyPlace();
-        if (unitPlace == null)
-            return;
-
-        bool isInFrontLine = frontLine.Contains(unitPlace);
-        bool isFriendly = unit.GetIsFriend() == IsFriend.friend;
-
-        // 如果在前线，尝试移动到支援阵线
-        if (isInFrontLine)
-        {
-            {
-                // 移动到支援阵线
-                unitPlace.UnbondCard();
-                var validPos = (isFriendly)?GetTheFirstValidFriendlyPlace():GetTheFirstValidEnemySupportPlace();
-                unit.SetMyPlace(validPos);
-                unit.MoveToPosition(validPos.GetGlobalPosition());
-                unit.setState(CardState.placed);
-                return;
-            }
-        }
-
-        // 如果在前线但无法移动到支援阵线，或者在支援阵线
-        // 对于友方单位，尝试返回手牌
-        if (isFriendly)
-        {
-            // 尝试返回手牌
-            if (player1.GetCardsInHand().Count < 9)
-            {
-                unitPlace.UnbondCard();
-                unit.ClearMyPlace();
-                // 禁用单位的战斗能力
-                unit.DisableCombatAbility();
-                await player1.AddCardToHand(unit);
-                return;
-            }
-        }
-
-        // 无法返回手牌或敌方单位，直接弃置
-        unit.AddChange(ChangeType.DiscardCard,1);
-    }
-
-    /// <summary>
-    /// 打出一张卡但不消耗指挥点
-    /// </summary>
-    private async Task PlayCardWithoutCost(cardBase_ card, string targetType = "")
-    {
-        if (card == null) return;
-
-        // 如果是单位卡，尝试部署
-        if (card.cardType != CardTypes.Command)
-        {
-            var place = GetTheFirstValidFriendlyPlace();
-            if (place != null)
-            {
-                await AddCardToPlace(card, place);
-            }
-        }
-        else
-        {
-            // 如果是指令卡，直接执行效果
-            await ParseAndExecuteEffect(card.effect, card, null);
-        }
-
-        // 如果需要指定目标且有目标类型，随机选择
-        if (!string.IsNullOrEmpty(targetType) && card.targetType != TargetType.NOTarget)
-        {
-            List<cardBase_> possibleTargets = new List<cardBase_>();
-            
-            switch (targetType.ToLower())
-            {
-                case "enemy":
-                    possibleTargets = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy).ToList();
-                    break;
-                case "friend":
-                    possibleTargets = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.friend).ToList();
-                    break;
-                case "unit":
-                    possibleTargets = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.isHq != HQ.hq).ToList();
-                    break;
-                case "hq":
-                    if (enemyHq != null && enemyHq.getState() == CardState.placed)
-                        possibleTargets.Add(enemyHq);
-                    break;
-                default:
-                    possibleTargets = ReadCardInPlaces().Where(x => x.getState() == CardState.placed).ToList();
-                    break;
-            }
-
-            if (possibleTargets.Count > 0)
-            {
-                var rnd = new Random();
-                var randomTarget = possibleTargets[rnd.Next(possibleTargets.Count)];
-                await ParseAndExecuteEffect(card.effect, card, new List<cardBase_> { randomTarget });
-            }
-            else
-            {
-                await ParseAndExecuteEffect(card.effect, card, null);
-            }
-        }
     }
 
 
@@ -3788,21 +3234,6 @@ TextureButton buttonNextTurn;
         }
 
         return results;
-    }
-
-    /// <summary>
-    /// 执行所有挂起的变更操作
-    /// </summary>
-    private async Task ExecuteChangeLists()
-    {
-        // 遍历所有场上的卡牌，让每个卡牌执行自己的挂起变更操作
-        foreach (var card in cardInPlaces)
-        {
-            if (card != null)
-            {
-                await card.ExecChangeList();
-            }
-        }
     }
 
     /// <summary>
@@ -4064,14 +3495,6 @@ public class Player
     }
 
     /// <summary>
-    /// 获取当前悬停的手牌索引
-    /// </summary>
-    public int GetHoveredHandIndex()
-    {
-        return hoveredHandIndex;
-    }
-
-    /// <summary>
     /// 将卡牌添加到手牌
     /// </summary>
     /// <param name="card"></param>
@@ -4085,14 +3508,9 @@ public class Player
             battlefield.RemoveCard(card);
             return discardTask;
         }
-        if(!cardsInHand.Contains(card))
-    {
-            cardsInHand.Add(card);
-        }
-        if(!battlefield.ReadCardInPlaces().Contains(card))
-        {
-            battlefield.AddToBattleField(card);
-        }
+
+        cardsInHand.Add(card);
+        battlefield.AddToBattleField(card);
         card.setState(CardState.inHand);
         RefreshMyHand();
         return Task.CompletedTask;
@@ -4349,6 +3767,18 @@ public class Player
         if (newHover != hoveredHandIndex)
         {
             hoveredHandIndex = newHover;
+            RefreshMyHand();
+        }
+    }
+
+    /// <summary>
+    /// 直接设置悬停的手牌索引（用于鼠标进入/离开卡片时调用）
+    /// </summary>
+    public void SetHoveredHandIndex(int index)
+    {
+        if (index != hoveredHandIndex)
+        {
+            hoveredHandIndex = index;
             RefreshMyHand();
         }
     }

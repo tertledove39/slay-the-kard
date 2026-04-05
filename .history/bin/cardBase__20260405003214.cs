@@ -679,7 +679,10 @@ public partial class cardBase_ : Control
         int bestSize = FindBestFontSizeForLabel(label, font, text, 6, maxSize, effectiveSize);
 
         // 确保 Label 有 LabelSettings 并正确设置字体
-        label.LabelSettings = new LabelSettings();
+        if (label.LabelSettings == null)
+        {
+            label.LabelSettings = new LabelSettings();
+        }
         label.LabelSettings.Font = font;
         label.LabelSettings.FontSize = bestSize;
     }

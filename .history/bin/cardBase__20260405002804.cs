@@ -679,7 +679,10 @@ public partial class cardBase_ : Control
         int bestSize = FindBestFontSizeForLabel(label, font, text, 6, maxSize, effectiveSize);
 
         // 确保 Label 有 LabelSettings 并正确设置字体
-        label.LabelSettings = new LabelSettings();
+        if (label.LabelSettings == null)
+        {
+            label.LabelSettings = new LabelSettings();
+        }
         label.LabelSettings.Font = font;
         label.LabelSettings.FontSize = bestSize;
     }
@@ -695,8 +698,6 @@ public partial class cardBase_ : Control
         tempLabel.Text = text;
         tempLabel.LabelSettings = new LabelSettings();
         tempLabel.LabelSettings.Font = font;
-        // 临时添加到场景树以确保正确测量
-        AddChild(tempLabel);
 
         while (low <= high)
         {
@@ -720,7 +721,6 @@ public partial class cardBase_ : Control
         }
 
         // 清理临时 Label
-        RemoveChild(tempLabel);
         tempLabel.QueueFree();
 
         return best;

@@ -3451,19 +3451,7 @@ TextureButton buttonNextTurn;
                     else
                     {
                         // 默认使用targets
-                        cardsToShow = targets.Select(t =>
-                        {
-                            var cardData = GetCardMaganer().GetCard(t.name);
-                            if (cardData != null)
-                            {
-                                PackedScene cardRes = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
-                                var newCard = cardRes.Instantiate() as cardBase_;
-                                newCard.SetCardInformation(cardData);
-                                newCard.SetIsFriend(t.GetIsFriend());
-                                return newCard;
-                            }
-                            return null;
-                        }).Where(c => c != null).ToList();
+                        cardsToShow = new List<cardBase_>(targets);
                     }
 
                     if (cardsToShow.Count > 0)

@@ -677,11 +677,7 @@ public partial class cardBase_ : Control
         Vector2 effectiveSize = new Vector2(containerSize.X - 4, containerSize.Y - 2);
 
         int bestSize = FindBestFontSizeForLabel(label, font, text, 6, maxSize, effectiveSize);
-
-        // 确保 Label 有 LabelSettings 并正确设置字体
-        label.LabelSettings = new LabelSettings();
-        label.LabelSettings.Font = font;
-        label.LabelSettings.FontSize = bestSize;
+        label.AddThemeFontSizeOverride("font_size", bestSize);
     }
 
     private int FindBestFontSizeForLabel(Label label, Font font, string text, int minSize, int maxSize, Vector2 containerSize)
@@ -690,25 +686,12 @@ public partial class cardBase_ : Control
         int high = maxSize;
         int best = minSize;
 
-        // 创建临时 Label 用于测量，避免修改原 Label 的属性
-        Label tempLabel = new Label();
-        tempLabel.Text = text;
-        tempLabel.LabelSettings = new LabelSettings();
-        tempLabel.LabelSettings.Font = font;
-        // 临时添加到场景树以确保正确测量
-        AddChild(tempLabel);
-
         while (low <= high)
         {
             int mid = (low + high) / 2;
+            Vector2 size = font.GetStringSize(text, HorizontalAlignment.Left, containerSize.X, mid);
 
-            // 设置临时 Label 的字体大小
-            tempLabel.LabelSettings.FontSize = mid;
-
-            // 获取实际内容大小
-            Vector2 measuredSize = tempLabel.GetMinimumSize();
-
-            if (measuredSize.X <= containerSize.X && measuredSize.Y <= containerSize.Y)
+            if (size.X <= containerSize.X && size.Y <= containerSize.Y)
             {
                 best = mid;
                 low = mid + 1;
@@ -718,10 +701,6 @@ public partial class cardBase_ : Control
                 high = mid - 1;
             }
         }
-
-        // 清理临时 Label
-        RemoveChild(tempLabel);
-        tempLabel.QueueFree();
 
         return best;
     }

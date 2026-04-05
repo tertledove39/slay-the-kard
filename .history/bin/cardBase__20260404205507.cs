@@ -55,10 +55,6 @@ public partial class cardBase_ : Control
     Texture2D UssrPic;
     Texture2D Germanypic;
 
-    // 缓存卡名和标签尺寸，避免每次刷新都重新计算字体大小
-    private string lastNameText = string.Empty;
-    private Vector2 lastNameLabelSize = Vector2.Zero;
-
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       /// <summary>
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       /// 卡牌的所在位置,记得要释放
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       /// </summary>
@@ -79,15 +75,6 @@ public partial class cardBase_ : Control
             attackAble = 2; // 可以攻击两次（部署时一次，正常回合一次）
         }
         
-    }
-    
-    /// <summary>
-    /// 禁用单位的战斗能力（撤退时使用）
-    /// </summary>
-    public void DisableCombatAbility()
-    {
-        moveAble = 0;
-        attackAble = 0;
     }
     
     /// <summary>
@@ -231,9 +218,8 @@ public partial class cardBase_ : Control
         ChangeList.Add(new Change(type, value));
     }
 
-    public int shouldBeRemoved = 0;
     List<Change> ChangeList = new List<Change>();
-    public async Task ExecChangeList()
+    public void ExecChangeList()
     {
         foreach (var change in ChangeList)
         {
@@ -254,20 +240,10 @@ public partial class cardBase_ : Control
                 case ChangeType.SetDefence:
                     SetDefence(change.Value);
                     break;
-                case ChangeType.DiscardCard:
-                    shouldBeRemoved = 1;
-                    break;
+                
             }
         }
         ChangeList.Clear();
-    }
-
-    /// <summary>
-    /// 挂起弃置操作 - 在所有效果结算完成后执行
-    /// </summary>
-    public void AddPendingDiscard()
-    {
-        AddChange(ChangeType.DiscardCard, 0);
     }
 
 /// <summary>
@@ -594,38 +570,35 @@ public partial class cardBase_ : Control
 /// </summary>
     public void RefreshState()
     {
-        // 指令卡使用特殊的背景图
-        if (cardType == CardTypes.Command)
-        {
-            if (FileAccess.FileExists(IconPath))
-                GetNode<Sprite2D>("icon").Texture = ResourceManager.Instance?.GetTexture(IconPath) ?? GD.Load<Texture2D>(IconPath);
-            GetNode<Sprite2D>("cardbase").Texture = ResourceManager.Instance?.GetTexture("res://cards/卡背_command.png") ?? GD.Load<Texture2D>("res://cards/卡背_command.png");
-        }
-        else if(isHq != HQ.hq)
-        {
-            if (FileAccess.FileExists(IconPath))
-                GetNode<Sprite2D>("icon").Texture = ResourceManager.Instance?.GetTexture(IconPath) ?? GD.Load<Texture2D>(IconPath);
-        }
-        else
+        // HQ卡牌：背景图设置为IconPath
+        if(isHq == HQ.hq)
         {
             if (FileAccess.FileExists(IconPath))
                 GetNode<Sprite2D>("cardbase").Texture = ResourceManager.Instance?.GetTexture(IconPath) ?? GD.Load<Texture2D>(IconPath);
         }
-        if (name != null)
+        // 指令卡：使用特殊的背景图
+        else if (cardType == CardTypes.Command)
+        {
+            GetNode<Sprite2D>("cardbase").Texture = ResourceManager.Instance?.GetTexture("res://cards/卡背_command.png") ?? GD.Load<Texture2D>("res://cards/卡背_command.png");
+        }
+        // 普通卡牌：设置图标
+        else
+        {
+            if (FileAccess.FileExists(IconPath))
+                GetNode<Sprite2D>("icon").Texture = ResourceManager.Instance?.GetTexture(IconPath) ?? GD.Load<Texture2D>(IconPath);
+        }
+        if                     (name!= null)
         {
             var nameLabel = GetNode<Label>("name");
-            string currentName = name;
-            nameLabel.Text = currentName;
-
-            // 只有在名字或标签尺寸改变时才重新计算字体大小，避免频繁刷新带来的性能开销
-            if (currentName != lastNameText || nameLabel.Size != lastNameLabelSize)
+            nameLabel.Text = name;
+            // 只在第一次调用时调整字体大小
+            if (nameLabel.GetMeta("fontSizeInitialized", false).AsBool() == false)
             {
                 AdjustFontSizeToFit(nameLabel);
-                lastNameText = currentName;
-                lastNameLabelSize = nameLabel.Size;
+                nameLabel.SetMeta("fontSizeInitialized", true);
             }
         }
-        GetNode<Label>("attack").Text = attack.ToString();
+        GetNode<Label>         ("attack").Text                                                     = attack.ToString();
         GetNode<Label>         ("defence").Text                                                    = defence.ToString();
         GetNode<Label>         ("cost").Text                                                       = cost.ToString();
         if                     (description!= null)
@@ -639,8 +612,6 @@ public partial class cardBase_ : Control
                 descriptionLabel.SetMeta("fontSizeInitialized", true);
             }
         }
-
-        
         OnRefreshUnitType((int)cardType);
 
         // 指令卡的特殊UI设置
@@ -655,7 +626,6 @@ public partial class cardBase_ : Control
     /// <summary>
     /// 调整 Label 字体大小以适应容器（尽可能大且不超出边框）。
     /// 使用二分法减少测量次数，避免在卡牌大量刷新时出现卡顿。
-    /// 改进版：添加边距考虑，确保文本不会紧贴边界
     /// </summary>
     private void AdjustFontSizeToFit(Label label)
     {
@@ -673,15 +643,8 @@ public partial class cardBase_ : Control
         int maxSize = label.GetThemeFontSize("font_size");
         if (maxSize <= 0) maxSize = 12;
 
-        // 添加边距：左右各留2像素，上下各留1像素
-        Vector2 effectiveSize = new Vector2(containerSize.X - 4, containerSize.Y - 2);
-
-        int bestSize = FindBestFontSizeForLabel(label, font, text, 6, maxSize, effectiveSize);
-
-        // 确保 Label 有 LabelSettings 并正确设置字体
-        label.LabelSettings = new LabelSettings();
-        label.LabelSettings.Font = font;
-        label.LabelSettings.FontSize = bestSize;
+        int bestSize = FindBestFontSizeForLabel(label, font, text, 8, maxSize, containerSize);
+        label.AddThemeFontSizeOverride("font_size", bestSize);
     }
 
     private int FindBestFontSizeForLabel(Label label, Font font, string text, int minSize, int maxSize, Vector2 containerSize)
@@ -690,38 +653,30 @@ public partial class cardBase_ : Control
         int high = maxSize;
         int best = minSize;
 
-        // 创建临时 Label 用于测量，避免修改原 Label 的属性
-        Label tempLabel = new Label();
-        tempLabel.Text = text;
-        tempLabel.LabelSettings = new LabelSettings();
-        tempLabel.LabelSettings.Font = font;
-        // 临时添加到场景树以确保正确测量
-        AddChild(tempLabel);
+        // 考虑Label的边距，减少可用空间
+        float marginX = 8f; // 左右边距
+        float marginY = 4f; // 上下边距
+        Vector2 availableSize = new Vector2(
+            Mathf.Max(0, containerSize.X - marginX * 2),
+            Mathf.Max(0, containerSize.Y - marginY * 2)
+        );
 
         while (low <= high)
         {
             int mid = (low + high) / 2;
+            Vector2 textSize = font.GetStringSize(text, HorizontalAlignment.Left, availableSize.X, mid);
 
-            // 设置临时 Label 的字体大小
-            tempLabel.LabelSettings.FontSize = mid;
-
-            // 获取实际内容大小
-            Vector2 measuredSize = tempLabel.GetMinimumSize();
-
-            if (measuredSize.X <= containerSize.X && measuredSize.Y <= containerSize.Y)
+            // 检查文本是否能完全容纳在可用空间内
+            if (textSize.X <= availableSize.X && textSize.Y <= availableSize.Y)
             {
                 best = mid;
-                low = mid + 1;
+                low = mid + 1; // 尝试更大的字体
             }
             else
             {
-                high = mid - 1;
+                high = mid - 1; // 字体太大，尝试更小的
             }
         }
-
-        // 清理临时 Label
-        RemoveChild(tempLabel);
-        tempLabel.QueueFree();
 
         return best;
     }
@@ -827,15 +782,6 @@ public partial class cardBase_ : Control
         myPlace.BondCard(this);
     }
 
-    public void ClearMyPlace()
-    {
-        if (myPlace != null)
-        {
-            myPlace.UnbondCard();
-            myPlace = null;
-        }
-    }
-
 /// <summary>
 /// 死亡函数这块
 /// </summary> 
@@ -928,7 +874,7 @@ public partial class cardBase_ : Control
         // 步骤2: 正着停留3秒（不动不转）
         await Task.Delay(1000);
         
-        // 步骤3: 旋转着向左侧飞出 (1.5秒)
+                                                                     // 步骤3: 旋转着向左侧飞出 (1.5秒)
         Vector2 exitPosition = new Vector2(-1400, screenSize.Y / 2);  // 飞出到左侧
         var exitTween = CreateTween();
         exitTween.SetTrans(Tween.TransitionType.Quad);
@@ -938,11 +884,6 @@ public partial class cardBase_ : Control
         exitTween.TweenProperty(this, "rotation", Mathf.Pi * 4, 1.5f); // 旋转两圈
         await ToSignal(exitTween, Tween.SignalName.Finished);
     }
-
-    /// <summary>
-    /// 执行弃置动画并从战场上移除卡牌
-    /// </summary>
-
 
       /// <summary>
       /// 属性数据变化时的闪烁和颜色变化效果
@@ -1195,7 +1136,6 @@ public enum ChangeType
     GetDefence,
     LoseDefence,
     SetDefence,
-    DiscardCard,
 
 }
 

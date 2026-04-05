@@ -1,5 +1,7 @@
 using Godot;
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 public partial class End : CanvasLayer
 {
@@ -9,6 +11,11 @@ public partial class End : CanvasLayer
     // 单例实例（方便全局调用）
     private static End _instance;
     public static End Instance => _instance;
+
+    // 卡牌选择相关
+    private List<cardBase_> _choiceCards = new List<cardBase_>();
+    private TaskCompletionSource<cardBase_> _choiceTaskSource;
+    private HBoxContainer _choiceContainer;
 
     public override void _Ready()
     {
@@ -31,6 +38,13 @@ public partial class End : CanvasLayer
         _overlay.MouseFilter = Control.MouseFilterEnum.Stop; 
         GetNode<Sprite2D>("img").Visible = false;
         AddChild(_overlay);
+
+        // 创建卡牌选择容器
+        _choiceContainer = new HBoxContainer();
+        _choiceContainer.SetAnchorsPreset(Control.LayoutPreset.Center);
+        _choiceContainer.Alignment = BoxContainer.AlignmentMode.Center;
+        _choiceContainer.Visible = false;
+        AddChild(_choiceContainer);
     }
 
     /// <summary>
@@ -66,5 +80,4 @@ public partial class End : CanvasLayer
         // 目标 Alpha 为 0 (完全透明)
         _tween.TweenProperty(_overlay, "color", new Color(0, 0, 0, 0), duration);
     }
-
 }

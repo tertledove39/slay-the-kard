@@ -473,7 +473,7 @@ TextureButton buttonNextTurn;
         choiceLayer.AddChild(choiceContainer);
     }
 
-    private async Task<cardBase_> ShowCardChoice(List<cardBase_> cards, bool animateExit = true)
+    private async Task<cardBase_> ShowCardChoice(List<cardBase_> cards)
     {
         if (cards == null || cards.Count == 0)
             return null;
@@ -488,7 +488,7 @@ TextureButton buttonNextTurn;
         float totalWidth = choiceCards.Count * cardWidth + (choiceCards.Count - 1) * cardSpacing;
         float startX = (screenSize.X - totalWidth) / 2 + cardWidth / 2-40; // 起始x坐标，确保居中
 
-        // 设置所有卡牌在最上层显示，并添加到选择层中
+        // 设置所有卡牌在最上层显示
         foreach (var card in choiceCards)
         {
             card.ZIndex = 100;
@@ -498,7 +498,6 @@ TextureButton buttonNextTurn;
         {
             var card = choiceCards[i];
             AddToBattleField(card);
-            choiceLayer.AddChild(card);
         
             // 计算卡牌目标位置：屏幕中心水平排列，垂直居中
             float xPos = startX + i * (cardWidth + cardSpacing) - 90;
@@ -512,7 +511,7 @@ TextureButton buttonNextTurn;
             await card.MoveToPosition(new Vector2(xPos, yPos), 0.5f);
             
             // 可以移除或减少延迟时间
-            await Task.Delay(20); // 从10000减少到500毫秒
+            await Task.Delay(50); // 从10000减少到500毫秒
         }
 
         choiceContainer.Visible = true;
@@ -528,54 +527,20 @@ TextureButton buttonNextTurn;
         choiceContainer.Visible = false;
         isShowingChoiceUI = false;
 
-        if (animateExit)
+        // 清理用于选择的临时卡牌，避免它们继续留在 battlefield 的 cardInPlaces 中
+        foreach (var card in choiceCards)
         {
-            // Choose模式：被选择的卡飞出屏幕
-            if (selectedChoiceCard != null)
+            if (card == null)
+                continue;
+
+            if (cardInPlaces.Contains(card))
             {
-                selectedChoiceCard.ResetVisualsInstant();
-                var exitY = selectedChoiceCard.GlobalPosition.Y;
-                var exitPos = new Vector2(-cardWidth - 200, exitY);
-                await selectedChoiceCard.MoveToPosition(exitPos, 0.25f);
+                cardInPlaces.Remove(card);
             }
 
-            // 清理用于选择的临时卡牌
-            foreach (var card in choiceCards)
+            if (card != selectedChoiceCard && card.GetParent() != null)
             {
-                if (card == null)
-                    continue;
-
-                if (card.GetParent() != null)
-                {
-                    RemoveCard(card);
-                }
-            }
-        }
-        else
-        {
-            // Develop模式：被选择的卡回到正常亮度并正常加入手中，多余的卡飞出屏幕并被移除
-            if (selectedChoiceCard != null)
-            {
-                selectedChoiceCard.ResetVisualsInstant();
-                selectedChoiceCard.RestoreColor(); // 恢复正常亮度
-                selectedChoiceCard.ZIndex = 10; // 恢复正常层级
-            }
-
-            // 多余的卡飞出屏幕并被移除
-            foreach (var card in choiceCards)
-            {
-                if (card == null)
-                    continue;
-
-                if (card != selectedChoiceCard)
-                {
-                    var exitY = card.GlobalPosition.Y;
-                    var exitPos = new Vector2(-cardWidth - 200, exitY);
-                    await card.MoveToPosition(exitPos, 0.25f);
-
-                    // 使用RemoveCard正确清理卡牌
-                    RemoveCard(card);
-                }
+                card.GetParent().RemoveChild(card);
             }
         }
 
@@ -595,16 +560,13 @@ TextureButton buttonNextTurn;
         if (!isShowingChoiceUI || choiceCards == null || choiceCards.Count == 0)
             return;
 
-        foreach (var card in choiceCards)
+        // 使用 CheckCardClick 查找鼠标位置下的卡牌
+        var clickedCard = CheckCardClick(mousePosition);
+        
+        // 检查点击的卡牌是否在选择列表中
+        if (clickedCard != null && choiceCards.Contains(clickedCard))
         {
-            if (card == null)
-                continue;
-
-            if (card.GetGlobalRect().HasPoint(mousePosition))
-            {
-                selectedChoiceCard = card;
-                return;
-            }
+            selectedChoiceCard = clickedCard;
         }
     }
 
@@ -3378,7 +3340,7 @@ TextureButton buttonNextTurn;
                             cardBInstance.SetIsFriend(sourceCard?.GetIsFriend() ?? IsFriend.friend);
 
                             // 显示选择界面
-                            var selectedCard = await ShowCardChoice(new List<cardBase_> { cardAInstance, cardBInstance }, true);
+                            var selectedCard = await ShowCardChoice(new List<cardBase_> { cardAInstance, cardBInstance });
                             
                             // 执行选中卡牌的效果
                             if (selectedCard != null)
@@ -3451,25 +3413,13 @@ TextureButton buttonNextTurn;
                     else
                     {
                         // 默认使用targets
-                        cardsToShow = targets.Select(t =>
-                        {
-                            var cardData = GetCardMaganer().GetCard(t.name);
-                            if (cardData != null)
-                            {
-                                PackedScene cardRes = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
-                                var newCard = cardRes.Instantiate() as cardBase_;
-                                newCard.SetCardInformation(cardData);
-                                newCard.SetIsFriend(t.GetIsFriend());
-                                return newCard;
-                            }
-                            return null;
-                        }).Where(c => c != null).ToList();
+                        cardsToShow = new List<cardBase_>(targets);
                     }
 
                     if (cardsToShow.Count > 0)
                     {
                         // 显示选择界面
-                        var selectedCard = await ShowCardChoice(cardsToShow, false);
+                        var selectedCard = await ShowCardChoice(cardsToShow);
                         
                         // 将选中卡加入手牌
                         if (selectedCard != null && sourceCard?.GetIsFriend() == IsFriend.friend)
@@ -3482,13 +3432,13 @@ TextureButton buttonNextTurn;
                         }
 
                         // 释放未选择的卡牌回到池中
-                        //foreach (var card in cardsToShow)
-                        //{
-                        //    if (card != selectedCard)
-                        //    {
-                        //        RemoveCard(card);
-                        //    }
-                        //}
+                        foreach (var card in cardsToShow)
+                        {
+                            if (card != selectedCard)
+                            {
+                                RemoveCard(card);
+                            }
+                        }
                     }
                 }
 

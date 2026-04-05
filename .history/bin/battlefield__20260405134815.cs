@@ -497,7 +497,6 @@ TextureButton buttonNextTurn;
         for (int i = 0; i < choiceCards.Count; i++)
         {
             var card = choiceCards[i];
-            AddToBattleField(card);
             choiceLayer.AddChild(card);
         
             // 计算卡牌目标位置：屏幕中心水平排列，垂直居中
@@ -547,7 +546,7 @@ TextureButton buttonNextTurn;
 
                 if (card.GetParent() != null)
                 {
-                    RemoveCard(card);
+                    card.GetParent().RemoveChild(card);
                 }
             }
         }
@@ -3451,19 +3450,7 @@ TextureButton buttonNextTurn;
                     else
                     {
                         // 默认使用targets
-                        cardsToShow = targets.Select(t =>
-                        {
-                            var cardData = GetCardMaganer().GetCard(t.name);
-                            if (cardData != null)
-                            {
-                                PackedScene cardRes = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
-                                var newCard = cardRes.Instantiate() as cardBase_;
-                                newCard.SetCardInformation(cardData);
-                                newCard.SetIsFriend(t.GetIsFriend());
-                                return newCard;
-                            }
-                            return null;
-                        }).Where(c => c != null).ToList();
+                        cardsToShow = new List<cardBase_>(targets);
                     }
 
                     if (cardsToShow.Count > 0)

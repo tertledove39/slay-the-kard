@@ -31,6 +31,13 @@ public partial class End : CanvasLayer
         _overlay.MouseFilter = Control.MouseFilterEnum.Stop; 
         GetNode<Sprite2D>("img").Visible = false;
         AddChild(_overlay);
+
+        // 创建卡牌选择容器
+        _choiceContainer = new HBoxContainer();
+        _choiceContainer.SetAnchorsPreset(Control.LayoutPreset.Center);
+        _choiceContainer.Alignment = BoxContainer.AlignmentMode.Center;
+        _choiceContainer.Visible = false;
+        AddChild(_choiceContainer);
     }
 
     /// <summary>
