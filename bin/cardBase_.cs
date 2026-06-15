@@ -75,6 +75,7 @@ public partial class cardBase_ : Control
     private Label _attrTooltipLabel;
     private List<Rect2> _attrIconRects = new(); // 图标在_attrPanel中的本地rect
     private List<string> _attrIconDescs = new();
+    private Dictionary<string, TextureRect> _attrIconWidgets = new(); // trait名→图标控件
     private const int AttrIconSize = 22;
     private const int AttrMaxVisible = 5;
 
@@ -295,6 +296,27 @@ public partial class cardBase_ : Control
     /// <summary>
     /// 设置被守护状态
     /// </summary>
+    /// <summary>
+    /// trait图标闪烁动画：触发时闪烁trait图标
+    /// </summary>
+    public async void FlashTraitIcon(string traitName)
+    {
+        if (!_attrIconWidgets.TryGetValue(traitName, out var icon)) return;
+        if (icon == null || !IsInstanceValid(icon)) return;
+
+        Color originalColor = icon.SelfModulate;
+        Color flashColor = new Color(1f, 1f, 0.6f); // 亮黄色闪烁
+        for (int i = 0; i < 3; i++)
+        {
+            icon.SelfModulate = flashColor;
+            await ToSignal(GetTree().CreateTimer(0.1f), SceneTreeTimer.SignalName.Timeout);
+            if (!IsInstanceValid(this) || !IsInstanceValid(icon)) return;
+            icon.SelfModulate = originalColor;
+            await ToSignal(GetTree().CreateTimer(0.1f), SceneTreeTimer.SignalName.Timeout);
+            if (!IsInstanceValid(this) || !IsInstanceValid(icon)) return;
+        }
+    }
+
     public void SetBeGuardianed(bool value)
     {
         if (isBeGuardianed != value)
@@ -1070,6 +1092,7 @@ public partial class cardBase_ : Control
         }
         _attrIconRects.Clear();
         _attrIconDescs.Clear();
+        _attrIconWidgets.Clear();
 
         var attrs = GetAllAttributes();
         if (attrs.Count == 0) return;
@@ -1104,6 +1127,12 @@ public partial class cardBase_ : Control
             icon.MouseFilter = MouseFilterEnum.Ignore;
             icon.SelfModulate = attr.IconTint;
             _attrPanel.AddChild(icon);
+
+            // 记录trait图标控件引用（用于闪烁等动画）
+            if (attr.IsTrait && !string.IsNullOrEmpty(attr.TraitName))
+            {
+                _attrIconWidgets[attr.TraitName] = icon;
+            }
 
             // 记录图标在面板中的本地rect和对应描述
             _attrIconRects.Add(new Rect2(0, y, itemH, itemH));

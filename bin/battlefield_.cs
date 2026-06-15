@@ -253,7 +253,10 @@ public partial class battlefield_ : Control
         card.setState(CardState.placed);
         //RefreshAllCardDisplayOrder();
         await card.MoveToPosition(place.GetPlaceGlobalPosition());
-        
+
+        // 重置Z-index，防止新部署单位始终在最前
+        card.ZIndex = 10;
+
         // 闪击特性：单位被加入战场时刷新
         if(card.HasTrait(UnitTraits.Blitz)) card.RefreshUnit();
 
@@ -1746,6 +1749,7 @@ InputState currentInputState = InputState.nil;
                 // 伏击特性：先造成反击伤害（一回合一次）
                 if (defenderHasAmbush)
                 {
+                    to.FlashTraitIcon("Ambush");
                     to.UseAmbush(); // 标记伏击已被使用
                     await from.LoseDefence(counterDamage);
                     // 若敌方单位因此死亡，则不受到来自对方的伤害
@@ -1767,9 +1771,17 @@ InputState currentInputState = InputState.nil;
         // 标记单位已经攻击，减少可攻击次数
         from.HaveAttacked();
 
+        // trait触发闪烁
+        if (from.HasTrait(UnitTraits.Determination))
+            from.FlashTraitIcon("Determination");
+        if (attackerHasShock)
+            from.FlashTraitIcon("Shock");
+
         // 步兵、火炮、战斗机和轰炸机攻击后不能移动
-        if (from.cardType == CardTypes.Infantry || from.cardType == CardTypes.Artillery || 
-            from.cardType == CardTypes.Plane || from.cardType == CardTypes.Bomber)
+        // 但奋战单位若还有剩余攻击次数则保留攻击能力
+        bool stillHasDetermination = from.HasTrait(UnitTraits.Determination) && from.ReadAttackable() > 0;
+        if (!stillHasDetermination && (from.cardType == CardTypes.Infantry || from.cardType == CardTypes.Artillery ||
+            from.cardType == CardTypes.Plane || from.cardType == CardTypes.Bomber))
         {
             from.HaveMoved();
         }
