@@ -177,6 +177,9 @@ public partial class cardBase_ : Control
         if ((trait & UnitTraits.Shock) != 0) hasShock = true;
         if ((trait & UnitTraits.Mobilize) != 0) hasMobilize = true;
         if ((trait & UnitTraits.Ambush) != 0) hasAmbushActive = true;
+        // 闪击/奋战需要刷新行动次数
+        if ((trait & (UnitTraits.Blitz | UnitTraits.Determination)) != 0)
+            RefreshUnit();
         RefreshDescriptionText();
         BuildAttributePanel();
     }
@@ -297,24 +300,28 @@ public partial class cardBase_ : Control
     /// 设置被守护状态
     /// </summary>
     /// <summary>
-    /// trait图标闪烁动画：触发时闪烁trait图标
+    /// trait图标闪烁动画：触发时闪烁trait图标（参照FlashAttributeWithColor模式）
     /// </summary>
     public async void FlashTraitIcon(string traitName)
     {
         if (!_attrIconWidgets.TryGetValue(traitName, out var icon)) return;
-        if (icon == null || !IsInstanceValid(icon)) return;
+        if (icon == null) return;
 
+        Color flashColor = new Color(1f, 1f, 0.3f); // 亮黄色闪烁
         Color originalColor = icon.SelfModulate;
-        Color flashColor = new Color(1f, 1f, 0.6f); // 亮黄色闪烁
+
         for (int i = 0; i < 3; i++)
         {
+            if (!IsInstanceValid(this) || !IsInstanceValid(icon)) return;
             icon.SelfModulate = flashColor;
-            await ToSignal(GetTree().CreateTimer(0.1f), SceneTreeTimer.SignalName.Timeout);
+            await Task.Delay(100);
             if (!IsInstanceValid(this) || !IsInstanceValid(icon)) return;
             icon.SelfModulate = originalColor;
-            await ToSignal(GetTree().CreateTimer(0.1f), SceneTreeTimer.SignalName.Timeout);
-            if (!IsInstanceValid(this) || !IsInstanceValid(icon)) return;
+            await Task.Delay(100);
         }
+
+        if (!IsInstanceValid(this) || !IsInstanceValid(icon)) return;
+        icon.SelfModulate = originalColor;
     }
 
     public void SetBeGuardianed(bool value)
