@@ -462,11 +462,13 @@ public partial class cardBase_ : Control
     /// </summary>
     public void AddCost(int n)
     {
+        int oldCost = cost;
         if (cost + n <= 99) cost += n;
         else cost = 99;
         // 触发闪烁效果（价格越小越好，所以isInverted=true）
         FlashAttributeWithColor("cost", cost, initialCost, minHistoryCost, isInverted: true);
         RefreshState();
+        _ = AnimateCostRoll(oldCost, cost);
     }
 
     /// <summary>
@@ -474,12 +476,38 @@ public partial class cardBase_ : Control
     /// </summary>
     public void ReduceCost(int n)
     {
+        int oldCost = cost;
         if (cost - n >= 0) cost -= n;
         else cost = 0;
         // 更新历史最小值并触发闪烁效果
         if (cost < minHistoryCost) minHistoryCost = cost;
         FlashAttributeWithColor("cost", cost, initialCost, minHistoryCost, isInverted: true);
         RefreshState();
+        _ = AnimateCostRoll(oldCost, cost);
+    }
+
+    /// <summary>
+    /// 费用数字滚动动画：从旧值逐步滚动到新值
+    /// </summary>
+    private async Task AnimateCostRoll(int fromValue, int toValue)
+    {
+        if (fromValue == toValue) return;
+        var costLabel = GetNode<Label>("cost");
+        if (costLabel == null) return;
+
+        int steps = Math.Abs(toValue - fromValue);
+        int direction = toValue > fromValue ? 1 : -1;
+        // 动画总时长控制在500ms内，每步间隔20-50ms
+        int delayMs = Math.Clamp(500 / Math.Max(steps, 1), 20, 50);
+
+        int current = fromValue;
+        while (current != toValue)
+        {
+            await Task.Delay(delayMs);
+            current += direction;
+            if (IsInstanceValid(this) && IsInstanceValid(costLabel))
+                costLabel.Text = current.ToString();
+        }
     }
 
     public override void _Ready()

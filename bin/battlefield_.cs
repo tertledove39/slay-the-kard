@@ -1904,6 +1904,28 @@ InputState currentInputState = InputState.nil;
         return true;
     }
 
+    /// <summary>
+    /// Label数字滚动动画：从旧值逐步滚动到新值（用于费用、指挥点等）
+    /// </summary>
+    public async Task RollLabelNumber(Label label, int fromValue, int toValue)
+    {
+        if (fromValue == toValue || label == null) return;
+
+        int steps = Math.Abs(toValue - fromValue);
+        int direction = toValue > fromValue ? 1 : -1;
+        // 动画总时长控制在500ms内，每步间隔20-50ms
+        int delayMs = Math.Clamp(500 / Math.Max(steps, 1), 20, 50);
+
+        int current = fromValue;
+        while (current != toValue)
+        {
+            await Task.Delay(delayMs);
+            current += direction;
+            if (IsInstanceValid(label))
+                label.Text = current.ToString();
+        }
+    }
+
     List<cardBase_> enemyDeck;
 
     /// <summary>
@@ -4431,31 +4453,34 @@ public class Player
 
     public void AddPoint(int i = 1)
     {
+        int oldPoint = point;
         if(point + i >= pointMaxMaxMax) {point = pointMaxMaxMax;}
         else point += i;
-        RefreshPointLabel();
+        _ = battlefield.RollLabelNumber(pointLabel, oldPoint, point);
     }
 
     public void AddPointMax(int i = 1)
     {
+        int oldMax = pointMax;
         if(pointMax + i >= pointMaxMaxMax) {pointMax = pointMaxMaxMax;}
         else pointMax += i;
-        RefreshPointLabel();
+        _ = battlefield.RollLabelNumber(pointMaxLabel, oldMax, pointMax);
     }
-    
+
     public Boolean UsePoint(int x)
     {
         if(point >= x)
         {
+            int oldPoint = point;
             point -= x;
-            RefreshPointLabel();
+            _ = battlefield.RollLabelNumber(pointLabel, oldPoint, point);
             return true;
         }
         else
         {
             return false;
         }
-        
+
     }
 
     /// <summary>
@@ -4471,21 +4496,17 @@ public class Player
     /// </summary>
     public void RestorePoint(int x)
     {
+        int oldPoint = point;
         point += x;
         if (point > pointMax) point = pointMax;
-        RefreshPointLabel();
+        _ = battlefield.RollLabelNumber(pointLabel, oldPoint, point);
     }
 
-    void RefreshPointLabel()
-    {
-        pointLabel.Text = $"{point}";
-        pointMaxLabel.Text = $"{pointMax}";
-    }
-    
     public void RefreshPoint()
     {
+        int oldPoint = point;
         point = pointMax;
-        RefreshPointLabel();
+        _ = battlefield.RollLabelNumber(pointLabel, oldPoint, point);
     }
 
 
@@ -4493,10 +4514,12 @@ public class Player
     {
         if (pointMax + 1 <= pointMaxMax)
         {
+            int oldMax = pointMax;
             pointMax += 1;
+            _ = battlefield.RollLabelNumber(pointMaxLabel, oldMax, pointMax);
         }
         RefreshPoint();
-        
+
     }
 
     public List<cardBase_> GetCardsInHand()
@@ -4609,7 +4632,9 @@ public class Player
         
         pointLabel = battlefield.GetNode<Label>("point");
         pointMaxLabel = battlefield.GetNode<Label>("pointMax");
-        RefreshPointLabel();  // 初始化点数显示
+        // 初始化点数显示（无需动画）
+        pointLabel.Text = $"{point}";
+        pointMaxLabel.Text = $"{pointMax}";
     }
     
     /// <summary>
