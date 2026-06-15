@@ -4339,12 +4339,12 @@ InputState currentInputState = InputState.nil;
             if (condition.StartsWith("target.name=="))
             {
                 string name = condition.Substring("target.name==".Length).Trim();
-                return targets[0].name == name;
+                return targets[0].id == name;
             }
             if (condition.StartsWith("target.name!="))
             {
                 string name = condition.Substring("target.name!=".Length).Trim();
-                return targets[0].name != name;
+                return targets[0].id != name;
             }
         }
 
