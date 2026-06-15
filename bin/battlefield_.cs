@@ -257,10 +257,17 @@ public partial class battlefield_ : Control
         // 闪击特性：单位被加入战场时刷新
         if(card.HasTrait(UnitTraits.Blitz)) card.RefreshUnit();
 
+        // 前线单位无法具有烟幕
+        if (frontLine.Contains(place) && card.HasSmokeScreenActive())
+        {
+            card.RemoveSmokeScreen();
+        }
+
                       // 触发被加入战场的效果
         await TriggerUnitEffects("BeingAddedToField", card, new List<cardBase_>(), checkOnlySourceCard: true);
         ResumeDeathCheck(); // 恢复死亡检查
         CheckIfAnyUnitDiedAsync(); // 检查死亡
+        RefreshAllBeGuardianedStatus(); // 部署后刷新被守护状态
     }
 
 /// <summary>
@@ -1679,66 +1686,73 @@ InputState currentInputState = InputState.nil;
         }
         
         await to.LoseDefence(attackDamage);
-        
+
+        // 动员特性：受到伤害后消失
+        if (to.HasMobilizeActive() && attackDamage > 0)
+        {
+            to.RemoveMobilize();
+        }
+
         // 烟幕特性：单位第一次攻击时失去烟幕
         if (from.HasSmokeScreenActive())
         {
             from.RemoveSmokeScreen();
         }
 
-        // 冲击特性：攻击时不受到反击
+        // 冲击特性：攻击时不受到反击，无视伏击
         bool attackerHasShock = from.HasShockActive();
         if (attackerHasShock)
         {
             from.RemoveShock(); // 攻击后失去冲击
         }
-        
-          // 判断是否进行反击
-          // 战斗机、步兵、坦克、火炮可以反击敌人
-          // 轰炸机不能反击敌人
-        bool canCounterAttack = to.cardType != CardTypes.Bomber;
-        
-        // 战斗机、步兵、坦克在攻击后会受到反击
-        // 轰炸机、火炮不会受到反击
-        bool willReceiveCounterAttack = 
-            from.cardType == CardTypes.Plane || 
-            from.cardType == CardTypes.Infantry || 
-            from.cardType == CardTypes.Tank;
-        
-        // 伏击特性：被攻击时先造成反击伤害
-        bool defenderHasAmbush = to.HasTrait(UnitTraits.Ambush);
 
-        // 执行反击
-        if (canCounterAttack && willReceiveCounterAttack)
+        // 判断是否进行反击（冲击特性完全免疫反击）
+        if (!attackerHasShock)
         {
-            int counterDamage = to.ReadAttack();
-            
-            // 重甲特性：单位受到的战斗伤害-1
-            if (from.HasTrait(UnitTraits.HeavyArmor))
+            // 战斗机、步兵、坦克、火炮可以反击敌人，轰炸机不能
+            bool canCounterAttack = to.cardType != CardTypes.Bomber;
+
+            // 战斗机、步兵、坦克在攻击后会受到反击，轰炸机、火炮不会
+            bool willReceiveCounterAttack =
+                from.cardType == CardTypes.Plane ||
+                from.cardType == CardTypes.Infantry ||
+                from.cardType == CardTypes.Tank;
+
+            // 伏击特性：被攻击时先造成反击伤害（冲击无视伏击）
+            bool defenderHasAmbush = to.HasAmbushActive();
+
+            // 执行反击
+            if (canCounterAttack && willReceiveCounterAttack)
             {
-                counterDamage = Math.Max(0, counterDamage - 1);
-            }
-            
-            // 免疫特性：不受到战斗伤害
-            if (from.HasTrait(UnitTraits.Immunity))
-            {
-                counterDamage = 0;
-            }
-            
-            // 伏击特性：先造成反击伤害
-            if (defenderHasAmbush)
-            {
-                await from.LoseDefence(counterDamage);
-                // 若敌方单位因此死亡，则不受到来自对方的伤害
-                if (from.ReadDefence() <= 0)
+                int counterDamage = to.ReadAttack();
+
+                // 重甲特性：单位受到的战斗伤害-1
+                if (from.HasTrait(UnitTraits.HeavyArmor))
                 {
-                    // 不执行后续的正常反击
+                    counterDamage = Math.Max(0, counterDamage - 1);
+                }
+
+                // 免疫特性：不受到战斗伤害
+                if (from.HasTrait(UnitTraits.Immunity))
+                {
                     counterDamage = 0;
                 }
-            }
-            else
-            {
-                await from.LoseDefence(counterDamage);
+
+                // 伏击特性：先造成反击伤害（一回合一次）
+                if (defenderHasAmbush)
+                {
+                    to.UseAmbush(); // 标记伏击已被使用
+                    await from.LoseDefence(counterDamage);
+                    // 若敌方单位因此死亡，则不受到来自对方的伤害
+                    if (from.ReadDefence() <= 0)
+                    {
+                        counterDamage = 0;
+                    }
+                }
+                else
+                {
+                    await from.LoseDefence(counterDamage);
+                }
             }
         }
         
@@ -1873,6 +1887,7 @@ InputState currentInputState = InputState.nil;
         }
         ResumeDeathCheck(); // 恢复死亡检查
         CheckIfAnyUnitDiedAsync(); // 统一检查死亡
+        RefreshAllBeGuardianedStatus(); // 移动后刷新被守护状态
     }
 
     IsFriend CheckIfFrontLineIsFriend()
@@ -2671,7 +2686,10 @@ InputState currentInputState = InputState.nil;
         
         // 触发友方回合开始时点
         await TriggerUnitEffects("FriendlyTurnBegin", null);
-        
+
+        // 回合开始时trait处理
+        ApplyTurnStartTraits();
+
         // 增加所有已部署单位的存活回合数
         foreach(var card in cardInPlaces.Where(x=>x.getState()==CardState.placed).ToList())
         {
@@ -2695,6 +2713,90 @@ InputState currentInputState = InputState.nil;
         }
     }
 
+    /// <summary>
+    /// 回合开始时处理trait效果：动员buff、伏击重置、烟幕前线检查、被守护刷新
+    /// </summary>
+    private void ApplyTurnStartTraits()
+    {
+        foreach (var card in cardInPlaces.Where(x => x.getState() == CardState.placed).ToList())
+        {
+            if (card == null) continue;
+
+            // 动员：友方回合开始时+1攻击+1防御
+            if (card.GetIsFriend() == IsFriend.friend && card.HasMobilizeActive())
+            {
+                card.AddChange(ChangeType.GetAttack, 1);
+                card.AddChange(ChangeType.GetDefence, 1);
+            }
+        }
+
+        // 执行动员buff
+        _ = ExecuteChangeLists();
+
+        // 烟幕前线检查：前线的单位无法具有烟幕
+        foreach (var place in frontLine)
+        {
+            var card = place.GetMyCard();
+            if (card != null && card.HasSmokeScreenActive())
+            {
+                card.RemoveSmokeScreen();
+            }
+        }
+
+        // 刷新被守护状态
+        RefreshAllBeGuardianedStatus();
+    }
+
+    /// <summary>
+    /// 刷新所有单位的被守护状态
+    /// </summary>
+    private void RefreshAllBeGuardianedStatus()
+    {
+        foreach (var card in cardInPlaces.Where(x => x.getState() == CardState.placed && x.isHq != HQ.hq))
+        {
+            if (card == null) continue;
+            bool guarded = IsUnitProtectedByGuardian(card);
+            card.SetBeGuardianed(guarded);
+        }
+    }
+
+    /// <summary>
+    /// 检查单个单位是否被守护（左或右有守护单位）
+    /// </summary>
+    private bool IsUnitProtectedByGuardian(cardBase_ unit)
+    {
+        if (unit == null) return false;
+        if (unit.HasSmokeScreenActive()) return false;
+        if (unit.HasTrait(UnitTraits.Guardian)) return false;
+
+        var myPlace = unit.GetMyPlace();
+        if (myPlace == null) return false;
+
+        // 确定所在阵线
+        List<place_> line = null;
+        if (frontLine.Contains(myPlace)) line = frontLine;
+        else if (supportLine.Contains(myPlace)) line = supportLine;
+        else if (enemySupprotLine.Contains(myPlace)) line = enemySupprotLine;
+        if (line == null) return false;
+
+        int idx = line.IndexOf(myPlace);
+        // 检查左侧
+        if (idx > 0)
+        {
+            var leftCard = line[idx - 1].GetMyCard();
+            if (leftCard != null && leftCard.HasTrait(UnitTraits.Guardian))
+                return true;
+        }
+        // 检查右侧
+        if (idx < line.Count - 1)
+        {
+            var rightCard = line[idx + 1].GetMyCard();
+            if (rightCard != null && rightCard.HasTrait(UnitTraits.Guardian))
+                return true;
+        }
+        return false;
+    }
+
     public void RemoveCard(cardBase_ card)
     {
         if(card.GetIsFriend()== IsFriend.enemy && card.isHq == HQ.hq)
@@ -2703,6 +2805,7 @@ InputState currentInputState = InputState.nil;
         }
         cardInPlaces.Remove(card);
         card.Dead();
+        RefreshAllBeGuardianedStatus(); // 单位离场后刷新被守护状态
     }
 
     /// <summary>

@@ -48,7 +48,11 @@ public partial class cardBase_ : Control
     // 特性状态跟踪
     private bool hasSmokeScreen = false;
     private bool hasShock = false;
-    
+    private bool hasMobilize = false;
+    private bool hasAmbushActive = false;
+    // 被守护状态（由两侧守护单位提供，不是自身trait）
+    private bool isBeGuardianed = false;
+
     // 单位存活回合数
     private int lifeTime = 0;
     
@@ -90,11 +94,14 @@ public partial class cardBase_ : Control
         moveAble = 1;
         attackAble = 1;
 
-        // 奋战特性：单位部署后可立刻战斗
+        // 奋战特性：单位可攻击两次
         if (HasTrait(UnitTraits.Determination))
         {
-            attackAble = 2; // 可以攻击两次（部署时一次，正常回合一次）
+            attackAble = 2;
         }
+
+        // 恢复伏击（新回合）
+        RestoreAmbush();
 
         UpdateMoveableLight();
     }
@@ -204,6 +211,67 @@ public partial class cardBase_ : Control
     public void RemoveShock()
     {
         hasShock = false;
+    }
+
+    /// <summary>
+    /// 检查单位是否有动员
+    /// </summary>
+    public bool HasMobilizeActive()
+    {
+        return hasMobilize;
+    }
+
+    /// <summary>
+    /// 移除动员（受到伤害后）
+    /// </summary>
+    public void RemoveMobilize()
+    {
+        hasMobilize = false;
+    }
+
+    /// <summary>
+    /// 检查伏击是否可用（本回合尚未触发）
+    /// </summary>
+    public bool HasAmbushActive()
+    {
+        return hasAmbushActive;
+    }
+
+    /// <summary>
+    /// 使用伏击（触发后标记为已用）
+    /// </summary>
+    public void UseAmbush()
+    {
+        hasAmbushActive = false;
+    }
+
+    /// <summary>
+    /// 恢复伏击（新回合开始时）
+    /// </summary>
+    public void RestoreAmbush()
+    {
+        if (HasTrait(UnitTraits.Ambush))
+            hasAmbushActive = true;
+    }
+
+    /// <summary>
+    /// 设置被守护状态
+    /// </summary>
+    public void SetBeGuardianed(bool value)
+    {
+        if (isBeGuardianed != value)
+        {
+            isBeGuardianed = value;
+            BuildAttributePanel(); // 刷新图标面板
+        }
+    }
+
+    /// <summary>
+    /// 检查是否被守护
+    /// </summary>
+    public bool IsBeGuardianed()
+    {
+        return isBeGuardianed;
     }
 
     /// <summary>
@@ -698,10 +766,12 @@ public partial class cardBase_ : Control
         traits      = cardData.Traits;
         id = cardData.Id;
         
-        // 初始化烟幕和冲击状态
+        // 初始化烟幕、冲击、动员和伏击状态
         hasSmokeScreen = HasTrait(UnitTraits.SmokeScreen);
         hasShock = HasTrait(UnitTraits.Shock);
-        
+        hasMobilize = HasTrait(UnitTraits.Mobilize);
+        hasAmbushActive = HasTrait(UnitTraits.Ambush);
+
         // 初始化历史追踪值
         initialAttack = attack;
         initialDefence = defence;
@@ -742,6 +812,8 @@ public partial class cardBase_ : Control
             names.Append("伏击 ");
         if ((traits & UnitTraits.Immunity) != 0)
             names.Append("免疫 ");
+        if ((traits & UnitTraits.Mobilize) != 0)
+            names.Append("动员 ");
 
         if (names.Length == 0) return "";
         // 去除末尾空格
@@ -780,7 +852,7 @@ public partial class cardBase_ : Control
     }
 
     /// <summary>
-    /// 收集该卡所有attribute：effect属性 + trait属性。
+    /// 收集该卡所有attribute：effect属性 + trait属性（含状态着色）。
     /// </summary>
     public List<EffectAttribute> GetAllAttributes()
     {
@@ -789,30 +861,74 @@ public partial class cardBase_ : Control
         // 效果属性
         if (!string.IsNullOrEmpty(effect))
         {
-            // 去掉触发前缀（如"Deployed:"）后再解析
             string cleanEffect = effect;
             int colonIdx = cleanEffect.IndexOf(':');
             if (colonIdx > 0) cleanEffect = cleanEffect.Substring(colonIdx + 1);
             list.Add(ParseEffectAttribute(cleanEffect));
         }
 
-        // trait属性
+        // 被守护指示器（不是trait，是状态）
+        if (isBeGuardianed)
+        {
+            list.Add(new EffectAttribute
+            {
+                IconName = "beGuardianed",
+                Description = "被守护：两侧有守护单位保护",
+                IsTrait = false,
+                TraitName = "BeGuardianed",
+                IconTint = Colors.White
+            });
+        }
+
+        // trait属性（含状态着色）
         foreach (UnitTraits t in Enum.GetValues(typeof(UnitTraits)))
         {
             if (t == UnitTraits.None) continue;
             if ((traits & t) != 0)
             {
+                Color tint = GetTraitIconTint(t);
                 list.Add(new EffectAttribute
                 {
                     IconName = IconCache.GetTraitIconName(t),
                     Description = GetTraitDescription(t),
                     IsTrait = true,
-                    TraitName = t.ToString()
+                    TraitName = t.ToString(),
+                    IconTint = tint
                 });
             }
         }
 
         return list;
+    }
+
+    /// <summary>
+    /// 根据trait的运行时状态返回图标着色
+    /// </summary>
+    private Color GetTraitIconTint(UnitTraits t)
+    {
+        switch (t)
+        {
+            case UnitTraits.Determination:
+                // 黄色=可攻2次，白色=可攻1次，灰色=0次
+                if (attackAble >= 2) return new Color(1f, 1f, 0.24f); // 黄色
+                if (attackAble == 1) return Colors.White;
+                return new Color(0.5f, 0.5f, 0.5f); // 灰色
+
+            case UnitTraits.SmokeScreen:
+                return hasSmokeScreen ? Colors.White : new Color(0.5f, 0.5f, 0.5f);
+
+            case UnitTraits.Shock:
+                return hasShock ? new Color(1f, 1f, 0.24f) : new Color(0.5f, 0.5f, 0.5f);
+
+            case UnitTraits.Ambush:
+                return hasAmbushActive ? Colors.White : new Color(0.5f, 0.5f, 0.5f);
+
+            case UnitTraits.Mobilize:
+                return hasMobilize ? Colors.White : new Color(0.5f, 0.5f, 0.5f);
+
+            default:
+                return Colors.White;
+        }
     }
 
     /// <summary>
@@ -828,6 +944,7 @@ public partial class cardBase_ : Control
         UnitTraits.Shock => "冲击：攻击不受到反击，攻击后失去",
         UnitTraits.Ambush => "伏击：被攻击时先造成反击伤害",
         UnitTraits.Immunity => "免疫：不受到战斗伤害",
+        UnitTraits.Mobilize => "动员：友方回合开始时+1+1，受伤后消失",
         _ => ""
     };
 
@@ -947,6 +1064,7 @@ public partial class cardBase_ : Control
             icon.Size = new Vector2(AttrIconSize, AttrIconSize);
             icon.Position = new Vector2(bgMargin, y + bgMargin);
             icon.MouseFilter = MouseFilterEnum.Ignore;
+            icon.SelfModulate = attr.IconTint;
             _attrPanel.AddChild(icon);
 
             // 记录图标在面板中的本地rect和对应描述
@@ -1454,7 +1572,9 @@ public enum UnitTraits
     /// <summary>伏击：被攻击时先造成反击伤害</summary>
     Ambush = 1 << 6,
     /// <summary>免疫：不受到战斗伤害</summary>
-    Immunity = 1 << 7
+    Immunity = 1 << 7,
+    /// <summary>动员：友方回合开始时+1攻击+1防御，受到伤害后消失</summary>
+    Mobilize = 1 << 8
 }
 
 
@@ -1531,6 +1651,7 @@ public class EffectAttribute
     public string Description;
     public bool IsTrait; // true表示来自trait，false表示来自effect
     public string TraitName; // 仅IsTrait时有效
+    public Color IconTint = Colors.White; // 图标颜色，用于表示trait状态
 }
 
 /// <summary>
@@ -1545,20 +1666,23 @@ public static class IconCache
     private static readonly string[] KnownIcons = new[]
     {
         "action", "Determination", "Guardian",
-        "greenLight", "yellowLight", "redLight"
+        "greenLight", "yellowLight", "redLight",
+        "blitz", "mobilize", "smoke", "impact",
+        "ambush", "heavyArmour", "beGuardianed"
     };
 
     // trait -> icon 映射
     private static readonly Dictionary<UnitTraits, string> TraitIcons = new()
     {
-        { UnitTraits.Blitz, "action" },
+        { UnitTraits.Blitz, "blitz" },
         { UnitTraits.Determination, "Determination" },
-        { UnitTraits.HeavyArmor, "action" },
-        { UnitTraits.SmokeScreen, "action" },
+        { UnitTraits.HeavyArmor, "heavyArmour" },
+        { UnitTraits.SmokeScreen, "smoke" },
         { UnitTraits.Guardian, "Guardian" },
-        { UnitTraits.Shock, "action" },
-        { UnitTraits.Ambush, "action" },
-        { UnitTraits.Immunity, "action" },
+        { UnitTraits.Shock, "impact" },
+        { UnitTraits.Ambush, "ambush" },
+        { UnitTraits.Immunity, "heavyArmour" },
+        { UnitTraits.Mobilize, "mobilize" },
     };
 
     public static void Init()
