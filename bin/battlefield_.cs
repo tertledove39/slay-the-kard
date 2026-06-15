@@ -855,23 +855,29 @@ InputState currentInputState = InputState.nil;
     }
 
     /// <summary>
-    /// 控制台Tab自动补全：在所有以当前输入为前缀的指令之间轮流切换
+    /// 控制台Tab自动补全：根据用户原始输入的前缀，在所有匹配指令之间轮流切换
     /// </summary>
     private void HandleConsoleAutocomplete()
     {
         if (_consoleInput == null) return;
 
         string currentText = _consoleInput.Text;
-        // 获取光标前的最后一个"单词"（以|或空格分隔）
-        string beforeCursor = currentText;
-        int lastSep = Math.Max(beforeCursor.LastIndexOf('|'), beforeCursor.LastIndexOf(' '));
-        string prefix = lastSep >= 0 ? beforeCursor.Substring(lastSep + 1) : beforeCursor;
+        int lastSep = Math.Max(currentText.LastIndexOf('|'), currentText.LastIndexOf(' '));
+        string currentPrefix = lastSep >= 0 ? currentText.Substring(lastSep + 1) : currentText;
 
-        // 查找所有匹配的指令
+        // 判断是否仍在同一轮补全循环中：当前单词必须以原始前缀开头
+        bool inCycle = _autoCompleteIndex >= 0
+            && !string.IsNullOrEmpty(_autoCompletePrefix)
+            && currentPrefix.StartsWith(_autoCompletePrefix, StringComparison.OrdinalIgnoreCase);
+
+        // 确定搜索前缀：循环中始终使用用户最初输入的前缀
+        string searchPrefix = inCycle ? _autoCompletePrefix : currentPrefix;
+
+        // 查找所有以搜索前缀开头的匹配指令
         var matches = new List<string>();
         foreach (var cmd in ConsoleCommands)
         {
-            if (cmd.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && cmd != prefix)
+            if (cmd.StartsWith(searchPrefix, StringComparison.OrdinalIgnoreCase) && !cmd.Equals(searchPrefix, StringComparison.OrdinalIgnoreCase))
             {
                 matches.Add(cmd);
             }
@@ -884,23 +890,24 @@ InputState currentInputState = InputState.nil;
             return;
         }
 
-        // 如果前缀变了，重置索引
-        if (_autoCompletePrefix != prefix)
+        // 首次进入此轮补全，记录原始前缀
+        if (!inCycle)
         {
-            _autoCompleteIndex = -1;
-            _autoCompletePrefix = prefix;
+            _autoCompletePrefix = currentPrefix;
+            _autoCompleteIndex = 0;
+        }
+        else
+        {
+            _autoCompleteIndex = (_autoCompleteIndex + 1) % matches.Count;
         }
 
-        // 循环到下一个匹配项
-        _autoCompleteIndex = (_autoCompleteIndex + 1) % matches.Count;
         string completion = matches[_autoCompleteIndex];
 
-        // 替换当前单词为补全项
+        // 替换最后一个单词为补全项
         string newText = lastSep >= 0
             ? currentText.Substring(0, lastSep + 1) + completion
             : completion;
         _consoleInput.Text = newText;
-        // 光标移到末尾
         _consoleInput.CaretColumn = newText.Length;
     }
 
