@@ -171,14 +171,26 @@ public partial class cardBase_ : Control
     public void AddTrait(UnitTraits trait)
     {
         traits |= trait;
+        // 初始化对应的运行时状态
+        if ((trait & UnitTraits.SmokeScreen) != 0) hasSmokeScreen = true;
+        if ((trait & UnitTraits.Shock) != 0) hasShock = true;
+        if ((trait & UnitTraits.Mobilize) != 0) hasMobilize = true;
+        if ((trait & UnitTraits.Ambush) != 0) hasAmbushActive = true;
+        BuildAttributePanel(); // 刷新图标面板
     }
-    
+
     /// <summary>
     /// 移除特性
     /// </summary>
     public void RemoveTrait(UnitTraits trait)
     {
         traits &= ~trait;
+        // 清理对应的运行时状态
+        if ((trait & UnitTraits.SmokeScreen) != 0) hasSmokeScreen = false;
+        if ((trait & UnitTraits.Shock) != 0) hasShock = false;
+        if ((trait & UnitTraits.Mobilize) != 0) hasMobilize = false;
+        if ((trait & UnitTraits.Ambush) != 0) hasAmbushActive = false;
+        BuildAttributePanel(); // 刷新图标面板
     }
     
     /// <summary>
@@ -195,8 +207,9 @@ public partial class cardBase_ : Control
     public void RemoveSmokeScreen()
     {
         hasSmokeScreen = false;
+        BuildAttributePanel(); // 刷新图标
     }
-    
+
     /// <summary>
     /// 检查单位是否有冲击
     /// </summary>
@@ -204,13 +217,14 @@ public partial class cardBase_ : Control
     {
         return hasShock;
     }
-    
+
     /// <summary>
     /// 移除冲击
     /// </summary>
     public void RemoveShock()
     {
         hasShock = false;
+        BuildAttributePanel(); // 刷新图标
     }
 
     /// <summary>
@@ -227,6 +241,7 @@ public partial class cardBase_ : Control
     public void RemoveMobilize()
     {
         hasMobilize = false;
+        BuildAttributePanel(); // 刷新图标
     }
 
     /// <summary>
@@ -243,6 +258,7 @@ public partial class cardBase_ : Control
     public void UseAmbush()
     {
         hasAmbushActive = false;
+        BuildAttributePanel(); // 刷新图标
     }
 
     /// <summary>
@@ -251,7 +267,10 @@ public partial class cardBase_ : Control
     public void RestoreAmbush()
     {
         if (HasTrait(UnitTraits.Ambush))
+        {
             hasAmbushActive = true;
+            BuildAttributePanel(); // 刷新图标
+        }
     }
 
     /// <summary>
@@ -1639,7 +1658,8 @@ public enum Times
     friendlyInfantryDeployed,  // 友方步兵部署/加入时
     fightingInfantry,          // 对战步兵时
     attackingHq,               // 攻击总部时
-    takingDamage               // 本单位收到伤害时
+    takingDamage,              // 本单位收到伤害时
+    bePicked                   // 被指向（成为友方/敌方选择目标时）
 }
 
 /// <summary>

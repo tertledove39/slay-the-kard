@@ -1160,6 +1160,8 @@ InputState currentInputState = InputState.nil;
                         }
                     else
                         {
+                            // 触发被指向时点
+                            await TriggerUnitEffects("BePicked", result.GetMyCard(), new List<cardBase_> { cardNowChoose }, checkOnlySourceCard: true);
                              _ = ParseAndExecuteEffect(cardNowChoose.effect, cardNowChoose, [result.GetMyCard()]);
                             CheckIfAnyUnitDiedAsync(); // 结算单位变化
                             cardNowChoose = null;
@@ -1624,9 +1626,12 @@ InputState currentInputState = InputState.nil;
             return;
         }
 
+        // 触发被指向时点（目标被选为攻击对象）
+        await TriggerUnitEffects("BePicked", to, new List<cardBase_> { from }, checkOnlySourceCard: true);
+
         // 触发攻击者的 Attacking 效果
         await TriggerUnitEffects("Attacking", from, new List<cardBase_> { to }, checkOnlySourceCard: true);
-        
+
         // 触发被攻击者的 BeingAttacked 效果
         await TriggerUnitEffects("BeingAttacked", to, new List<cardBase_> { to, from }, checkOnlySourceCard: true);
 
