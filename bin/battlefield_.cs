@@ -1161,7 +1161,7 @@ InputState currentInputState = InputState.nil;
                     else
                         {
                             // 触发被指向时点
-                            await TriggerUnitEffects("BePicked", result.GetMyCard(), new List<cardBase_> { cardNowChoose }, checkOnlySourceCard: true);
+                            _ = TriggerUnitEffects("BePicked", result.GetMyCard(), new List<cardBase_> { cardNowChoose }, checkOnlySourceCard: true);
                              _ = ParseAndExecuteEffect(cardNowChoose.effect, cardNowChoose, [result.GetMyCard()]);
                             CheckIfAnyUnitDiedAsync(); // 结算单位变化
                             cardNowChoose = null;
