@@ -176,7 +176,8 @@ public partial class cardBase_ : Control
         if ((trait & UnitTraits.Shock) != 0) hasShock = true;
         if ((trait & UnitTraits.Mobilize) != 0) hasMobilize = true;
         if ((trait & UnitTraits.Ambush) != 0) hasAmbushActive = true;
-        BuildAttributePanel(); // 刷新图标面板
+        RefreshDescriptionText();
+        BuildAttributePanel();
     }
 
     /// <summary>
@@ -190,7 +191,20 @@ public partial class cardBase_ : Control
         if ((trait & UnitTraits.Shock) != 0) hasShock = false;
         if ((trait & UnitTraits.Mobilize) != 0) hasMobilize = false;
         if ((trait & UnitTraits.Ambush) != 0) hasAmbushActive = false;
-        BuildAttributePanel(); // 刷新图标面板
+        RefreshDescriptionText();
+        BuildAttributePanel();
+    }
+
+    /// <summary>
+    /// 刷新描述文字（轻量级，不重建整个面板）
+    /// </summary>
+    private void RefreshDescriptionText()
+    {
+        var descLabel = GetNode<RichTextLabel>("description");
+        if (descLabel != null)
+        {
+            descLabel.Text = BuildTraitPrefix() + description;
+        }
     }
     
     /// <summary>
@@ -207,7 +221,8 @@ public partial class cardBase_ : Control
     public void RemoveSmokeScreen()
     {
         hasSmokeScreen = false;
-        BuildAttributePanel(); // 刷新图标
+        RefreshDescriptionText();
+        BuildAttributePanel();
     }
 
     /// <summary>
@@ -224,7 +239,8 @@ public partial class cardBase_ : Control
     public void RemoveShock()
     {
         hasShock = false;
-        BuildAttributePanel(); // 刷新图标
+        RefreshDescriptionText();
+        BuildAttributePanel();
     }
 
     /// <summary>
@@ -241,7 +257,8 @@ public partial class cardBase_ : Control
     public void RemoveMobilize()
     {
         hasMobilize = false;
-        BuildAttributePanel(); // 刷新图标
+        RefreshDescriptionText();
+        BuildAttributePanel();
     }
 
     /// <summary>
@@ -258,7 +275,8 @@ public partial class cardBase_ : Control
     public void UseAmbush()
     {
         hasAmbushActive = false;
-        BuildAttributePanel(); // 刷新图标
+        RefreshDescriptionText();
+        BuildAttributePanel();
     }
 
     /// <summary>
@@ -269,7 +287,8 @@ public partial class cardBase_ : Control
         if (HasTrait(UnitTraits.Ambush))
         {
             hasAmbushActive = true;
-            BuildAttributePanel(); // 刷新图标
+            RefreshDescriptionText();
+            BuildAttributePanel();
         }
     }
 
