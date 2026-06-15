@@ -15,9 +15,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 public partial class battlefield_ : Control
 {
 
-
-
-
 /// <summary>
 /// 是否允许控制输入 0 允许 1 禁止
 /// </summary> 
@@ -771,13 +768,36 @@ TextureButton buttonNextTurn;
 
     // 临时用于显示一次性箭头的Line2D引用（可同时显示多个）
 
-    public override void _Input(InputEvent @event)
+
+/// <summary>
+/// 用于控制input
+/// </summary>
+    enum InputState
     {
-        if (ReadControlState() == 1) return;
-        
-        if (@event is InputEventMouseButton mouseButton)
-        {
-            // 处理卡牌选择界面的输入
+        P_InHandCommand,
+
+        P_InHandUnit,
+        P_InPlaceUnit,
+        P_InHandCommandNeedChooseTarget,
+        P_InHandUnitNeedChooseTarget,
+
+        P_ChoosingCard,
+        waitingForChoosingTarget,
+        nil
+    }
+
+InputState currentInputState = InputState.nil;
+
+    public override void _Input(InputEvent @event)
+{
+
+
+    //如果当前正处于无法操作状态 取消这一次操作
+    if (ReadControlState() == 1) return;
+
+    if (@event is InputEventMouseButton mouseButton)
+    {
+        // 处理卡牌选择界面的输入
             if (mouseButton.Pressed && mouseButton.ButtonIndex == MouseButton.Left)
             {
                 if (isShowingChoiceUI)
@@ -786,281 +806,242 @@ TextureButton buttonNextTurn;
                     return; // 选择界面中不要处理其他输入
                 }
             }
+
             
             var mousePosition = GetGlobalMousePosition();
-            //选择卡
             if (mouseButton.Pressed)
+        {
+            var card = CheckCardClick(mousePosition);
+            if(currentInputState != InputState.waitingForChoosingTarget) cardNowChoose = card;
+            if (card == null) return; // 没有点击到卡牌，不处理
+            var validTargets = GetAllowedTargets(card);
+            if(currentInputState == InputState.waitingForChoosingTarget) ;//如果是等待 那直接跳过
+            else if (card.cardType == CardTypes.Command && card.getState() == CardState.inHand && card.targetType != TargetType.NOTarget) {currentInputState = InputState.P_InHandCommandNeedChooseTarget;HighlightValidTargets(card.targetType);}
+            else if (card.cardType == CardTypes.Command && card.getState() == CardState.inHand && card.targetType == TargetType.NOTarget) currentInputState = InputState.P_InHandCommand;
+            else if (card.cardType != CardTypes.Command && card.getState() == CardState.inHand && card.targetType != TargetType.NOTarget) currentInputState = InputState.P_InHandUnitNeedChooseTarget;
+            else if (card.cardType != CardTypes.Command && card.getState() == CardState.inHand && card.targetType == TargetType.NOTarget) currentInputState = InputState.P_InHandUnit;
+            else if (card.cardType != CardTypes.Command && card.getState() == CardState.placed ) currentInputState = InputState.P_InPlaceUnit;
+            else currentInputState = InputState.nil;
+
+            switch (currentInputState)
             {
-                
-                // 点击事件
-                
-                var card = CheckCardClick(mousePosition);
-                //手上的
-                if (card != null && card.getState() == CardState.inHand)
-                {
-                    // 如果是 Command 卡，改为显示箭头并记录为已选择状态，但不移动卡牌
-                    if (card.cardType == CardTypes.Command)
+                case InputState.P_InHandCommandNeedChooseTarget:
+                if(player1 != null && player1.HasPoint(card.ReadCost()))
                     {
-                        // 只有在点数足够时才允许选择并显示箭头
-                        if (player1 != null && player1.HasPoint(card.ReadCost()))
-                        {
-                            cardNowChoose = card;
-                            cardNowChoose.setState(CardState.commandCardCaught);
-                            // 显示箭头起点
-                            arrowFrom.GlobalPosition = card.GetGlobalPosition() + arrowOffset;
-                            cardBase.ProcessMode     = Node.ProcessModeEnum.Inherit;
-                            cardBase.Visible         = true;
-                            HighlightValidTargets(cardNowChoose.targetType); // 根据 Command 卡的目标类型高亮合法目标
-                        }
-                        // 点数不足时不做任何反应
-                    }
-                    else
-                    {
-                        // 选中时立即重置视觉（避免旋转/缩放导致的瞬移）
-                        card.ResetVisualsInstant();
-
-                        offset        = card.GetGlobalPosition() - mousePosition;
                         cardNowChoose = card;
-                        card.setState(CardState.caught);
+                        cardNowChoose.setState(CardState.commandCardCaught);
+                        // 显示箭头起点
+                        arrowFrom.GlobalPosition = card.GetGlobalPosition() + arrowOffset;
+                        cardBase.ProcessMode     = Node.ProcessModeEnum.Inherit;
+                        cardBase.Visible         = true;
+                        
                     }
-                }
+                break;
 
-                //场上的
-                if (card != null && card.getState() == CardState.placed)
-                {
-                    // 检查是否是友方单位，如果是敌方单位则不允许拖动
-                    if (card.GetIsFriend() != IsFriend.friend)
+                //这些都是拖拽
+                case InputState.P_InHandCommand:
+                case InputState.P_InHandUnit:
+                case InputState.P_InHandUnitNeedChooseTarget:
+                if(player1 != null && player1.HasPoint(card.ReadCost()))
+                        {
+                    //先拖拽到某个位置,然后再考虑目标的问题,大概吧
+                    card.ResetVisualsInstant();
+
+                    //拖拽这张卡!
+                    offset        = card.GetGlobalPosition() - mousePosition;
+                    cardNowChoose = card;
+                    card.setState(CardState.caught);
+                        }
+                
+                if(currentInputState == InputState.waitingForChoosingTarget)
+                        {
+                            HighlightValidTargets(cardNowChoose.targetType);
+                        }
+                    break;
+
+                case InputState.P_InPlaceUnit:
+                     if (card.GetIsFriend() != IsFriend.friend || card.isHq == HQ.hq)
                     {
                         return;  // 敌方单位不能被拖动
                     }
-                    // 检查是否是总部，总部不能被移动
-                    if (card.isHq == HQ.hq)
-                    {
-                        return;  // 总部不能被移动
-                    }
-                    
-                    // 选中时立即重置视觉（避免旋转/缩放导致的瞬移）
-                    card.ResetVisualsInstant();
 
+                    card.ResetVisualsInstant();
                     cardNowChoose = card;
                     card.setState(CardState.inplaceAndCaught);
-
-                    //箭头显示
                     arrowFrom.GlobalPosition = card.GetGlobalPosition() + arrowOffset;
                     cardBase.ProcessMode = Node.ProcessModeEnum.Inherit;
                     cardBase.Visible = true;
-                    
                     // 高亮合法攻击目标（敌方单位）
                     HighlightValidAttackTargets(card);
-                }
-                //RefreshAllCardDisplayOrder();
+                    break;
+
+                case InputState.waitingForChoosingTarget:
                 
-                
+                    break;
+
+                default:
+                    break;
             }
-            //释放时 取消选择
-            if (mouseButton.Pressed==false)
+        } 
+
+        if (mouseButton.Pressed==false)
             {
                 
-                //如果现在选着卡
-                if(cardNowChoose!= null )
+                
+                if(cardNowChoose== null ) return; // 没有卡牌被拖动，不处理
+                var result = GetPlaceWithPosition(mousePosition);
+                
+
+                switch (currentInputState)
                 {
-                    
-
-                    //if (validArea.GetGlobalRect().HasPoint(mousePosition))
-
-                    //松开时检查是否在任意一个合法的格子上
-                    var result = GetPlaceWithPosition(mousePosition);
-
-                    // 处理 TargetType.NOTarget 的 Command 卡：只要释放点在 validArea 内，直接以 null 目标执行效果
-                    if (cardNowChoose.getState() == CardState.commandCardCaught &&
-                        cardNowChoose.cardType == CardTypes.Command &&
-                        cardNowChoose.targetType == TargetType.NOTarget &&
-                        validArea.GetGlobalRect().HasPoint(mousePosition))
-                    {
-                        if (player1.UsePoint(cardNowChoose.ReadCost()))
+                    case InputState.P_InHandCommandNeedChooseTarget:
+                    if(result == null || result.GetMyCard() == null ||result.GetMyCard() != null && IsValidTarget(result.GetMyCard(), cardNowChoose.targetType)== false)
                         {
-                            _ = ParseAndExecuteEffect(cardNowChoose.effect, cardNowChoose, null);
-                            player1.RemoveFromHand(cardNowChoose);
-                            RemoveCard(cardNowChoose);
-                            CheckIfAnyUnitDiedAsync(); // 结算单位变化
+                            
+                            cardNowChoose.setState(CardState.inHand);
+                            cardNowChoose = null;
+                            break;
+                        }
+                    if (player1.UsePoint(cardNowChoose.ReadCost()))
+                        {
+                            ExecuteCommandAndDiscard(cardNowChoose, new List<cardBase_> { result.GetMyCard() }, needRestoreColor: true);
+                        }
+                    currentInputState = InputState.nil;
+                    cardNowChoose = null;
+                    break;
+
+                    case InputState.P_InHandCommand:
+                    //不在合法区域释放,归位
+                    if (validArea.GetGlobalRect().HasPoint(mousePosition)!=true)
+                        {
+                            cardNowChoose.setState(CardState.inHand);
+                            cardNowChoose = null;
+                            break;
+                        } 
+
+                    if (player1.UsePoint(cardNowChoose.ReadCost()))
+                        {
+                            if(cardNowChoose==null) break;
+                            ExecuteCommandAndDiscard(cardNowChoose, null);
                         }
                         else
                         {
                             // 点数不足，什么也不执行
                         }
 
-                        // 清理并返回，避免后续针对 result 的处理干扰
-                        cardBase.ProcessMode = Node.ProcessModeEnum.Disabled;
-                        cardBase.Visible     = false;
-                        cardNowChoose.setState(CardState.inHand);
-                        player1.RefreshMyHand();
-                        cardNowChoose = null;
-                        RestoreAllTargetsColor();
-                        return;
-                    }
+                    currentInputState = InputState.nil;
+                    cardNowChoose = null;
 
-                    if(result != null)
-                    {
-                            if(result.GetMyCard()== null)
-                            {
-                                if(cardNowChoose.getState() == CardState.caught  && player1.UsePoint(cardNowChoose.ReadCost()) == true)
-                                {
-                                    // 在手上并且有钱的话就移动过去
-                                    _ = Move(cardNowChoose,result);
-                                }
-                                else if(cardNowChoose.getState() == CardState.inplaceAndCaught)
-                                {
-                                    // 在场上并且拖动到合法格子
-                                    _ = Move(cardNowChoose,result);
-                                }
-                            }
-                                else if((result.GetMyCard().GetIsFriend() == IsFriend.enemy ||result.GetMyCard().GetIsFriend() == IsFriend.enemyNeutral)&&cardNowChoose.getState()==CardState.inplaceAndCaught)
-                            {
-                                //攻击
-                                Attack(cardNowChoose,result.GetMyCard());
-                            }
-                            else if(cardNowChoose.getState() == CardState.commandCardCaught)
-                                {
-                                    // 如果是 Command 卡，则不移动卡牌，改为生成箭头并记录释放所在格子
-                                    if (cardNowChoose.cardType == CardTypes.Command)
-                                    {
-                                        // 检查玩家是否有足够的点数
-                                        if (player1.UsePoint(cardNowChoose.ReadCost()))
-                                        {
-                                            // 检查目标是否合法
-                                            bool isValidTarget = false;
-                                            
-                                            if (cardNowChoose.targetType == TargetType.NOTarget)
-                                            {
-                                                // NOTarget 无需指向任何目标，只要在 validArea 内就可以
-                                                isValidTarget = validArea.GetGlobalRect().HasPoint(mousePosition);
-                                            }
-                                            else
-                                            {
-                                                // 其他目标类型需要检查目标卡是否合法
-                                                cardBase_ targetCard = result?.GetMyCard();
-                                                isValidTarget = (targetCard != null && IsValidTarget(targetCard, cardNowChoose.targetType)) ||
-                                                                (targetCard == null && cardNowChoose.targetType == TargetType.aPlace);
-                                            }
-                                            
-                                            if (isValidTarget)
-                                            {
-                                                // 目标合法，执行效果
-                                                cardBase_ targetCard = result?.GetMyCard();                                                       // 获取目标格子上的卡
-                                                          _          = ParseAndExecuteEffect(cardNowChoose.effect, cardNowChoose, [targetCard]);
-                                                
-                                                // 从手牌中移除这张卡
-                                                player1.RemoveFromHand(cardNowChoose);
-                                                    // 彻底删除这张卡（会调用Dead()）
-                                                RemoveCard(cardNowChoose);
-                                                CheckIfAnyUnitDiedAsync(); // 结算单位变化
-                                                
-                                                // 隐藏箭头
-                                                cardBase.ProcessMode = Node.ProcessModeEnum.Disabled;
-                                                cardBase.Visible     = false;
-                                                cardNowChoose.setState(CardState.inHand);
-                                            }
-                                            else
-                                            {
-                                                // 目标不合法，返还点数并恢复状态
-                                                player1.RestorePoint(cardNowChoose.ReadCost());
-                                                cardBase.ProcessMode = Node.ProcessModeEnum.Disabled;
-                                                cardBase.Visible     = false;
-                                                cardNowChoose.setState(CardState.inHand);
-                                            }
-                                        }
-                                        else
-                                        {
-                                            // 点数不足，隐藏箭头并回到手牌状态
-                                            cardBase.ProcessMode = Node.ProcessModeEnum.Disabled;
-                                            cardBase.Visible     = false;
-                                            cardNowChoose.setState(CardState.inHand);
-                                        }
-                                    }
+                    break;
 
-                                    
-                                    
-                                }
-                            
-                            
-                        }
-                    // 如果没有命中任何 place（result == null），允许对 TargetType.NOTarget 的 Command 卡在 validArea 内释放生效
-                    if (result == null && cardNowChoose.getState() == CardState.commandCardCaught)
-                    {
-                        if (cardNowChoose.cardType == CardTypes.Command)
+                    case InputState.P_InHandUnit:
+                    if(result == null || result.GetMyCard() != null || supportLine.Contains(result) == false)
                         {
-                            // 仅当卡的目标类型为 NOTarget 且鼠标在 validArea 内才允许
-                            if (cardNowChoose.targetType == TargetType.NOTarget && validArea.GetGlobalRect().HasPoint(mousePosition))
-                            {
-                                if (player1.UsePoint(cardNowChoose.ReadCost()))
-                                {
-                                    // 执行效果（无具体目标）
-                                    _ = ParseAndExecuteEffect(cardNowChoose.effect, cardNowChoose, null);
-
-                                    // 从手牌中移除并删除该卡
-                                    player1.RemoveFromHand(cardNowChoose);
-                                    RemoveCard(cardNowChoose);
-
-                                    // 隐藏箭头并恢复状态
-                                    cardBase.ProcessMode = Node.ProcessModeEnum.Disabled;
-                                    cardBase.Visible     = false;
-                                    cardNowChoose.setState(CardState.inHand);
-                                }
-                                else
-                                {
-                                    // 点数不足，隐藏箭头并回到手牌状态
-                                    cardBase.ProcessMode = Node.ProcessModeEnum.Disabled;
-                                    cardBase.Visible     = false;
-                                    cardNowChoose.setState(CardState.inHand);
-                                }
-                            }
-                            else
-                            {
-                                // 非法释放，直接回到手牌状态（没有扣点）
-                                cardBase.ProcessMode = Node.ProcessModeEnum.Disabled;
-                                cardBase.Visible     = false;
-                                cardNowChoose.setState(CardState.inHand);
-                            }
+                            
+                            cardNowChoose.setState(CardState.inHand);
+                            cardNowChoose = null;
+                            break;
                         }
-                    }
+                        
+                    if (player1.UsePoint(cardNowChoose.ReadCost()))
+                        {
+                             _ = Move(cardNowChoose,result);
+                              player1.RemoveFromHand(cardNowChoose);
+                             cardNowChoose.setState(CardState.placed);
+                             cardNowChoose = null;
+                        }
+                    currentInputState = InputState.nil;
+                    cardNowChoose = null;
+                    
+                    break;
 
-                    //否则回到起点
-                    if (cardNowChoose.getState() == CardState.caught)
-                    {
-                        cardNowChoose.setState(CardState.inHand);
-                    }
-                    else if (cardNowChoose.getState() == CardState.inplaceAndCaught)
-                    {
-                        // 如果是 Command 卡，释放后依然保持在手牌状态（不移动）
-                        if (cardNowChoose.cardType == CardTypes.Command)
+                    case InputState.P_InHandUnitNeedChooseTarget:
+
+                    if(result == null || result.GetMyCard() != null || supportLine.Contains(result) == false)
                         {
                             cardNowChoose.setState(CardState.inHand);
+                            cardNowChoose = null;
+                            break;
                         }
-                        else
+                        
+                    if (player1.UsePoint(cardNowChoose.ReadCost()))
                         {
-                            cardNowChoose.setState(CardState.placed);
+                             _ = Move(cardNowChoose,result);
+                              player1.RemoveFromHand(cardNowChoose);
+                             cardNowChoose.setState(CardState.placed);
+                            if(GetHowManyCardIsValid(cardNowChoose.targetType)>0) currentInputState = InputState.waitingForChoosingTarget;
+                            break;
                         }
-                    }
-                    else if (cardNowChoose.getState() == CardState.commandCardCaught)
-                    {
-                        // Command 卡如果没有有效释放，恢复为 inHand 状态
-                        cardNowChoose.setState(CardState.inHand);
-                    }
-
-                    //不管怎样都刷新手牌区
-                    player1.RefreshMyHand();
+                    cardNowChoose.setState(CardState.inHand);
                     cardNowChoose = null;
-                    //隐藏箭头
+                    break;
 
-                    cardBase.ProcessMode = Node.ProcessModeEnum.Disabled;
-                    cardBase.Visible     = false;
-                    
-                    RestoreAllTargetsColor(); // 取消高亮，恢复所有单位的原始颜色
-                    CheckIfAnyUnitDiedAsync();
+                    case InputState.P_InPlaceUnit:
+                    cardNowChoose.setState(CardState.placed);
+                    if(result == null)
+                        {
+                            cardNowChoose = null;
+                            break;
+                        }
+                    if(result.GetMyCard() == null)
+                        {
+                            _=Move(cardNowChoose, result);
+                            cardNowChoose = null;
+                            break;
+                        }
+                    else if(result.GetMyCard().GetIsFriend() != cardNowChoose.GetIsFriend())
+                        {
+                            Attack(cardNowChoose, result.GetMyCard());
+                            cardNowChoose = null;
+                            break;
+                        }
+                    currentInputState = InputState.nil;
+                    cardNowChoose = null;
+                    break;
+
+                    case InputState.waitingForChoosingTarget:
+                    if(result == null || result.GetMyCard() == null||result.GetMyCard() != null && IsValidTarget(result.GetMyCard(), cardNowChoose.targetType)== false)
+                        {
+                            ;
+                        }
+                    else
+                        {
+                             _ = ParseAndExecuteEffect(cardNowChoose.effect, cardNowChoose, [result.GetMyCard()]);
+                            CheckIfAnyUnitDiedAsync(); // 结算单位变化
+                            cardNowChoose = null;
+                            currentInputState = InputState.nil;
+                        }
+                    break;
+
+                    default:break;
                 }
+                if(currentInputState != InputState.waitingForChoosingTarget)
+                {
+                cardBase.ProcessMode = Node.ProcessModeEnum.Disabled;
+                cardBase.Visible = false;
+                RestoreAllTargetsColor(); // 取消高亮，恢复所有单位的原始颜色
+                }
+                else if(currentInputState == InputState.waitingForChoosingTarget)
+                {
+                    cardBase.ProcessMode = Node.ProcessModeEnum.Inherit;
+                    cardBase.Visible = true;
+                    HighlightValidTargets(cardNowChoose.targetType); // 根据 Command 卡的目标类型高亮合法目标
+                    arrowFrom.GlobalPosition = cardNowChoose.GetGlobalPosition() + arrowOffset;
+                }
+                player1.RefreshMyHand();
+                
             }
-        }
+
+
+        //不管怎么说 先把箭头隐藏了
+        
+        RefreshAllCardDisplayOrder();
+        
+        CheckIfAnyUnitDiedAsync();
+
+            
     }
+}
 
     public override void _Process(double delta)
     {
@@ -1081,7 +1062,7 @@ TextureButton buttonNextTurn;
         }
 
         // 跟踪卡牌拖动
-        if (Input.IsMouseButtonPressed(MouseButton.Left) && cardNowChoose != null && cardNowChoose.getState() == CardState.caught)
+        if (Input.IsMouseButtonPressed(MouseButton.Left) && cardNowChoose != null && cardNowChoose.getState() == CardState.caught )
         {
             cardNowChoose.SetGlobalPosition(GetGlobalMousePosition() + offset);
         }
@@ -1175,6 +1156,9 @@ TextureButton buttonNextTurn;
                     case "friendDeckRemainingCount":
                         sb.Append(player1?.ReadDeckCount() ?? 0);
                         break;
+                    case "lifeTime":
+                        sb.Append(targets != null && targets.Count > 0 ? targets[0].ReadLifeTime() : 0);
+                        break;
                     default:
                         sb.Append(ReadMemory(varName));
                         break;
@@ -1253,25 +1237,53 @@ TextureButton buttonNextTurn;
     /// <summary>
     /// 分割效果字符串，忽略括号内的逗号
     /// </summary>
-    private string[] SplitEffectString(string effectString)
+    /// <summary>
+    /// 分割效果字符串，考虑引号和括号内的内容
+    /// </summary>
+    /// <param name="effectString">要分割的字符串</param>
+    /// <param name="delimiter">分隔符，默认为逗号</param>
+    /// <returns>分割后的字符串数组</returns>
+    private string[] SplitEffectString(string effectString, char delimiter = ',')
     {
         List<string> segments = new List<string>();
         StringBuilder currentSegment = new StringBuilder();
         int parenCount = 0;
+        bool inQuotes = false;
+        char quoteChar = '\0';
 
         foreach (char c in effectString)
         {
-            if (c == '(')
+            // 处理引号
+            if ((c == '\"' || c == '\'') && !inQuotes)
+            {
+                inQuotes = true;
+                quoteChar = c;
+                currentSegment.Append(c); // 将引号添加到当前段
+            }
+            else if (c == quoteChar && inQuotes)
+            {
+                inQuotes = false;
+                quoteChar = '\0';
+                currentSegment.Append(c); // 将引号添加到当前段
+            }
+            // 在引号内，不进行任何符号处理，直接添加到当前段
+            else if (inQuotes)
+            {
+                currentSegment.Append(c);
+            }
+            // 处理括号（不在引号内）
+            else if (c == '(' && !inQuotes)
             {
                 parenCount++;
                 currentSegment.Append(c);
             }
-            else if (c == ')')
+            else if (c == ')' && !inQuotes)
             {
                 parenCount--;
                 currentSegment.Append(c);
             }
-            else if (c == ',' && parenCount == 0)
+            // 处理分隔符（不在引号内且不在括号内）
+            else if (c == delimiter && parenCount == 0 && !inQuotes)
             {
                 segments.Add(currentSegment.ToString().Trim());
                 currentSegment.Clear();
@@ -1354,14 +1366,30 @@ TextureButton buttonNextTurn;
             var effectString = unit.effect;
             if (!effectString.Contains(":")) continue;
 
-            var prefix = effectString.Split(":")[0].Trim();
-            if (prefix != triggerPoint) continue;
+            // 分割多个效果（用逗号分隔，但要考虑括号内的逗号）
+            var effectSegments = SplitEffectString(effectString);
+            
+            foreach (var segment in effectSegments)
+            {
+                if (!segment.Contains(":")) continue;
+                
+                var prefix = segment.Split(":")[0].Trim();
+                if (prefix != triggerPoint) continue;
 
-            // 移除时间前缀，获取实际效果
-            var actualEffect = effectString.Substring(effectString.IndexOf(":") + 1);
+                // 移除时间前缀，获取实际效果
+                var actualEffect = segment.Substring(segment.IndexOf(":") + 1);
 
-            // 触发此单位的效果（unit 作为执行效果的单位，targetCards 作为目标列表）
-            await ParseAndExecuteEffect(actualEffect, unit, targetCards);
+                // 触发此单位的效果（unit 作为执行效果的单位，targetCards 作为目标列表）
+                // 如果是FriendlyTurnBegin事件，将unit作为targetCard传递，以便KillAllTargets等指令可以正确执行
+                if (triggerPoint == "FriendlyTurnBegin")
+                {
+                    await ParseAndExecuteEffect(actualEffect, unit, targetCards, unit);
+                }
+                else
+                {
+                    await ParseAndExecuteEffect(actualEffect, unit, targetCards);
+                }
+            }
         }
 
     }
@@ -1380,6 +1408,49 @@ TextureButton buttonNextTurn;
             AllowControl();
             ResumeDeathCheck(); // 恢复死亡检查
             return;
+        }
+
+        // 检查步兵和坦克是否只能攻击相邻阵线的单位
+        // 前线的单位可以攻击敌方支援阵线，支援阵线的单位可以攻击敌方前线
+        if ((from.cardType == CardTypes.Infantry || from.cardType == CardTypes.Tank) && 
+            from.GetMyPlace() != null && to.GetMyPlace() != null)
+        {
+            place_ fromPlace = from.GetMyPlace();
+            place_ toPlace = to.GetMyPlace();
+            
+            // 获取攻击者和目标的阵线位置
+            bool fromInFrontLine = frontLine.Contains(fromPlace);
+            bool toInFrontLine = frontLine.Contains(toPlace);
+            bool fromInFriendSupportLine = supportLine.Contains(fromPlace);
+            bool fromInEnemySupportLine = enemySupprotLine.Contains(fromPlace);
+            bool toInFriendSupportLine = supportLine.Contains(toPlace);
+            bool toInEnemySupportLine = enemySupprotLine.Contains(toPlace);
+            
+            // 获取攻击者和目标的阵营
+            bool fromIsFriend = from.GetIsFriend() == IsFriend.friend;
+            bool toIsEnemy = to.GetIsFriend() == IsFriend.enemy;
+            bool fromIsEnemy = from.GetIsFriend() == IsFriend.enemy;
+            bool toIsFriend = to.GetIsFriend() == IsFriend.friend;
+            
+            // 检查是否可以攻击，满足以下四个条件之一即可：
+            // 1. 友方单位在前线且敌方单位在敌方支援阵线
+            // 2. 友方单位在支援阵线且敌方单位在前线
+            // 3. 敌方单位在前线且友方单位在支援阵线
+            // 4. 敌方单位在敌方支援阵线且友方单位在前线
+            bool canAttack = 
+                (fromIsFriend && fromInFrontLine && toIsEnemy && toInEnemySupportLine) ||
+                (fromIsFriend && fromInFriendSupportLine && toIsEnemy && toInFrontLine) ||
+                (fromIsEnemy && fromInFrontLine && toIsFriend && toInFriendSupportLine) ||
+                (fromIsEnemy && fromInEnemySupportLine && toIsFriend && toInFrontLine);
+            
+            // 如果不能攻击，则不允许
+            if (!canAttack)
+            {
+                GD.Print($"Attack failed: {from} (Infantry/Tank) can only attack adjacent lines");
+                AllowControl();
+                ResumeDeathCheck(); // 恢复死亡检查
+                return;
+            }
         }
 
         // 检查目标是否具有烟幕特性
@@ -1645,6 +1716,11 @@ TextureButton buttonNextTurn;
         }
         else
         {
+            // 如果不是从手上部署，则调用HaveMoved()方法
+            if (!isDeployedFromHand)
+            {
+                card.HaveMoved();
+            }
             // 否则触发移动单位的 Moving 效果
             await TriggerUnitEffects("Moving", card, new List<cardBase_> { card }, checkOnlySourceCard: true);
         }
@@ -2399,11 +2475,24 @@ TextureButton buttonNextTurn;
         // 触发敌方回合开始时点
         await TriggerUnitEffects("EnemyTurnBegin", null);
         
+        // 增加所有已部署单位的存活回合数
+        foreach(var card in cardInPlaces.Where(x=>x.getState()==CardState.placed).ToList())
+        {
+            card.IncrementLifeTime();
+        }
+        
         // 触发双方回合开始时点
         await TriggerUnitEffects("TurnBegin", null);
         
         // 触发友方回合开始时点
         await TriggerUnitEffects("FriendlyTurnBegin", null);
+        
+        // 增加所有已部署单位的存活回合数
+        foreach(var card in cardInPlaces.Where(x=>x.getState()==CardState.placed).ToList())
+        {
+            card.IncrementLifeTime();
+        }
+        
         CheckIfAnyUnitDiedAsync(); // 检查死亡
 
         await EnemyTurnAsync();
@@ -2452,8 +2541,21 @@ TextureButton buttonNextTurn;
 
         void TestButtonPressed()
     {
-        player1.AddCardToHand(cardMaganer.GetCard("来自人民"));
-        
+        player1.AddCardToHand(cardMaganer.GetCard("i18"));
+        player1.AddCardToHand(cardMaganer.GetCard("血红的镰刀"));
+    }
+
+        void OnButtonTest2Pressed()
+    {
+        BattleStateManager.Deck = player1.ReadMyDeck();
+        BattleStateManager.battlefield = this;
+        // 以叠加方式加载卡组展示界面，CanvasLayer确保渲染在所有元素之上
+        var canvasLayer = new CanvasLayer();
+        canvasLayer.Layer = 1;
+        AddChild(canvasLayer);
+        var displayScene = ResourceLoader.Load<PackedScene>("res://bin/display_card.tscn");
+        var displayCard = displayScene.Instantiate();
+        canvasLayer.AddChild(displayCard);
     }
 
     /// <summary>
@@ -2472,6 +2574,27 @@ TextureButton buttonNextTurn;
                 card.SetGrayscale();
             }
         }
+    }
+
+/// <summary>
+/// 自动计算这张卡在当前的场上有多少个合法的目标
+/// </summary>
+/// <param name="t"></param>
+/// <returns></returns>
+    private int GetHowManyCardIsValid(TargetType t)
+    {
+        int counter = 0;
+        foreach (var a in allPlaces)
+        {
+            if(a.GetMyCard()!= null)
+            {
+                if (IsValidTarget(a.GetMyCard(), t))
+                {
+                    counter++;
+                }
+            }
+        }
+        return counter;
     }
 
     /// <summary>
@@ -2565,10 +2688,35 @@ TextureButton buttonNextTurn;
             return;
         }
 
-        // 移除时间前缀 如 "deployed:"
+        // 移除时间前缀 如 "deployed:"，但要考虑引号内的冒号
         if (effectString.Contains(":"))
         {
-            effectString = effectString.Substring(effectString.IndexOf(":") + 1);
+            bool inQuotes = false;
+            char quoteChar = '\0';
+            int colonIndex = -1;
+            for (int i = 0; i < effectString.Length; i++)
+            {
+                char c = effectString[i];
+                if ((c == '"' || c == '\'') && !inQuotes)
+                {
+                    inQuotes = true;
+                    quoteChar = c;
+                }
+                else if (c == quoteChar && inQuotes)
+                {
+                    inQuotes = false;
+                    quoteChar = '\0';
+                }
+                else if (c == ':' && !inQuotes)
+                {
+                    colonIndex = i;
+                    break;
+                }
+            }
+            if (colonIndex != -1)
+            {
+                effectString = effectString.Substring(colonIndex + 1);
+            }
         }
 
         
@@ -2576,23 +2724,27 @@ TextureButton buttonNextTurn;
         // 首先用逗号分割 逗号分割优先级更高，但要忽略括号内的逗号
         var effectSegments = SplitEffectString(effectString);
 
+        // 在循环外初始化targets，使得setTarget指令设置的targets可以在后续的segment中保留
+        List<cardBase_> targets = [];
+        int result = 0;
+        
+        // 初始化目标列表：优先使用 targetCards（新的单位效果参数），否则使用 targetCard（向后兼容参数）
+        if (targetCards != null && targetCards.Count > 0)
+        {
+            targets = new List<cardBase_>(targetCards);
+        }
+        else if (targetCard != null)
+        {
+            targets = new List<cardBase_> { targetCard };
+        }
+        
         foreach (var segment in effectSegments)
         {
-            List<cardBase_> targets = [];
-            int result = 0;
+            // 重置result，但不重置targets，使得setTarget指令设置的targets可以在后续的segment中保留
+            result = 0;
 
-            // 初始化目标列表：优先使用 targetCards（新的单位效果参数），否则使用 targetCard（向后兼容参数）
-            if (targetCards != null && targetCards.Count > 0)
-            {
-                targets = new List<cardBase_>(targetCards);
-            }
-            else if (targetCard != null)
-            {
-                targets = new List<cardBase_> { targetCard };
-            }
-
-            // 对每个逗号分割的效果段 再用 "|" 分割多个指令
-            var parts = segment.Split("|");
+            // 对每个逗号分割的效果段 再用 "|" 分割多个指令，但要考虑引号和括号内的内容
+            var parts = SplitEffectString(segment, '|');
             
             // 收集所有标签及其索引
             Dictionary<string, int> labels = new Dictionary<string, int>();
@@ -2927,33 +3079,88 @@ TextureButton buttonNextTurn;
                     }
                 }
 
-                // AddToHand(string) - 将名字为s的卡加入手牌
+                // AddToHand(string) 或 AddToHand(string,int) - 将名字为s的卡加入手牌，可以指定数量
                 if (instruction.StartsWith("AddToHand"))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\((.*)\)");
                     if (match.Success)
                     {
-                        string cardName = match.Groups[1].Value;
+                        string[] parameters = match.Groups[1].Value.Split(',');
+                        string cardName = parameters[0].Trim();
+                        int count = 1; // 默认添加1张
+                        
+                        // 如果有两个参数，第二个参数是数量，使用EvaluateExpression解析
+                        if (parameters.Length > 1)
+                        {
+                            count = EvaluateExpression(parameters[1].Trim(), result, targets, sourceCard);
+                            if (count < 1) count = 0; // 确保至少添加1张
+                        }
+                        
                         var cardData = GetCardMaganer().GetCard(cardName);
                         if (cardData != null)
                         {
+                            List<cardBase_> addedCards = new List<cardBase_>();
                             PackedScene cardRes = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
-                            var card = cardRes.Instantiate() as cardBase_;
-                            card.SetCardInformation(cardData);
-                            card.SetIsFriend(sourceCard?.GetIsFriend() ?? IsFriend.friend);
-
+                            
+                            // 根据数量添加多张卡
+                            for (int j = 0; j < count; j++)
+                            {
+                                var card = cardRes.Instantiate() as cardBase_;
+                                card.SetCardInformation(cardData);
+                                card.SetIsFriend(sourceCard?.GetIsFriend() ?? IsFriend.friend);
+                                addedCards.Add(card);
+                                
+                                if (sourceCard?.GetIsFriend() == IsFriend.friend)
+                                {
+                                    await player1.AddCardToHand(card);
+                                }
+                                else if (sourceCard?.GetIsFriend() == IsFriend.enemy)
+                                {
+                                    await player2.AddCardToHand(card);
+                                }
+                            }
+                            
+                            // 设置最后添加的卡牌列表
                             if (sourceCard?.GetIsFriend() == IsFriend.friend)
                             {
-                                await player1.AddCardToHand(card);
-                                player1.SetLastDrawnCards([card]);
+                                player1.SetLastDrawnCards(addedCards);
                             }
                             else if (sourceCard?.GetIsFriend() == IsFriend.enemy)
                             {
-                                await player2.AddCardToHand(card);
-                                player2.SetLastDrawnCards([card]);
+                                player2.SetLastDrawnCards(addedCards);
                             }
                         }
                     }
+                }
+
+                // GetEffect(string) - 使targets获得指定的effect
+                if (instruction.StartsWith("GetEffect"))
+                {
+                    // 提取括号内的内容，语法固定为GetEffect("eff")
+                    int startIndex = instruction.IndexOf('(');
+                    int endIndex = instruction.LastIndexOf(')');
+                    if (startIndex != -1 && endIndex != -1 && endIndex > startIndex)
+                    {
+                        string effectToGive = instruction.Substring(startIndex + 1, endIndex - startIndex - 1);
+                        // 移除外层的引号（如果有）
+                        if (effectToGive.StartsWith('"') && effectToGive.EndsWith('"'))
+                        {
+                            effectToGive = effectToGive.Substring(1, effectToGive.Length - 2);
+                        }
+                        foreach (var target in targets)
+                        {
+                            // 为每个target添加effect
+                            if (!string.IsNullOrEmpty(target.effect))
+                            {
+                                target.effect = target.effect + "," + effectToGive;
+                            }
+                            else
+                            {
+                                target.effect = effectToGive;
+                            }
+                        }
+                        }
+
                 }
 
                 // DiscardWithName(string,i) - 弃置i张名字含s的卡(若可能)
@@ -3451,9 +3658,9 @@ TextureButton buttonNextTurn;
                     else
                     {
                         // 默认使用targets
-                        cardsToShow = targets.Select(t =>
+                        var candidateCards = targets.Select(t =>
                         {
-                            var cardData = GetCardMaganer().GetCard(t.name);
+                            var cardData = GetCardMaganer().GetCard(t.id);
                             if (cardData != null)
                             {
                                 PackedScene cardRes = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
@@ -3464,6 +3671,15 @@ TextureButton buttonNextTurn;
                             }
                             return null;
                         }).Where(c => c != null).ToList();
+                        
+                        // 如果多于3张，随机选择3张
+                        if (candidateCards.Count > 3)
+                        {
+                            var rnd = new Random();
+                            candidateCards = candidateCards.OrderBy(x => rnd.Next()).Take(3).ToList();
+                        }
+                        
+                        cardsToShow = candidateCards;
                     }
 
                     if (cardsToShow.Count > 0)
@@ -3507,14 +3723,14 @@ TextureButton buttonNextTurn;
                 // GetAllEnemyUnits() - 获得所有敌方单位
                 if (instruction == "GetAllEnemyUnits")
                 {
-                    var enemyUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy).ToList();
+                    var enemyUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy && x.isHq != HQ.hq).ToList();
                     targets = enemyUnits;
                 }
 
                 // GetAllFriendUnits() - 获得所有友方单位
                 if (instruction == "GetAllFriendUnits")
                 {
-                    var friendUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.friend).ToList();
+                    var friendUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.friend && x.isHq != HQ.hq).ToList();
                     targets = friendUnits;
                 }
 
@@ -3522,6 +3738,10 @@ TextureButton buttonNextTurn;
                 if (instruction == "GetAllEnemyTargets")
                 {
                     var enemyTargets = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy).ToList();
+                    if (enemyHq != null && enemyHq.getState() == CardState.placed)
+                    {
+                        enemyTargets.Add(enemyHq);
+                    }
                     targets = enemyTargets;
                 }
 
@@ -3529,6 +3749,10 @@ TextureButton buttonNextTurn;
                 if (instruction == "GetAllFriendTargets")
                 {
                     var friendTargets = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.friend).ToList();
+                    if (myHq != null && myHq.getState() == CardState.placed)
+                    {
+                        friendTargets.Add(myHq);
+                    }
                     targets = friendTargets;
                 }
 
@@ -3657,6 +3881,28 @@ TextureButton buttonNextTurn;
     }
 
     /// <summary>
+    /// 执行指令卡效果，等待完成后播放弃置动画，最后移除卡牌。
+    /// 确保效果执行完毕 -> DiscardCard动画完整播放 -> RemoveCard的顺序，避免冲突。
+    /// </summary>
+    private async void ExecuteCommandAndDiscard(cardBase_ commandCard, List<cardBase_> targets, bool needRestoreColor = false)
+    {
+        await ParseAndExecuteEffect(commandCard.effect, commandCard, targets);
+        commandCard.ResetVisualsInstant();
+        player1.RemoveFromHand(commandCard);
+
+        if (needRestoreColor)
+        {
+            cardBase.ProcessMode = Node.ProcessModeEnum.Disabled;
+            cardBase.Visible = false;
+            RestoreAllTargetsColor();
+        }
+
+        await commandCard.DiscardCard();
+        RemoveCard(commandCard);
+        CheckIfAnyUnitDiedAsync();
+    }
+
+    /// <summary>
     /// 打出一张卡但不消耗指挥点
     /// </summary>
     private async Task PlayCardWithoutCost(cardBase_ card, string targetType = "")
@@ -3754,7 +4000,23 @@ TextureButton buttonNextTurn;
     /// </summary>
     private List<cardBase_> GetTargetsFromSelector(string selector)
     {
-        List<cardBase_> results = cardInPlaces.Where(x => x.getState() == CardState.placed).ToList();
+        // 获取所有在战场上的单位，包括总部
+        List<cardBase_> results = new List<cardBase_>();
+        
+        // 添加所有在cardInPlaces中的单位
+        results.AddRange(cardInPlaces.Where(x => x.getState() == CardState.placed).ToList());
+        
+        // 添加友方总部（如果存在且在战场上）
+        if (myHq != null && myHq.getState() == CardState.placed && !results.Contains(myHq))
+        {
+            results.Add(myHq);
+        }
+        
+        // 添加敌方总部（如果存在且在战场上）
+        if (enemyHq != null && enemyHq.getState() == CardState.placed && !results.Contains(enemyHq))
+        {
+            results.Add(enemyHq);
+        }
 
         var parts = selector.Split(".");
 
@@ -3875,6 +4137,8 @@ TextureButton buttonNextTurn;
             condition = condition.Replace("source.cost", sourceCard.ReadCost().ToString());
         }
 
+            condition = condition.Replace("result", result.ToString());
+
         // 处理布尔型快捷条件
         if (condition == "target.isFriend" && targets != null && targets.Count > 0)
         {
@@ -3906,6 +4170,18 @@ TextureButton buttonNextTurn;
             {
                 string type = condition.Substring("target.cardType!=".Length).Trim();
                 return targets[0].cardType.ToString() != type;
+            }
+            
+            // 处理 target.name ==/!= 名称比较
+            if (condition.StartsWith("target.name=="))
+            {
+                string name = condition.Substring("target.name==".Length).Trim();
+                return targets[0].id == name;
+            }
+            if (condition.StartsWith("target.name!="))
+            {
+                string name = condition.Substring("target.name!=".Length).Trim();
+                return targets[0].id != name;
             }
         }
 
@@ -4571,6 +4847,11 @@ public class Player
             deck[j] = temp;
         }
 
+    }
+
+    public List<cardBase_> ReadMyDeck()
+    {
+        return deck;
     }
 
 

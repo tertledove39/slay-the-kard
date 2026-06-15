@@ -13,6 +13,7 @@ config_version=5
 config/name="新建游戏项目"
 run/main_scene="uid://evqf3f0uq3ao"
 config/features=PackedStringArray("4.5", "C#", "Mobile")
+run/max_fps=144
 config/icon="res://icon.svg"
 
 [debug]
@@ -33,3 +34,4 @@ project/assembly_name="新建游戏项目"
 
 textures/canvas_textures/default_texture_filter=0
 viewport/hdr_2d=true
+anti_aliasing/quality/screen_space_aa=2

@@ -1,3 +1,4 @@
+
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -47,6 +48,9 @@ public partial class cardBase_ : Control
     // 特性状态跟踪
     private bool hasSmokeScreen = false;
     private bool hasShock = false;
+    
+    // 单位存活回合数
+    private int lifeTime = 0;
     
     CardState state;
     Node2D cardBase;
@@ -145,6 +149,23 @@ public partial class cardBase_ : Control
     {
         hasShock = false;
     }
+
+    /// <summary>
+    /// 读取单位已存活的回合数
+    /// </summary>
+    /// <returns>存活回合数</returns>
+    public int ReadLifeTime()
+    {
+        return lifeTime;
+    }
+
+    /// <summary>
+    /// 增加单位存活回合数
+    /// </summary>
+    public void IncrementLifeTime()
+    {
+        lifeTime++;
+    }
     
 
 
@@ -163,6 +184,11 @@ public partial class cardBase_ : Control
     public void HaveMoved()
     {
         moveAble = 0;
+        // 只有坦克可以在移动后攻击，其他单位移动后不能攻击
+        if (cardType != CardTypes.Tank)
+        {
+            attackAble = 0;
+        }
     }
 
     public Boolean CheckIfCanAttack()
@@ -407,7 +433,7 @@ public partial class cardBase_ : Control
         cardBase.ProcessMode = Node.ProcessModeEnum.Disabled;
         cardBase.Visible     = false;
 
-        battleField = GetTree().Root.GetNode<battlefield_>("BattleField");
+        battleField = GetTree().Root.GetNodeOrNull<battlefield_>("BattleField");
         attackAble = 0;
         moveAble = 0;
         ZIndex = 10;
@@ -436,7 +462,7 @@ public partial class cardBase_ : Control
             GetNode<Sprite2D>("cardbase").Texture = GD.Load<Texture2D>("res://cards/卡背_command.png");
         }
 
-        battleField = GetTree().Root.GetNode<battlefield_>("BattleField");
+        battleField = GetTree().Root.GetNodeOrNull<battlefield_>("BattleField");
 
         // 记录初始缩放并创建悬停高亮框
         originalScale = Scale;

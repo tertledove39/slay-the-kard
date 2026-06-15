@@ -1,0 +1,23 @@
+[gd_scene load_steps=2 format=3 uid="uid://c64nses7n5n4i"]
+
+[ext_resource type="Script" uid="uid://criakdhkt5suh" path="res://DisplayCard.cs" id="1_gs8ea"]
+
+[node name="displayCard" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_gs8ea")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(800, 450)
+
+[node name="Button" type="Button" parent="."]
+layout_mode = 0
+offset_left = 91.0
+offset_top = 616.0
+offset_right = 287.0
+offset_bottom = 743.0
+text = "返回"
