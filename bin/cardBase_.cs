@@ -497,10 +497,12 @@ public partial class cardBase_ : Control
 
         int steps = Math.Abs(toValue - fromValue);
         int direction = toValue > fromValue ? 1 : -1;
-        // 动画总时长控制在500ms内，每步间隔20-50ms
-        int delayMs = Math.Clamp(500 / Math.Max(steps, 1), 20, 50);
+        // 总时长控制在1000ms内，每步80-150ms确保清晰可见
+        int delayMs = Math.Clamp(1000 / Math.Max(steps, 1), 80, 150);
 
         int current = fromValue;
+        // 先立即显示起始值
+        costLabel.Text = current.ToString();
         while (current != toValue)
         {
             await Task.Delay(delayMs);
