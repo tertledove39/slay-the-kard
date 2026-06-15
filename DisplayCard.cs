@@ -11,6 +11,7 @@ public partial class DisplayCard : Control
 
     private float _targetY;
     private Control _cardContainer;
+    private bool _cancelled; // 异步加载取消标记，防止返回后继续加载导致泄漏
 
     public override void _Ready()
     {
@@ -40,9 +41,11 @@ public partial class DisplayCard : Control
     public async Task Display(List<cardBase_> cardList)
     {
         if (cardList == null || cardList.Count == 0) return;
+        _cancelled = false;
 
         // 先让出当前帧，确保背景遮罩和按钮立即渲染，避免用户感知卡顿
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        if (_cancelled) return;
 
         var sortedList = cardList
             .OrderBy(c => c.ReadCost())
@@ -63,6 +66,8 @@ public partial class DisplayCard : Control
 
         foreach (var card in sortedList)
         {
+            if (_cancelled) break;
+
             counter++;
             if (counter > 6)
             {
@@ -116,7 +121,8 @@ public partial class DisplayCard : Control
 
     void _on_button_pressed()
     {
-        // 展示副本随DisplayCard一起释放，牌组原卡不受影响
+        // 取消进行中的异步加载，避免继续向即将释放的节点添加子节点造成泄漏
+        _cancelled = true;
         QueueFree();
     }
 }

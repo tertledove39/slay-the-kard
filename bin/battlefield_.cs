@@ -180,8 +180,9 @@ public partial class battlefield_ : Control
 
         if (cardNowChoose != null)
         {
-            MoveChild(cardNowChoose,1);
-            cardNowChoose.ZIndex = 15;
+            // 移到子节点末尾确保渲染在最上层
+            MoveChild(cardNowChoose, GetChildCount() - 1);
+            cardNowChoose.ZIndex = 100;
         }
 
         if (cardInPlaces != null)
@@ -788,9 +789,138 @@ TextureButton buttonNextTurn;
 
 InputState currentInputState = InputState.nil;
 
-    public override void _Input(InputEvent @event)
-{
+    // 控制台面板
+    private Panel _consolePanel;
+    private LineEdit _consoleInput;
+    private bool _consoleVisible;
 
+    // 控制台自动补全
+    private int _autoCompleteIndex = -1;
+    private string _autoCompletePrefix = "";
+    private static readonly string[] ConsoleCommands = new[]
+    {
+        "myHq", "enemyHq", "this", "target",
+        "Heal()", "damage()", "GetAttack()", "LoseAttack()", "SetDefence()", "addDefence()",
+        "setResult()", "setTarget", "drawCard", "DrawUnitCards()",
+        "GetEffect()", "AddToHand()", "addToSupportLine()", "addToEnemySupportLine()",
+        "addToDeck()", "SetMemory()", "AddPoint()", "AddPointMax()",
+        "GetAllFriendUnits", "GetAllEnemyUnits", "GetAllFriendTargets", "GetAllEnemyTargets",
+        "GetEnemyHq", "GetFriendHq", "GetRandomFriendUnit", "GetRandomEnemyUnit",
+        "GetRandomFriendTarget", "GetRandomEnemyTarget", "GetRandomNumber()",
+        "KillAllTargets", "HealAllTargets", "Refresh", "Retreat", "Discard",
+        "foreach", "End&", "Develop", "Choose()", "Play",
+        "AddTrait()", "RemoveTrait()", "DrawACard()", "GetCardsBeingTreated",
+        "getCount()", "setTargets()", "DiscardRandomly()", "DiscardWithName()",
+    };
+
+    private void ToggleConsole()
+    {
+        if (_consolePanel == null) CreateConsole();
+        _consoleVisible = !_consoleVisible;
+        _consolePanel.Visible = _consoleVisible;
+        if (_consoleVisible) _consoleInput.GrabFocus();
+    }
+
+    private void CreateConsole()
+    {
+        _consolePanel = new Panel();
+        _consolePanel.Visible = false;
+        _consolePanel.Position = new Vector2(50, 10);
+        _consolePanel.Size = new Vector2(600, 36);
+        _consolePanel.ZIndex = 1000;
+        var style = new StyleBoxFlat();
+        style.BgColor = new Color(0, 0, 0, 0.85f);
+        _consolePanel.AddThemeStyleboxOverride("panel", style);
+        AddChild(_consolePanel);
+
+        _consoleInput = new LineEdit();
+        _consoleInput.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        _consoleInput.AddThemeColorOverride("font_color", Colors.LimeGreen);
+        _consoleInput.AddThemeFontSizeOverride("font_size", 14);
+        _consoleInput.PlaceholderText = "输入效果指令，回车执行...";
+        _consoleInput.TextSubmitted += OnConsoleSubmit;
+        _consolePanel.AddChild(_consoleInput);
+    }
+
+    private async void OnConsoleSubmit(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+        string cmd = text.Trim();
+        _consoleInput.Text = "";
+        _autoCompleteIndex = -1;
+        _autoCompletePrefix = "";
+        // 以友方总部为sourceCard和targetCard执行，确保setTarget和drawCard等指令能正常工作
+        await ParseAndExecuteEffect(cmd, myHq, null, myHq);
+        CheckIfAnyUnitDiedAsync();
+    }
+
+    /// <summary>
+    /// 控制台Tab自动补全：在所有以当前输入为前缀的指令之间轮流切换
+    /// </summary>
+    private void HandleConsoleAutocomplete()
+    {
+        if (_consoleInput == null) return;
+
+        string currentText = _consoleInput.Text;
+        // 获取光标前的最后一个"单词"（以|或空格分隔）
+        string beforeCursor = currentText;
+        int lastSep = Math.Max(beforeCursor.LastIndexOf('|'), beforeCursor.LastIndexOf(' '));
+        string prefix = lastSep >= 0 ? beforeCursor.Substring(lastSep + 1) : beforeCursor;
+
+        // 查找所有匹配的指令
+        var matches = new List<string>();
+        foreach (var cmd in ConsoleCommands)
+        {
+            if (cmd.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && cmd != prefix)
+            {
+                matches.Add(cmd);
+            }
+        }
+
+        if (matches.Count == 0)
+        {
+            _autoCompleteIndex = -1;
+            _autoCompletePrefix = "";
+            return;
+        }
+
+        // 如果前缀变了，重置索引
+        if (_autoCompletePrefix != prefix)
+        {
+            _autoCompleteIndex = -1;
+            _autoCompletePrefix = prefix;
+        }
+
+        // 循环到下一个匹配项
+        _autoCompleteIndex = (_autoCompleteIndex + 1) % matches.Count;
+        string completion = matches[_autoCompleteIndex];
+
+        // 替换当前单词为补全项
+        string newText = lastSep >= 0
+            ? currentText.Substring(0, lastSep + 1) + completion
+            : completion;
+        _consoleInput.Text = newText;
+        // 光标移到末尾
+        _consoleInput.CaretColumn = newText.Length;
+    }
+
+    public override void _Input(InputEvent @event)
+    {
+    // 按`键开关控制台
+    if (@event is InputEventKey keyEvent && keyEvent.Pressed && keyEvent.Keycode == Key.Quoteleft)
+    {
+        ToggleConsole();
+        AcceptEvent();
+        return;
+    }
+
+    // 控制台Tab自动补全
+    if (@event is InputEventKey tabEvent && tabEvent.Pressed && tabEvent.Keycode == Key.Tab && _consoleVisible && _consoleInput != null)
+    {
+        HandleConsoleAutocomplete();
+        AcceptEvent();
+        return;
+    }
 
     //如果当前正处于无法操作状态 取消这一次操作
     if (ReadControlState() == 1) return;
@@ -814,6 +944,8 @@ InputState currentInputState = InputState.nil;
             var card = CheckCardClick(mousePosition);
             if(currentInputState != InputState.waitingForChoosingTarget) cardNowChoose = card;
             if (card == null) return; // 没有点击到卡牌，不处理
+            // 点击时立即将卡牌提升到最上层
+            RefreshAllCardDisplayOrder();
             var validTargets = GetAllowedTargets(card);
             if(currentInputState == InputState.waitingForChoosingTarget) ;//如果是等待 那直接跳过
             else if (card.cardType == CardTypes.Command && card.getState() == CardState.inHand && card.targetType != TargetType.NOTarget) {currentInputState = InputState.P_InHandCommandNeedChooseTarget;HighlightValidTargets(card.targetType);}
@@ -862,7 +994,10 @@ InputState currentInputState = InputState.nil;
                 case InputState.P_InPlaceUnit:
                      if (card.GetIsFriend() != IsFriend.friend || card.isHq == HQ.hq)
                     {
-                        return;  // 敌方单位不能被拖动
+                        // 敌方/HQ不可被拖动，重置输入状态防止释放时误操作
+                        cardNowChoose = null;
+                        currentInputState = InputState.nil;
+                        return;
                     }
 
                     card.ResetVisualsInstant();
@@ -977,6 +1112,11 @@ InputState currentInputState = InputState.nil;
                     break;
 
                     case InputState.P_InPlaceUnit:
+                    if (cardNowChoose.isHq == HQ.hq)
+                    {
+                        cardNowChoose = null;
+                        break;
+                    }
                     cardNowChoose.setState(CardState.placed);
                     if(result == null)
                         {
@@ -1738,9 +1878,24 @@ InputState currentInputState = InputState.nil;
             }
         }
         return IsFriend.neutral;
-        
+
     }
 
+    /// <summary>
+    /// 检查卡牌从当前位置是否实际可移动（前线不可移，支援线需前线为友方）
+    /// </summary>
+    public bool CanCardMoveFromPlace(cardBase_ card)
+    {
+        if (card == null) return false;
+        var place = card.GetMyPlace();
+        if (place == null) return false;
+        if (frontLine.Contains(place)) return false;
+        if (card.GetIsFriend() == IsFriend.friend && supportLine.Contains(place))
+            return CheckIfFrontLineIsFriend() == IsFriend.friend;
+        if (card.GetIsFriend() == IsFriend.enemy && enemySupprotLine.Contains(place))
+            return CheckIfFrontLineIsFriend() == IsFriend.enemy;
+        return true;
+    }
 
     List<cardBase_> enemyDeck;
 
@@ -2719,7 +2874,12 @@ InputState currentInputState = InputState.nil;
             }
         }
 
-        
+        // 剥离末尾的attribute元数据 [icon=xxx,description=yyy]
+        int lastBracket = effectString.LastIndexOf('[');
+        if (lastBracket >= 0 && effectString.EndsWith("]"))
+        {
+            effectString = effectString.Substring(0, lastBracket).TrimEnd();
+        }
 
         // 首先用逗号分割 逗号分割优先级更高，但要忽略括号内的逗号
         var effectSegments = SplitEffectString(effectString);
@@ -2766,15 +2926,16 @@ InputState currentInputState = InputState.nil;
             {
                 string part = parts[i];
                 string instruction = part.Trim();
-                
+                string ins = instruction.ToLowerInvariant(); // 大小写不敏感
+
                 // 跳过标签定义（End& 需要被处理以支持 foreach 结构）
-                if (instruction.EndsWith("&") && instruction != "End&")
+                if (instruction.EndsWith("&") && ins != "end&")
                 {
                     continue;
                 }
 
                 // foreach - 进入循环并保存当前 targets
-                if (instruction == "foreach")
+                if (ins == "foreach")
                 {
                     if (foreachStack.Count == 0)
                     {
@@ -2798,7 +2959,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // End& - 结束当前循环或跳转到上一个仍有元素的循环
-                if (instruction == "End&")
+                if (ins == "end&")
                 {
                     if (foreachStack.Count > 0)
                     {
@@ -2858,7 +3019,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // this - 指代执行效果的单位本身
-                if (instruction == "this")
+                if (ins == "this")
                 {
                     if (sourceCard != null)
                     {
@@ -2866,7 +3027,7 @@ InputState currentInputState = InputState.nil;
                     }
                 }
                 // target - 指代传入的目标列表
-                else if (instruction == "target")
+                else if (ins == "target")
                 {
                     if (targetCards != null && targetCards.Count > 0)
                     {
@@ -2877,7 +3038,7 @@ InputState currentInputState = InputState.nil;
                         targets = new List<cardBase_> { targetCard };
                     }
                 }
-                else if (instruction.StartsWith("GetTargetByIndex"))
+                else if (instruction.StartsWith("GetTargetByIndex", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
                     if (match.Success)
@@ -2890,11 +3051,11 @@ InputState currentInputState = InputState.nil;
                     }
                 }
 
-                if(instruction == "myHq")
+                if(ins == "myhq")
                 {
                     targets = [myHq];
                 }
-                else if(instruction == "enemyHq")
+                else if(ins == "enemyhq")
                 {
                     targets = [enemyHq];
                 }
@@ -2916,7 +3077,7 @@ InputState currentInputState = InputState.nil;
                     }
                 }
 
-                if (instruction.StartsWith("GetAttack"))
+                if (instruction.StartsWith("GetAttack", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
                     if (match.Success)
@@ -2932,7 +3093,7 @@ InputState currentInputState = InputState.nil;
                     }
                 }
 
-                if (instruction.StartsWith("SetDefence"))
+                if (instruction.StartsWith("SetDefence", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
                     if (match.Success)
@@ -2949,7 +3110,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // damage(n) - 使用AddChange减少防御力
-                if (instruction.StartsWith("damage"))
+                if (instruction.StartsWith("damage", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
                     if (match.Success)
@@ -2977,7 +3138,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // drawCard - 抽卡
-                if (instruction == "drawCard")
+                if (ins == "drawcard")
                 {
                     if (sourceCard?.GetIsFriend() == IsFriend.friend)
                     {
@@ -2991,7 +3152,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // DrawACard(string,int) - 尝试从卡组中抽出i张名字含s字符串的单位
-                if (instruction.StartsWith("DrawACard"))
+                if (instruction.StartsWith("DrawACard", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction,  @"\(([^,]*),([^)]*)\)");
                     if (match.Success)
@@ -3011,7 +3172,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // DrawACardWithType(unitType,int) - 从卡组中抽出i张类型为u的卡
-                if (instruction.StartsWith("DrawACardWithType"))
+                if (instruction.StartsWith("DrawACardWithType", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction,  @"\(([^,]*),([^)]*)\)");
                     if (match.Success)
@@ -3031,7 +3192,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // DrawUnitCards(i) - 从卡组中抽取i张单位卡（非指挥卡）
-                if (instruction.StartsWith("DrawUnitCards"))
+                if (instruction.StartsWith("DrawUnitCards", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
                     if (match.Success)
@@ -3049,7 +3210,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // DiscardRandomly(i) - 随机弃置i张卡
-                if (instruction.StartsWith("DiscardRandomly"))
+                if (instruction.StartsWith("DiscardRandomly", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
                     if (match.Success)
@@ -3067,7 +3228,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // GetCardsBeingTreated - 获得刚刚被抽到的卡的引用
-                if (instruction == "GetCardsBeingTreated")
+                if (ins == "getcardsbeingtreated")
                 {
                     if (sourceCard?.GetIsFriend() == IsFriend.friend)
                     {
@@ -3080,7 +3241,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // AddToHand(string) 或 AddToHand(string,int) - 将名字为s的卡加入手牌，可以指定数量
-                if (instruction.StartsWith("AddToHand"))
+                if (instruction.StartsWith("AddToHand", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\((.*)\)");
                     if (match.Success)
@@ -3093,7 +3254,7 @@ InputState currentInputState = InputState.nil;
                         if (parameters.Length > 1)
                         {
                             count = EvaluateExpression(parameters[1].Trim(), result, targets, sourceCard);
-                            if (count < 1) count = 0; // 确保至少添加1张
+                            if (count < 1) count = 1; // 确保至少添加1张
                         }
                         
                         var cardData = GetCardMaganer().GetCard(cardName);
@@ -3134,7 +3295,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // GetEffect(string) - 使targets获得指定的effect
-                if (instruction.StartsWith("GetEffect"))
+                if (instruction.StartsWith("GetEffect", StringComparison.OrdinalIgnoreCase))
                 {
                     // 提取括号内的内容，语法固定为GetEffect("eff")
                     int startIndex = instruction.IndexOf('(');
@@ -3164,7 +3325,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // DiscardWithName(string,i) - 弃置i张名字含s的卡(若可能)
-                if (instruction.StartsWith("DiscardWithName"))
+                if (instruction.StartsWith("DiscardWithName", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction,  @"\((.*),(\d+)\)");
                     if (match.Success)
@@ -3184,7 +3345,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // setResult(n) - 设置结果值
-                if (instruction.StartsWith("setResult"))
+                if (instruction.StartsWith("setResult", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
                     if (match.Success)
@@ -3195,7 +3356,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // SetMemory(s,n) - 设置自定义变量值
-                if (instruction.StartsWith("SetMemory"))
+                if (instruction.StartsWith("SetMemory", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^,]+),([^)]*)\)");
                     if (match.Success)
@@ -3207,7 +3368,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // addDefence(n) - 增加目标防御力
-                if (instruction.StartsWith("addDefence"))
+                if (instruction.StartsWith("addDefence", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
                     if (match.Success)
@@ -3224,7 +3385,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // Retreat(list) - 使单位撤退
-                if (instruction.StartsWith("Retreat"))
+                if (instruction.StartsWith("Retreat", StringComparison.OrdinalIgnoreCase))
                 {
                     foreach (var target in targets)
                     {
@@ -3236,7 +3397,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // Discard(list) - 挂起弃置操作
-                if (instruction.StartsWith("Discard"))
+                if (instruction.StartsWith("Discard", StringComparison.OrdinalIgnoreCase))
                 {
                     foreach (var target in targets)
                     {
@@ -3248,7 +3409,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // getCount(${selector}) - 获取符合条件的单位数量
-                if (instruction.StartsWith("getCount"))
+                if (instruction.StartsWith("getCount", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\$\{([^}]*)\}");
                     if (match.Success)
@@ -3260,7 +3421,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // setTarget - 设置目标为传入的targetCard
-                if (instruction == "setTarget")
+                if (ins == "settarget")
                 {
                     if (targetCard != null)
                     {
@@ -3269,7 +3430,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // addToSupportLine(cardId) - 添加卡到支援阵线
-                if (instruction.StartsWith("addToSupportLine"))
+                if (instruction.StartsWith("addToSupportLine", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
                     if (match.Success)
@@ -3291,7 +3452,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // addToEnemySupportLine(cardId) - 添加卡到敌方支援阵线
-                if (instruction.StartsWith("addToEnemySupportLine"))
+                if (instruction.StartsWith("addToEnemySupportLine", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
                     if (match.Success)
@@ -3313,7 +3474,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // addToDeck(cardId) - 将指定卡牌洗入卡组
-                if (instruction.StartsWith("addToDeck"))
+                if (instruction.StartsWith("addToDeck", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
                     if (match.Success)
@@ -3331,7 +3492,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // GetPoint() - 获得指挥点
-                if (instruction == "GetPoint")
+                if (ins == "getpoint")
                 {
                     if (sourceCard?.GetIsFriend() == IsFriend.friend)
                     {
@@ -3344,7 +3505,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // GetPointMax() - 获得指挥点槽
-                if (instruction == "GetPointMax")
+                if (ins == "getpointmax")
                 {
                     if (sourceCard?.GetIsFriend() == IsFriend.friend)
                     {
@@ -3357,7 +3518,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // AddPointMax() - 增加指挥点槽
-                if (instruction.StartsWith("AddPointMax"))
+                if (instruction.StartsWith("AddPointMax", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
                     if (match.Success)
@@ -3375,7 +3536,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // AddPoint() - 增加指挥点
-                if (instruction.StartsWith("AddPoint"))
+                if (instruction.StartsWith("AddPoint", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
                     if (match.Success)
@@ -3393,7 +3554,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // GetRandomFriendUnit() - 随机获得一个友方单位
-                if (instruction == "GetRandomFriendUnit")
+                if (ins == "getrandomfriendunit")
                 {
                     var friendUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.friend && x.isHq != HQ.hq).ToList();
                     if (friendUnits.Count > 0)
@@ -3408,7 +3569,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // setTargets(selector) - 使用选择器设置目标列表
-                if (instruction.StartsWith("setTargets"))
+                if (instruction.StartsWith("setTargets", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\$\{([^}]*)\}");
                     if (match.Success)
@@ -3419,7 +3580,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // GetRandomEnemyUnit() - 随机获得一个敌方单位
-                if (instruction == "GetRandomEnemyUnit")
+                if (ins == "getrandomenemyunit")
                 {
                     var enemyUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy && x.isHq != HQ.hq).ToList();
                     if (enemyUnits.Count > 0)
@@ -3434,7 +3595,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // GetRandomFriendTarget() - 随机获得一个友方目标(目标=单位+总部)
-                if (instruction == "GetRandomFriendTarget")
+                if (ins == "getrandomfriendtarget")
                 {
                     var friendTargets = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.friend).ToList();
                     if (myHq != null && myHq.getState() == CardState.placed)
@@ -3453,7 +3614,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // GetRandomEnemyTarget() - 随机获得一个敌方目标(目标=单位+总部)
-                if (instruction == "GetRandomEnemyTarget")
+                if (ins == "getrandomenemytarget")
                 {
                     var enemyTargets = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy).ToList();
                     if (enemyHq != null && enemyHq.getState() == CardState.placed)
@@ -3472,7 +3633,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // GetRandomNumber() - 随机获得一个数字(包括两个参数,min,max)
-                if (instruction.StartsWith("GetRandomNumber"))
+                if (instruction.StartsWith("GetRandomNumber", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^,]*),([^)]*)\)");
                     if (match.Success)
@@ -3485,7 +3646,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // KillAllTargets() - 消灭列表上的所有单位
-                if (instruction == "KillAllTargets")
+                if (ins == "killalltargets")
                 {
                     foreach (var target in targets)
                     {
@@ -3497,7 +3658,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // Play 或 Play(u) - 打出一张卡，不消耗指挥点
-                if (instruction.StartsWith("Play"))
+                if (instruction.StartsWith("Play", StringComparison.OrdinalIgnoreCase))
                 {
                     // 解析参数，如果有的话
                     string targetType = "";
@@ -3561,7 +3722,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // Choose(cardA,cardB) - 显示两张卡让玩家选择
-                if (instruction.StartsWith("Choose"))
+                if (instruction.StartsWith("Choose", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^,]+),([^)]+)\)");
                     if (match.Success)
@@ -3601,7 +3762,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // Develop 或 Develop($selector) 或 Develop(name1,name2,...) - 开发效果
-                if (instruction.StartsWith("Develop"))
+                if (instruction.StartsWith("Develop", StringComparison.OrdinalIgnoreCase))
                 {
                     List<cardBase_> cardsToShow = new List<cardBase_>();
 
@@ -3709,7 +3870,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // HealAllTargets() - 完全修复单位，将列表上所有单位的防御力设置为历史最大值
-                if (instruction == "HealAllTargets")
+                if (ins == "healalltargets")
                 {
                     foreach (var target in targets)
                     {
@@ -3721,21 +3882,21 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // GetAllEnemyUnits() - 获得所有敌方单位
-                if (instruction == "GetAllEnemyUnits")
+                if (ins == "getallenemyunits")
                 {
                     var enemyUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy && x.isHq != HQ.hq).ToList();
                     targets = enemyUnits;
                 }
 
                 // GetAllFriendUnits() - 获得所有友方单位
-                if (instruction == "GetAllFriendUnits")
+                if (ins == "getallfriendunits")
                 {
                     var friendUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.friend && x.isHq != HQ.hq).ToList();
                     targets = friendUnits;
                 }
 
                 // GetAllEnemyTargets() - 获得所有敌方目标(目标=单位+总部)
-                if (instruction == "GetAllEnemyTargets")
+                if (ins == "getallenemytargets")
                 {
                     var enemyTargets = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy).ToList();
                     if (enemyHq != null && enemyHq.getState() == CardState.placed)
@@ -3746,7 +3907,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // GetAllFriendTargets() - 获得所有友方目标(目标=单位+总部)
-                if (instruction == "GetAllFriendTargets")
+                if (ins == "getallfriendtargets")
                 {
                     var friendTargets = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.friend).ToList();
                     if (myHq != null && myHq.getState() == CardState.placed)
@@ -3757,7 +3918,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // GetEnemyHq() - 获得敌方总部
-                if (instruction == "GetEnemyHq")
+                if (ins == "getenemyhq")
                 {
                     if (enemyHq != null && enemyHq.getState() == CardState.placed)
                     {
@@ -3766,7 +3927,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // GetFriendHq() - 获得友方总部
-                if (instruction == "GetFriendHq")
+                if (ins == "getfriendhq")
                 {
                     if (myHq != null && myHq.getState() == CardState.placed)
                     {
@@ -3775,7 +3936,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // Refresh - 刷新目标单位，使其回到可以移动和攻击的状态
-                if (instruction == "Refresh")
+                if (ins == "refresh")
                 {
                     foreach (var target in targets)
                     {
@@ -3787,7 +3948,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // AddTrait(trait) - 为目标单位添加指定的特性
-                if (instruction.StartsWith("AddTrait"))
+                if (instruction.StartsWith("AddTrait", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
                     if (match.Success)
@@ -3804,7 +3965,7 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // RemoveTrait(trait) - 从目标单位移除指定的特性
-                if (instruction.StartsWith("RemoveTrait"))
+                if (instruction.StartsWith("RemoveTrait", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
                     if (match.Success)
@@ -3886,7 +4047,7 @@ InputState currentInputState = InputState.nil;
     /// </summary>
     private async void ExecuteCommandAndDiscard(cardBase_ commandCard, List<cardBase_> targets, bool needRestoreColor = false)
     {
-        await ParseAndExecuteEffect(commandCard.effect, commandCard, targets);
+        // 立即清理视觉状态并移出手牌，避免卡牌悬停在空中等待效果执行
         commandCard.ResetVisualsInstant();
         player1.RemoveFromHand(commandCard);
 
@@ -3897,6 +4058,8 @@ InputState currentInputState = InputState.nil;
             RestoreAllTargetsColor();
         }
 
+        // 等待效果执行完毕后再播放丢弃动画并移除
+        await ParseAndExecuteEffect(commandCard.effect, commandCard, targets);
         await commandCard.DiscardCard();
         RemoveCard(commandCard);
         CheckIfAnyUnitDiedAsync();
@@ -4176,12 +4339,12 @@ InputState currentInputState = InputState.nil;
             if (condition.StartsWith("target.name=="))
             {
                 string name = condition.Substring("target.name==".Length).Trim();
-                return targets[0].id == name;
+                return targets[0].name == name;
             }
             if (condition.StartsWith("target.name!="))
             {
                 string name = condition.Substring("target.name!=".Length).Trim();
-                return targets[0].id != name;
+                return targets[0].name != name;
             }
         }
 

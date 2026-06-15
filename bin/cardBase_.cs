@@ -59,6 +59,21 @@ public partial class cardBase_ : Control
     Texture2D UssrPic;
     Texture2D Germanypic;
 
+    // 移动/攻击状态指示灯
+    private Sprite2D moveableLight;
+    private Texture2D greenLightTex;
+    private Texture2D yellowLightTex;
+    private Texture2D redLightTex;
+
+    // 效果/trait的attribute图标面板
+    private Control _attrPanel;
+    private Panel _attrTooltipPanel;
+    private Label _attrTooltipLabel;
+    private List<Rect2> _attrIconRects = new(); // 图标在_attrPanel中的本地rect
+    private List<string> _attrIconDescs = new();
+    private const int AttrIconSize = 22;
+    private const int AttrMaxVisible = 5;
+
     // 缓存卡名和标签尺寸，避免每次刷新都重新计算字体大小
     private string lastNameText = string.Empty;
     private Vector2 lastNameLabelSize = Vector2.Zero;
@@ -72,17 +87,16 @@ public partial class cardBase_ : Control
 
     public void RefreshUnit()
     {
-        GD.Print($"RefreshUnit: {this}, Type={cardType}, Before: moveAble={moveAble}, attackAble={attackAble}");
         moveAble = 1;
         attackAble = 1;
-        GD.Print($"  After: moveAble={moveAble}, attackAble={attackAble}");
-        
+
         // 奋战特性：单位部署后可立刻战斗
         if (HasTrait(UnitTraits.Determination))
         {
             attackAble = 2; // 可以攻击两次（部署时一次，正常回合一次）
         }
-        
+
+        UpdateMoveableLight();
     }
     
     /// <summary>
@@ -92,8 +106,50 @@ public partial class cardBase_ : Control
     {
         moveAble = 0;
         attackAble = 0;
+        UpdateMoveableLight();
     }
-    
+
+    /// <summary>
+    /// 根据moveAble和attackAble状态切换指示灯纹理。
+    /// 绿灯：可移动且可攻击；黄灯：可移动或可攻击其一；红灯：均不可。
+    /// 仅在单位已放置在战场上且非指令卡时显示。
+    /// </summary>
+    private void UpdateMoveableLight()
+    {
+        if (moveableLight == null) return;
+
+        // 已放置或被拖拽中的非指令/非总部单位显示指示灯
+        bool shouldShow = (state == CardState.placed || state == CardState.inplaceAndCaught)
+                       && isHq != HQ.hq
+                       && cardType != CardTypes.Command;
+
+        if (!shouldShow)
+        {
+            moveableLight.Visible = false;
+            return;
+        }
+
+        moveableLight.Visible = true;
+        bool canMove = moveAble >= 1 && CanMoveFromCurrentPlace();
+        bool canAttack = attackAble >= 1;
+
+        if (canMove && canAttack)
+            moveableLight.Texture = greenLightTex;
+        else if (canMove || canAttack)
+            moveableLight.Texture = yellowLightTex;
+        else
+            moveableLight.Texture = redLightTex;
+    }
+
+    /// <summary>
+    /// 根据当前位置检查单位是否实际可以移动。
+    /// </summary>
+    private bool CanMoveFromCurrentPlace()
+    {
+        if (battleField == null) return true;
+        return battleField.CanCardMoveFromPlace(this);
+    }
+
     /// <summary>
     /// 检查单位是否具有指定特性
     /// </summary>
@@ -189,6 +245,7 @@ public partial class cardBase_ : Control
         {
             attackAble = 0;
         }
+        UpdateMoveableLight();
     }
 
     public Boolean CheckIfCanAttack()
@@ -213,6 +270,7 @@ public partial class cardBase_ : Control
     public void HaveAttacked()
     {
         attackAble --;
+        UpdateMoveableLight();
     }
 
     public int ReadAttackable()
@@ -455,6 +513,16 @@ public partial class cardBase_ : Control
 
         }
 
+        // 初始化移动/攻击状态指示灯——使用编辑器中已摆放的Sprite2D
+        moveableLight = GetNode<Sprite2D>("moveableDisplay");
+        greenLightTex = ResourceManager.Instance?.GetTexture("res://assest/greenLight.png")
+                     ?? GD.Load<Texture2D>("res://assest/greenLight.png");
+        yellowLightTex = ResourceManager.Instance?.GetTexture("res://assest/yellowLight.png")
+                      ?? GD.Load<Texture2D>("res://assest/yellowLight.png");
+        redLightTex = ResourceManager.Instance?.GetTexture("res://assest/redLight.png")
+                   ?? GD.Load<Texture2D>("res://assest/redLight.png");
+        UpdateMoveableLight();
+
         if (this.cardType == CardTypes.Command)
         {
             GetNode<Label>("defence").Visible = false;
@@ -467,6 +535,9 @@ public partial class cardBase_ : Control
         // 记录初始缩放并创建悬停高亮框
         originalScale = Scale;
         SetupHoverHighlight();
+
+        // 构建attribute图标面板
+        BuildAttributePanel();
     }
 
 
@@ -618,6 +689,119 @@ public partial class cardBase_ : Control
 /// <summary>
 /// 将内存中的状态和现实出来的刷新一下，一般用于卡牌信息改变的时候
 /// </summary>
+    /// <summary>
+    /// 根据traits位标记自动合成加黑描述前缀。不包含效果描述，仅trait名。
+    /// </summary>
+    private string BuildTraitPrefix()
+    {
+        if (traits == UnitTraits.None) return "";
+
+        var names = new System.Text.StringBuilder();
+        if ((traits & UnitTraits.Blitz) != 0)
+            names.Append("闪击 ");
+        if ((traits & UnitTraits.Determination) != 0)
+            names.Append("奋战 ");
+        if ((traits & UnitTraits.HeavyArmor) != 0)
+            names.Append("重甲 ");
+        if ((traits & UnitTraits.SmokeScreen) != 0)
+            names.Append("烟幕 ");
+        if ((traits & UnitTraits.Guardian) != 0)
+            names.Append("守护 ");
+        if ((traits & UnitTraits.Shock) != 0)
+            names.Append("冲击 ");
+        if ((traits & UnitTraits.Ambush) != 0)
+            names.Append("伏击 ");
+        if ((traits & UnitTraits.Immunity) != 0)
+            names.Append("免疫 ");
+
+        if (names.Length == 0) return "";
+        // 去除末尾空格
+        names.Length--;
+        return names.ToString() + "\n";
+    }
+
+    /// <summary>
+    /// 从effect字符串末尾解析[icon=xxx,description=yyy]属性。若无则返回默认action。
+    /// </summary>
+    private EffectAttribute ParseEffectAttribute(string effectStr)
+    {
+        if (string.IsNullOrEmpty(effectStr))
+            return new EffectAttribute { IconName = "action", Description = "" };
+
+        // 查找最后一个[...]
+        int lastBracket = effectStr.LastIndexOf('[');
+        if (lastBracket < 0 || !effectStr.EndsWith("]"))
+            return new EffectAttribute { IconName = "action", Description = "" };
+
+        string meta = effectStr.Substring(lastBracket + 1, effectStr.Length - lastBracket - 2);
+        string iconName = "action";
+        string desc = "";
+
+        foreach (var part in meta.Split(','))
+        {
+            var kv = part.Split('=', 2);
+            if (kv.Length == 2)
+            {
+                if (kv[0].Trim() == "icon") iconName = kv[1].Trim();
+                if (kv[0].Trim() == "description") desc = kv[1].Trim();
+            }
+        }
+
+        return new EffectAttribute { IconName = iconName, Description = desc, IsTrait = false };
+    }
+
+    /// <summary>
+    /// 收集该卡所有attribute：effect属性 + trait属性。
+    /// </summary>
+    public List<EffectAttribute> GetAllAttributes()
+    {
+        var list = new List<EffectAttribute>();
+
+        // 效果属性
+        if (!string.IsNullOrEmpty(effect))
+        {
+            // 去掉触发前缀（如"Deployed:"）后再解析
+            string cleanEffect = effect;
+            int colonIdx = cleanEffect.IndexOf(':');
+            if (colonIdx > 0) cleanEffect = cleanEffect.Substring(colonIdx + 1);
+            list.Add(ParseEffectAttribute(cleanEffect));
+        }
+
+        // trait属性
+        foreach (UnitTraits t in Enum.GetValues(typeof(UnitTraits)))
+        {
+            if (t == UnitTraits.None) continue;
+            if ((traits & t) != 0)
+            {
+                list.Add(new EffectAttribute
+                {
+                    IconName = IconCache.GetTraitIconName(t),
+                    Description = GetTraitDescription(t),
+                    IsTrait = true,
+                    TraitName = t.ToString()
+                });
+            }
+        }
+
+        return list;
+    }
+
+    /// <summary>
+    /// 获取trait的中文描述文本
+    /// </summary>
+    private static string GetTraitDescription(UnitTraits t) => t switch
+    {
+        UnitTraits.Blitz => "闪击：部署后可立刻战斗",
+        UnitTraits.Determination => "奋战：可再战斗1次",
+        UnitTraits.HeavyArmor => "重甲：受到的战斗伤害-1",
+        UnitTraits.SmokeScreen => "烟幕：首次行动前不能被攻击",
+        UnitTraits.Guardian => "守护：两侧单位不能被攻击",
+        UnitTraits.Shock => "冲击：攻击不受到反击，攻击后失去",
+        UnitTraits.Ambush => "伏击：被攻击时先造成反击伤害",
+        UnitTraits.Immunity => "免疫：不受到战斗伤害",
+        _ => ""
+    };
+
     public void RefreshState()
     {
         // 指令卡使用特殊的背景图
@@ -657,7 +841,7 @@ public partial class cardBase_ : Control
         if                     (description!= null)
         {
             var descriptionLabel = GetNode<RichTextLabel>("description");
-            descriptionLabel.Text = description;
+            descriptionLabel.Text = BuildTraitPrefix() + description;
             // 只在第一次调用时调整字体大小
             if (descriptionLabel.GetMeta("fontSizeInitialized", false).AsBool() == false)
             {
@@ -676,6 +860,107 @@ public partial class cardBase_ : Control
             GetNode<Label>("attack").Visible = false;
         }
 
+        // 构建attribute图标面板
+        BuildAttributePanel();
+    }
+
+    /// <summary>
+    /// 构建或刷新卡牌右侧的attribute图标面板
+    /// </summary>
+    private void BuildAttributePanel()
+    {
+        // 指令卡不显示attribute
+        if (cardType == CardTypes.Command) return;
+
+        // 清除旧面板和tooltip
+        if (_attrPanel != null)
+        {
+            _attrPanel.QueueFree();
+            _attrPanel = null;
+        }
+        if (_attrTooltipPanel != null)
+        {
+            _attrTooltipPanel.QueueFree();
+            _attrTooltipPanel = null;
+            _attrTooltipLabel = null;
+        }
+        _attrIconRects.Clear();
+        _attrIconDescs.Clear();
+
+        var attrs = GetAllAttributes();
+        if (attrs.Count == 0) return;
+
+        _attrPanel = new Control();
+        _attrPanel.MouseFilter = MouseFilterEnum.Ignore;
+        _attrPanel.Position = new Vector2(155, 30);
+        AddChild(_attrPanel);
+
+        int visibleCount = Math.Min(attrs.Count, AttrMaxVisible);
+        int y = 0;
+        int bgMargin = 2;
+        int itemH = AttrIconSize + bgMargin * 2;
+
+        for (int i = 0; i < visibleCount; i++)
+        {
+            var attr = attrs[i];
+
+            // 半透明黑色背景
+            var bg = new ColorRect();
+            bg.Size = new Vector2(itemH, itemH);
+            bg.Position = new Vector2(0, y);
+            bg.Color = new Color(0, 0, 0, 0.5f);
+            bg.MouseFilter = MouseFilterEnum.Ignore;
+            _attrPanel.AddChild(bg);
+
+            // 图标
+            var icon = new TextureRect();
+            icon.Texture = IconCache.GetIcon(attr.IconName);
+            icon.Size = new Vector2(AttrIconSize, AttrIconSize);
+            icon.Position = new Vector2(bgMargin, y + bgMargin);
+            icon.MouseFilter = MouseFilterEnum.Ignore;
+            _attrPanel.AddChild(icon);
+
+            // 记录图标在面板中的本地rect和对应描述
+            _attrIconRects.Add(new Rect2(0, y, itemH, itemH));
+            _attrIconDescs.Add(attr.Description ?? "");
+
+            y += itemH + 2;
+        }
+
+        // 折叠提示
+        if (attrs.Count > AttrMaxVisible)
+        {
+            var moreLabel = new Label();
+            moreLabel.Text = $"+{attrs.Count - AttrMaxVisible}";
+            moreLabel.Position = new Vector2(2, y);
+            moreLabel.AddThemeColorOverride("font_color", new Color(0.8f, 0.8f, 0.8f));
+            moreLabel.AddThemeFontSizeOverride("font_size", 10);
+            moreLabel.MouseFilter = MouseFilterEnum.Ignore;
+            _attrPanel.AddChild(moreLabel);
+        }
+
+        // 创建悬停提示（Panel + Label，初始隐藏）
+        _attrTooltipPanel = new Panel();
+        _attrTooltipPanel.Visible = false;
+        _attrTooltipPanel.MouseFilter = MouseFilterEnum.Ignore;
+        _attrTooltipPanel.ZIndex = 999;
+        var panelStyle = new StyleBoxFlat();
+        panelStyle.BgColor = new Color(0, 0, 0, 0.75f);
+        panelStyle.ContentMarginLeft = 4;
+        panelStyle.ContentMarginRight = 4;
+        panelStyle.ContentMarginTop = 2;
+        panelStyle.ContentMarginBottom = 2;
+        _attrTooltipPanel.AddThemeStyleboxOverride("panel", panelStyle);
+        AddChild(_attrTooltipPanel);
+
+        _attrTooltipLabel = new Label();
+        _attrTooltipLabel.MouseFilter = MouseFilterEnum.Ignore;
+        _attrTooltipLabel.AddThemeColorOverride("font_color", Colors.White);
+        // 使用与卡牌描述文字相同的字号
+        int descFontSize = GetNode<RichTextLabel>("description").GetThemeFontSize("normal_font_size");
+        if (descFontSize <= 0) descFontSize = 14;
+        _attrTooltipLabel.AddThemeFontSizeOverride("font_size", descFontSize);
+        _attrTooltipPanel.AddChild(_attrTooltipLabel);
     }
 
     /// <summary>
@@ -862,9 +1147,39 @@ public partial class cardBase_ : Control
         }
     }
 
+    /// <summary>
+    /// 检测鼠标是否悬停在attribute图标上，显示/隐藏描述tooltip
+    /// </summary>
+    public override void _Input(InputEvent @event)
+    {
+        if (_attrIconRects.Count == 0 || _attrTooltipPanel == null) return;
+
+        if (!(@event is InputEventMouseMotion)) return;
+
+        var mousePos = GetLocalMousePosition();
+        var panelPos = (_attrPanel != null) ? _attrPanel.Position : Vector2.Zero;
+        bool found = false;
+
+        for (int i = 0; i < _attrIconRects.Count; i++)
+        {
+            if (_attrIconRects[i].HasPoint(mousePos - panelPos))
+            {
+                _attrTooltipLabel.Text = _attrIconDescs[i];
+                _attrTooltipPanel.Position = mousePos + new Vector2(16, 8);
+                _attrTooltipPanel.Size = _attrTooltipLabel.GetMinimumSize() + new Vector2(8, 4);
+                _attrTooltipPanel.Visible = true;
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+            _attrTooltipPanel.Visible = false;
+    }
+
 /// <summary>
 /// 死亡函数这块
-/// </summary> 
+/// </summary>
     public void Dead()
     {
         if (myPlace != null)
@@ -903,6 +1218,7 @@ public partial class cardBase_ : Control
     public void setState(CardState state)
     {
         this.state = state;
+        UpdateMoveableLight();
     }
 
     public Boolean CheckIfPointIsIn(Vector2 point)
@@ -1175,6 +1491,70 @@ public enum Times
     fightingInfantry,          // 对战步兵时
     attackingHq,               // 攻击总部时
     takingDamage               // 本单位收到伤害时
+}
+
+/// <summary>
+/// 效果的attribute元数据，包含icon和描述
+/// </summary>
+public class EffectAttribute
+{
+    public string IconName;
+    public string Description;
+    public bool IsTrait; // true表示来自trait，false表示来自effect
+    public string TraitName; // 仅IsTrait时有效
+}
+
+/// <summary>
+/// 图标缓存管理器——预加载有限的icon纹理，避免每次加载
+/// </summary>
+public static class IconCache
+{
+    private static Dictionary<string, Texture2D> _cache = new();
+    private static bool _initialized = false;
+
+    // 所有可用的icon文件名（不含扩展名）
+    private static readonly string[] KnownIcons = new[]
+    {
+        "action", "Determination", "Guardian",
+        "greenLight", "yellowLight", "redLight"
+    };
+
+    // trait -> icon 映射
+    private static readonly Dictionary<UnitTraits, string> TraitIcons = new()
+    {
+        { UnitTraits.Blitz, "action" },
+        { UnitTraits.Determination, "Determination" },
+        { UnitTraits.HeavyArmor, "action" },
+        { UnitTraits.SmokeScreen, "action" },
+        { UnitTraits.Guardian, "Guardian" },
+        { UnitTraits.Shock, "action" },
+        { UnitTraits.Ambush, "action" },
+        { UnitTraits.Immunity, "action" },
+    };
+
+    public static void Init()
+    {
+        if (_initialized) return;
+        foreach (var name in KnownIcons)
+        {
+            var path = $"res://assest/{name}.png";
+            var tex = ResourceManager.Instance?.GetTexture(path)
+                   ?? GD.Load<Texture2D>(path);
+            if (tex != null) _cache[name] = tex;
+        }
+        _initialized = true;
+    }
+
+    public static Texture2D GetIcon(string name)
+    {
+        Init();
+        return _cache.TryGetValue(name, out var tex) ? tex : null;
+    }
+
+    public static string GetTraitIconName(UnitTraits trait)
+    {
+        return TraitIcons.TryGetValue(trait, out var name) ? name : "action";
+    }
 }
 
 //储存卡牌信息

@@ -1,10 +1,11 @@
-[gd_scene load_steps=28 format=4 uid="uid://bc1bwysmnoo2o"]
+[gd_scene load_steps=29 format=4 uid="uid://bc1bwysmnoo2o"]
 
 [ext_resource type="Script" uid="uid://c717nlrmhinj2" path="res://bin/cardBase_.cs" id="1_068hq"]
 [ext_resource type="Texture2D" uid="uid://c7cdfutbtsx01" path="res://cards/卡背1.png" id="2_bwqk7"]
 [ext_resource type="Texture2D" uid="uid://dqixqxurc6jp5" path="res://cards/轻步兵.png" id="3_q3cvq"]
 [ext_resource type="Texture2D" uid="uid://cfb0hmxtemnou" path="res://cards/inf.png" id="4_gf004"]
 [ext_resource type="Texture2D" uid="uid://cfijdan3c6kcf" path="res://cards/ussr.png" id="7_bwqk7"]
+[ext_resource type="Texture2D" uid="uid://crx38yiuasx5p" path="res://assest/redLight.png" id="7_pqwk4"]
 [ext_resource type="AudioStream" uid="uid://c7ugvrb82h3ox" path="res://assest/爆炸21.wav" id="15_3yh85"]
 
 [sub_resource type="Image" id="Image_068hq"]
@@ -737,6 +738,11 @@ stream = ExtResource("15_3yh85")
 position = Vector2(167, 50.999996)
 scale = Vector2(0.7, 0.7)
 texture = ExtResource("7_bwqk7")
+
+[node name="moveableDisplay" type="Sprite2D" parent="."]
+position = Vector2(91.999985, 229)
+scale = Vector2(1.0312498, 1.0312496)
+texture = ExtResource("7_pqwk4")
 
 [connection signal="focus_entered" from="checkMouce" to="." method="MouceEntered"]
 [connection signal="focus_exited" from="checkMouce" to="." method="MouceExited"]
