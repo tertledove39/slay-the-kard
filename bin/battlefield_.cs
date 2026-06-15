@@ -1889,7 +1889,7 @@ InputState currentInputState = InputState.nil;
     }
 
     /// <summary>
-    /// 检查卡牌从当前位置是否实际可移动（前线不可移，支援线需前线为友方）
+    /// 检查卡牌从当前位置是否实际可移动（前线不可移，支援线需前线非敌方控制）
     /// </summary>
     public bool CanCardMoveFromPlace(cardBase_ card)
     {
@@ -1898,9 +1898,9 @@ InputState currentInputState = InputState.nil;
         if (place == null) return false;
         if (frontLine.Contains(place)) return false;
         if (card.GetIsFriend() == IsFriend.friend && supportLine.Contains(place))
-            return CheckIfFrontLineIsFriend() == IsFriend.friend;
+            return CheckIfFrontLineIsFriend() != IsFriend.enemy;
         if (card.GetIsFriend() == IsFriend.enemy && enemySupprotLine.Contains(place))
-            return CheckIfFrontLineIsFriend() == IsFriend.enemy;
+            return CheckIfFrontLineIsFriend() != IsFriend.friend;
         return true;
     }
 
