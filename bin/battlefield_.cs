@@ -1913,15 +1913,14 @@ InputState currentInputState = InputState.nil;
 
         int steps = Math.Abs(toValue - fromValue);
         int direction = toValue > fromValue ? 1 : -1;
-        // 总时长控制在1000ms内，每步80-150ms确保清晰可见
-        int delayMs = Math.Clamp(1000 / Math.Max(steps, 1), 80, 150);
+        // 每步间隔80-150ms，变化越多越快但确保每步可见
+        float delaySec = Math.Clamp(1.0f / Math.Max(steps, 1), 0.08f, 0.15f);
 
         int current = fromValue;
-        // 先立即显示起始值
         label.Text = current.ToString();
         while (current != toValue)
         {
-            await Task.Delay(delayMs);
+            await ToSignal(GetTree().CreateTimer(delaySec), SceneTreeTimer.SignalName.Timeout);
             current += direction;
             if (IsInstanceValid(label))
                 label.Text = current.ToString();
