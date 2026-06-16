@@ -109,12 +109,12 @@ public partial class PostBattleReward : CanvasLayer
 
         // 标题
         var title = MakeLabel("[center]选择一组卡牌奖励[/center]", 30, Colors.Gold);
-        title.Position = new Vector2(GetViewportRect().Size.X / 2 - 250, 30);
+        title.Position = new Vector2(GetViewport().GetVisibleRect().Size.X / 2 - 250, 30);
         title.Size = new Vector2(500, 50);
         AddChild(title);
 
         // 三组面板居中排列
-        float viewWidth = GetViewportRect().Size.X;
+        float viewWidth = GetViewport().GetVisibleRect().Size.X;
         float panelW = CardDisplayWidth * CardDisplayScale + 20;
         float totalW = GroupsCount * (panelW + 40);
         float startX = (viewWidth - totalW) / 2;
@@ -134,7 +134,7 @@ public partial class PostBattleReward : CanvasLayer
             highlight.Position = new Vector2(gx - 4, 100);
             highlight.Size = new Vector2(panelW + 8, CardDisplayHeight * CardDisplayScale * CardsPerGroup + 160);
             highlight.Color = new Color(0, 0, 0, 0);
-            highlight.MouseFilter = MouseFilterEnum.Ignore;
+            highlight.MouseFilter = Control.MouseFilterEnum.Ignore;
             AddChild(highlight);
             groupHighlights.Add(highlight);
 
@@ -179,7 +179,7 @@ public partial class PostBattleReward : CanvasLayer
             card.SetCardInformation(group[i]);
             card.SetIsFriend(IsFriend.friend);
             card.Scale = new Vector2(CardDisplayScale, CardDisplayScale);
-            card.MouseFilter = MouseFilterEnum.Ignore;
+            card.MouseFilter = Control.MouseFilterEnum.Ignore;
             card.ZIndex = 50;
             // 在面板内居中排列
             card.Position = new Vector2(startX + (panelW - CardDisplayWidth * CardDisplayScale) / 2,
@@ -209,12 +209,12 @@ public partial class PostBattleReward : CanvasLayer
 
         // 标题与计数
         var title = MakeLabel($"[center]选择{MaxSwapCards}张要替换的卡牌[/center]", 26, Colors.Gold);
-        title.Position = new Vector2(GetViewportRect().Size.X / 2 - 250, 20);
+        title.Position = new Vector2(GetViewport().GetVisibleRect().Size.X / 2 - 250, 20);
         title.Size = new Vector2(500, 40);
         AddChild(title);
 
         var countLabel = MakeLabel($"[center]已选: 0/{MaxSwapCards}[/center]", 20, Colors.White);
-        countLabel.Position = new Vector2(GetViewportRect().Size.X / 2 - 100, 58);
+        countLabel.Position = new Vector2(GetViewport().GetVisibleRect().Size.X / 2 - 100, 58);
         countLabel.Size = new Vector2(200, 30);
         AddChild(countLabel);
 
@@ -225,7 +225,7 @@ public partial class PostBattleReward : CanvasLayer
         float cardW = CardDisplayWidth * 0.58f;
         float cardH = CardDisplayHeight * 0.58f;
         int cols = 7;
-        float gridStartX = (GetViewportRect().Size.X - cols * (cardW + 8)) / 2;
+        float gridStartX = (GetViewport().GetVisibleRect().Size.X - cols * (cardW + 8)) / 2;
         float gridStartY = 100;
 
         for (int i = 0; i < deck.Count; i++)
@@ -237,7 +237,7 @@ public partial class PostBattleReward : CanvasLayer
             var card = CreateCardFromSource(deckCard);
             card.Scale = new Vector2(0.58f, 0.58f);
             card.Position = new Vector2(gridStartX + col * (cardW + 8), gridStartY + row * (cardH + 4));
-            card.MouseFilter = MouseFilterEnum.Stop;
+            card.MouseFilter = Control.MouseFilterEnum.Stop;
             card.ZIndex = 50;
             AddChild(card);
             cardDisplays.Add(card);
@@ -247,7 +247,7 @@ public partial class PostBattleReward : CanvasLayer
             highlight.Position = card.Position;
             highlight.Size = new Vector2(cardW, cardH);
             highlight.Color = new Color(0, 0, 0, 0);
-            highlight.MouseFilter = MouseFilterEnum.Ignore;
+            highlight.MouseFilter = Control.MouseFilterEnum.Ignore;
             highlight.ZIndex = 49;
             AddChild(highlight);
             highlightRects.Add(highlight);
@@ -264,7 +264,7 @@ public partial class PostBattleReward : CanvasLayer
         float btnY = gridStartY + ((deck.Count - 1) / cols + 1) * (cardH + 4) + 20;
         var confirmBtn = new Button();
         confirmBtn.Text = $"确认替换（需选{MaxSwapCards}张）";
-        confirmBtn.Position = new Vector2(GetViewportRect().Size.X / 2 - 90, btnY);
+        confirmBtn.Position = new Vector2(GetViewport().GetVisibleRect().Size.X / 2 - 90, btnY);
         confirmBtn.Size = new Vector2(180, 44);
         confirmBtn.Disabled = true;
         AddChild(confirmBtn);
@@ -330,7 +330,7 @@ public partial class PostBattleReward : CanvasLayer
         var bg = new ColorRect();
         bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         bg.Color = new Color(0, 0, 0, 0.75f);
-        bg.MouseFilter = MouseFilterEnum.Stop;
+        bg.MouseFilter = Control.MouseFilterEnum.Stop;
         return bg;
     }
 
