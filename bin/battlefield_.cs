@@ -199,6 +199,10 @@ public partial class battlefield_ : Control
                 if (card.isDiscarding)
                     continue;
 
+                // 跳过已临时Reparent到其他节点的卡（如ShowCardChoice期间）
+                if (card.GetParent() != this)
+                    continue;
+
                 MoveChild(card, 1);
 
                 if (isShowingChoiceUI && choiceCards != null && choiceCards.Contains(card))
