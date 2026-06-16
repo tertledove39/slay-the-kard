@@ -564,7 +564,7 @@ TextureButton buttonNextTurn;
         {
             var card = choiceCards[i];
             AddToBattleField(card);
-            choiceLayer.AddChild(card);
+            card.Reparent(choiceLayer);
         
             // 计算卡牌目标位置：屏幕中心水平排列，垂直居中
             float xPos = startX + i * (cardWidth + cardSpacing) - 90;
