@@ -2825,14 +2825,14 @@ InputState currentInputState = InputState.nil;
         RefreshAllBeGuardianedStatus(); // 单位离场后刷新被守护状态
     }
 
-    private int _discardZCounter = 50;
+    private int _discardZCounter = 90;
 
     /// <summary>
-    /// 播放弃牌动画并在完成后移除（fire-and-forget，Z-index递增确保后弃置的在上方）
+    /// 播放弃牌动画并在完成后移除（fire-and-forget，Z-index递减确保后弃置的在上方）
     /// </summary>
     public async Task CardDiscardAndRemove(cardBase_ card)
     {
-        card.ZIndex = _discardZCounter++;
+        card.ZIndex = _discardZCounter--;
         await card.DiscardCard();
         RemoveCard(card);
     }
