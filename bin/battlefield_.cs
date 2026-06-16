@@ -2826,6 +2826,15 @@ InputState currentInputState = InputState.nil;
     }
 
     /// <summary>
+    /// 播放弃牌动画并在完成后移除（用于fire-and-forget模式）
+    /// </summary>
+    public async Task CardDiscardAndRemove(cardBase_ card)
+    {
+        await card.DiscardCard();
+        RemoveCard(card);
+    }
+
+    /// <summary>
     /// 高亮合法的攻击目标，其他单位变成灰色
     /// </summary>
     public void HighlightValidAttackTargets(cardBase_ attacker)
@@ -4671,8 +4680,8 @@ public class Player
         if (cardsInHand.Count >= maxHandSize)
         {
             battlefield.AddToBattleField(card);
-            await card.DiscardCard();
-            battlefield.RemoveCard(card);
+            _ = battlefield.CardDiscardAndRemove(card);
+            await Task.Delay(1000);
             return;
         }
         if(!cardsInHand.Contains(card))
@@ -4701,8 +4710,8 @@ public class Player
             _card.SetCardInformation(card);
             _card.SetIsFriend(isFriend);
             battlefield.AddToBattleField(_card);
-            await _card.DiscardCard();
-            battlefield.RemoveCard(_card);
+            _ = battlefield.CardDiscardAndRemove(_card);
+            await Task.Delay(1000);
             return;
         }
 
@@ -4724,7 +4733,7 @@ public class Player
         battlefield.AddToBattleField(newCard);
         newCard.setState(CardState.inHand);
         RefreshMyHand();
-        return Task.CompletedTask;
+        return;
     }
 
     public void RemoveFromHand(cardBase_ card)
@@ -4957,8 +4966,8 @@ public class Player
             if (cardsInHand.Count >= maxHandSize)
             {
                 battlefield.AddToBattleField(card);
-                await card.DiscardCard();
-                battlefield.RemoveCard(card);
+                _ = battlefield.CardDiscardAndRemove(card);
+                await Task.Delay(1000);
                 return;
             }
             card.SetPosition(new Godot.Vector2(-2000, 800));
