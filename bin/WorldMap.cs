@@ -42,10 +42,11 @@ public partial class WorldMap : Control
 
     public override void _Input(InputEvent @event)
     {
-        // 按 ` 键切换控制台
+        // 按 ` 键切换控制台，吞掉事件防止字符残留
         if (@event is InputEventKey keyEvent && keyEvent.Pressed && keyEvent.Keycode == Key.Quoteleft)
         {
             ToggleConsole();
+            AcceptEvent();
         }
         // Tab 自动补全
         if (@event is InputEventKey tabEvent && tabEvent.Pressed && tabEvent.Keycode == Key.Tab && _consoleVisible)
@@ -116,9 +117,8 @@ public partial class WorldMap : Control
         foreach (var kv in _areaButtons)
         {
             bool unlocked = BattleStateManager.IsAreaUnlocked(kv.Key);
-            kv.Value.Disabled = !unlocked;
-            // 锁定区域呈灰色半透明，解锁区域正常显示
-            kv.Value.Modulate = unlocked ? Colors.White : new Color(0.4f, 0.4f, 0.4f, 0.6f);
+            // 锁定区域隐藏，解锁区域正常显示
+            kv.Value.Visible = unlocked;
         }
     }
 
@@ -197,7 +197,11 @@ public partial class WorldMap : Control
         _consoleVisible = !_consoleVisible;
         _consolePanel.Visible = _consoleVisible;
         if (_consoleOutput != null) _consoleOutput.Visible = _consoleVisible;
-        if (_consoleVisible) _consoleInput.GrabFocus();
+        if (_consoleVisible)
+        {
+            _consoleInput.Clear();
+            _consoleInput.GrabFocus();
+        }
     }
 
     private void CreateConsole()
