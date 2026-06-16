@@ -32,6 +32,7 @@ public partial class WorldMap : Control
 
     public override void _Ready()
     {
+        LoadEvents();
         LoadAreaPools();
         ConnectAreaButtons();
         RefreshAreaStates();
@@ -130,7 +131,8 @@ public partial class WorldMap : Control
     }
 
     /// <summary>
-    /// 加载区域敌人池配置文件
+    /// 加载区域任务池配置文件（支持敌人和事件混合条目）
+    /// 敌人条目直接存储ID，事件条目以 "event:事件ID" 格式存储
     /// </summary>
     private void LoadAreaPools()
     {
@@ -151,19 +153,54 @@ public partial class WorldMap : Control
         foreach (var section in configFile)
         {
             var areaName = section.Key;
-            var enemies = new List<string>();
+            var entries = new List<string>();
             var keys = configFile.GetSectionKeys(areaName);
             foreach (var key in keys)
             {
-                var enemyId = configFile[areaName][key].ToString().Trim();
-                if (!string.IsNullOrEmpty(enemyId) && !enemies.Contains(enemyId))
-                    enemies.Add(enemyId);
+                var val = configFile[areaName][key].ToString().Trim();
+                if (!string.IsNullOrEmpty(val) && !entries.Contains(val))
+                    entries.Add(val);
             }
-            if (enemies.Count > 0)
-                _areaPools[areaName] = enemies;
+            if (entries.Count > 0)
+                _areaPools[areaName] = entries;
         }
 
         GD.Print($"Loaded area pools: {_areaPools.Count} areas");
+    }
+
+    /// <summary>加载event.ini并缓存到BattleStateManager</summary>
+    private static void LoadEvents()
+    {
+        var iniPath = "res://bin/event.ini";
+        if (!Godot.FileAccess.FileExists(iniPath)) return;
+        var configFile = new IniFile();
+        configFile.Load(iniPath);
+        var events = new Dictionary<string, EventData>();
+
+        foreach (var section in configFile)
+        {
+            var ev = new EventData { Id = section.Key };
+            ev.Title = configFile[section.Key]["title"].ToString().Trim();
+            ev.Image = configFile[section.Key]["image"].ToString().Trim();
+            ev.Description = configFile[section.Key]["description"].ToString().Trim();
+
+            for (int i = 1; i <= 4; i++)
+            {
+                var textKey = $"choice{i}_text";
+                var effectKey = $"choice{i}_effect";
+                var text = configFile[section.Key][textKey].ToString().Trim();
+                if (string.IsNullOrEmpty(text)) break;
+                ev.Choices.Add(new EventChoice
+                {
+                    Text = text,
+                    Effect = configFile[section.Key][effectKey].ToString().Trim()
+                });
+            }
+            events[ev.Id] = ev;
+        }
+
+        BattleStateManager.CacheAllEvents(events);
+        GD.Print($"Loaded {events.Count} events from event.ini");
     }
 
     /// <summary>
@@ -197,7 +234,7 @@ public partial class WorldMap : Control
     }
 
     /// <summary>
-    /// 点击区域按钮：随机抽取3个不同的敌人，弹出选择界面
+    /// 点击区域按钮：随机抽取3个不同的任务条目（敌人或事件），弹出选择界面
     /// </summary>
     private void OnAreaPressed(string areaName)
     {
@@ -213,43 +250,60 @@ public partial class WorldMap : Control
 
         if (!_areaPools.TryGetValue(areaName, out var pool) || pool.Count == 0)
         {
-            GD.Print($"No enemy pool for area: {areaName}");
+            GD.Print($"No pool for area: {areaName}");
             return;
         }
 
         var candidates = new List<string>(pool);
-        var selected = PickRandomEnemies(candidates, 3);
+        var selectedIds = PickRandomEntries(candidates, 3);
 
-        if (selected.Count < 3)
+        if (selectedIds.Count < 1)
         {
-            GD.Print($"Not enough enemies in pool for {areaName}");
+            GD.Print($"Not enough entries in pool for {areaName}");
             return;
         }
+
+        // 将选中的ID转换为MissionEntry
+        var entries = selectedIds.Select(id => ParseEntry(id)).ToList();
 
         _chooseMissionPanel = _chooseMissionScene.Instantiate() as ChooseMission;
         if (_chooseMissionPanel != null)
         {
-            _chooseMissionPanel.SetEnemies(selected[0], selected[1], selected[2]);
+            _chooseMissionPanel.SetEntries(entries, areaName);
             _chooseMissionPanel.SetAnchorsPreset(LayoutPreset.FullRect);
             _chooseMissionPanel.ZIndex = 200;
             AddChild(_chooseMissionPanel);
 
-            // 半透明黑色背景遮罩
             var bg = new ColorRect();
             bg.SetAnchorsPreset(LayoutPreset.FullRect);
             bg.Color = new Color(0, 0, 0, 0.75f);
             bg.MouseFilter = MouseFilterEnum.Stop;
             _chooseMissionPanel.AddChild(bg);
             _chooseMissionPanel.MoveChild(bg, 0);
-
-            GD.Print($"Opened ChooseMission for {areaName}: {selected[0]}, {selected[1]}, {selected[2]}");
         }
     }
 
-    /// <summary>
-    /// 从候选列表中随机抽取count个互不相同的敌人
-    /// </summary>
-    private static List<string> PickRandomEnemies(List<string> pool, int count)
+    /// <summary>将池中的ID字符串解析为MissionEntry（"event:xxx"为事件，其余为敌人）</summary>
+    private static MissionEntry ParseEntry(string id)
+    {
+        if (id.StartsWith("event:"))
+        {
+            var eventId = id["event:".Length..];
+            var ev = BattleStateManager.GetEvent(eventId);
+            return new MissionEntry
+            {
+                Id = eventId,
+                DisplayName = ev != null ? ev.Title : eventId,
+                Type = MissionType.Event
+            };
+        }
+        // 敌人条目
+        var enemyName = BattleStateManager.EnemyDisplayNames.TryGetValue(id, out var name) ? name : id;
+        return new MissionEntry { Id = id, DisplayName = enemyName, Type = MissionType.Battle };
+    }
+
+    /// <summary>从候选列表中随机抽取count个互不相同的条目</summary>
+    private static List<string> PickRandomEntries(List<string> pool, int count)
     {
         var shuffled = new List<string>(pool);
         var rng = new Random();
@@ -260,6 +314,7 @@ public partial class WorldMap : Control
         }
         return shuffled.Take(Math.Min(count, shuffled.Count)).ToList();
     }
+
 
     // ============================================================
     // 控制台功能

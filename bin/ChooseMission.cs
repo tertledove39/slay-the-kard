@@ -1,68 +1,72 @@
 using Godot;
 using System;
+using System.Collections.Generic;
 
 /// <summary>
-/// 选择任务界面控制器：显示3个敌人按钮，玩家选择一个进入战斗
+/// 任务类型：战斗或事件
+/// </summary>
+public enum MissionType { Battle, Event }
+
+/// <summary>
+/// 任务条目：标识符(ID)、显示名称、类型
+/// </summary>
+public struct MissionEntry
+{
+    public string Id;
+    public string DisplayName;
+    public MissionType Type;
+}
+
+/// <summary>
+/// 选择任务界面控制器：显示3个按钮，玩家选择进入战斗或事件
 /// </summary>
 public partial class ChooseMission : Control
 {
-    private Label _label1;
-    private Label _label2;
-    private Label _label3;
-    private TextureButton _btn1;
-    private TextureButton _btn2;
-    private TextureButton _btn3;
-
-    private string _enemy1;
-    private string _enemy2;
-    private string _enemy3;
+    private Label _label1, _label2, _label3;
+    private TextureButton _btn1, _btn2, _btn3;
+    private List<MissionEntry> _entries = new();
+    private string _areaName;
 
     public override void _Ready()
     {
-        // 获取按钮
         _btn1 = GetNode<TextureButton>("TextureButton");
         _btn2 = GetNode<TextureButton>("TextureButton2");
         _btn3 = GetNode<TextureButton>("TextureButton3");
 
-        // 创建按钮上方的敌人名称标签
-        _label1 = CreateEnemyLabel(_btn1, new Vector2(0, -80));
-        _label2 = CreateEnemyLabel(_btn2, new Vector2(0, -80));
-        _label3 = CreateEnemyLabel(_btn3, new Vector2(0, -80));
+        _label1 = CreateLabel(_btn1, new Vector2(0, -80));
+        _label2 = CreateLabel(_btn2, new Vector2(0, -80));
+        _label3 = CreateLabel(_btn3, new Vector2(0, -80));
 
-        // 连接按钮信号
-        _btn1.Pressed += OnChoose1Pressed;
-        _btn2.Pressed += OnChoose2Pressed;
-        _btn3.Pressed += OnChoose3Pressed;
+        _btn1.Pressed += () => OnChoose(0);
+        _btn2.Pressed += () => OnChoose(1);
+        _btn3.Pressed += () => OnChoose(2);
 
-        // 从BattleStateManager读取已选定的敌人
-        ApplyEnemyNames();
+        ApplyNames();
     }
 
-    /// <summary>
-    /// 由WorldMap在打开本界面之前调用，设置3个候选敌人
-    /// </summary>
-    public void SetEnemies(string enemy1, string enemy2, string enemy3)
+    /// <summary>设置任务条目列表和区域名，并刷新显示</summary>
+    public void SetEntries(List<MissionEntry> entries, string areaName)
     {
-        _enemy1 = enemy1;
-        _enemy2 = enemy2;
-        _enemy3 = enemy3;
+        _entries = entries ?? new();
+        _areaName = areaName;
+        ApplyNames();
     }
 
-    private void ApplyEnemyNames()
+    private void ApplyNames()
     {
-        if (_label1 != null && !string.IsNullOrEmpty(_enemy1))
-            _label1.Text = GetDisplayName(_enemy1);
-        if (_label2 != null && !string.IsNullOrEmpty(_enemy2))
-            _label2.Text = GetDisplayName(_enemy2);
-        if (_label3 != null && !string.IsNullOrEmpty(_enemy3))
-            _label3.Text = GetDisplayName(_enemy3);
+        var labels = new[] { _label1, _label2, _label3 };
+        for (int i = 0; i < labels.Length && i < _entries.Count; i++)
+        {
+            if (labels[i] != null)
+                labels[i].Text = _entries[i].DisplayName;
+        }
     }
 
-    private static Label CreateEnemyLabel(TextureButton button, Vector2 offset)
+    private static Label CreateLabel(TextureButton button, Vector2 offset)
     {
         var label = new Label();
         label.HorizontalAlignment = HorizontalAlignment.Center;
-        label.AddThemeFontSizeOverride("font_size", 28);
+        label.AddThemeFontSizeOverride("font_size", 26);
         label.AddThemeColorOverride("font_color", Colors.White);
         label.Size = new Vector2(button.Size.X, 60);
         label.Position = button.Position + offset;
@@ -70,36 +74,36 @@ public partial class ChooseMission : Control
         return label;
     }
 
-    private void OnChoose1Pressed()
+    private void OnChoose(int index)
     {
-        StartBattle(_enemy1);
-    }
+        if (index < 0 || index >= _entries.Count) return;
+        var entry = _entries[index];
+        if (string.IsNullOrEmpty(entry.Id)) return;
 
-    private void OnChoose2Pressed()
-    {
-        StartBattle(_enemy2);
-    }
-
-    private void OnChoose3Pressed()
-    {
-        StartBattle(_enemy3);
+        if (entry.Type == MissionType.Event)
+        {
+            StartEvent(entry.Id);
+        }
+        else
+        {
+            StartBattle(entry.Id);
+        }
     }
 
     private void StartBattle(string enemyId)
     {
-        if (string.IsNullOrEmpty(enemyId)) return;
-
         BattleStateManager.SelectedEnemy = enemyId;
         BattleStateManager.IsCampaignMode = true;
-
-        // 切换到战斗场景
         GetTree().ChangeSceneToFile("res://bin/battleField.tscn");
     }
 
-    private static string GetDisplayName(string enemyId)
+    private async void StartEvent(string eventId)
     {
-        if (BattleStateManager.EnemyDisplayNames.TryGetValue(enemyId, out var name))
-            return name;
-        return enemyId;
+        // 加载事件数据
+        var eventData = BattleStateManager.GetEvent(eventId);
+        if (eventData == null) return;
+
+        // 打开事件界面（CanvasLayer叠加在当前场景上）
+        await EventScene.Show(this, eventData, _areaName);
     }
 }

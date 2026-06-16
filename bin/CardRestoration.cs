@@ -42,6 +42,8 @@ public static class BattleStateManager
     public static bool IsDeckInitialized { get; set; } = false;
     /// <summary>所有卡牌的CardData缓存（card.ini解析结果，跨场景复用）</summary>
     private static Dictionary<string, CardData> _allCards;
+    /// <summary>所有事件数据缓存（event.ini解析结果）</summary>
+    private static Dictionary<string, EventData> _allEvents;
 
     /// <summary>缓存所有卡牌数据，供跨场景访问</summary>
     public static void CacheAllCards(Dictionary<string, CardData> cards)
@@ -55,6 +57,21 @@ public static class BattleStateManager
     {
         if (_allCards != null && _allCards.TryGetValue(id, out var card))
             return card;
+        return null;
+    }
+
+    /// <summary>缓存所有事件数据</summary>
+    public static void CacheAllEvents(Dictionary<string, EventData> events)
+    {
+        if (events != null && events.Count > 0)
+            _allEvents = events;
+    }
+
+    /// <summary>根据ID获取事件数据</summary>
+    public static EventData GetEvent(string id)
+    {
+        if (_allEvents != null && _allEvents.TryGetValue(id, out var ev))
+            return ev;
         return null;
     }
 
