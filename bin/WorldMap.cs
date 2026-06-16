@@ -184,20 +184,20 @@ public partial class WorldMap : Control
         foreach (var section in configFile)
         {
             var ev = new EventData { Id = section.Key };
-            ev.Title = configFile[section.Key]["title"].ToString().Trim();
-            ev.Image = configFile[section.Key]["image"].ToString().Trim();
-            ev.Description = configFile[section.Key]["description"].ToString().Trim();
+            ev.Title = configFile[section.Key]["title"].GetString();
+            ev.Image = configFile[section.Key]["image"].GetString();
+            ev.Description = configFile[section.Key]["description"].GetString();
 
             for (int i = 1; i <= 4; i++)
             {
                 var textKey = $"choice{i}_text";
                 var effectKey = $"choice{i}_effect";
-                var text = configFile[section.Key][textKey].ToString().Trim();
+                var text = configFile[section.Key][textKey].GetString();
                 if (string.IsNullOrEmpty(text)) break;
                 ev.Choices.Add(new EventChoice
                 {
                     Text = text,
-                    Effect = configFile[section.Key][effectKey].ToString().Trim()
+                    Effect = configFile[section.Key][effectKey].GetString()
                 });
             }
             events[ev.Id] = ev;
