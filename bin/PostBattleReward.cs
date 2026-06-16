@@ -325,9 +325,12 @@ public partial class PostBattleReward : CanvasLayer
             card.ZIndex = 10;
             cardDisplays.Add(card);
 
-            // 高亮框（置于卡牌下方）
+            // 因卡牌pivot在中心(90,120)，缩放后视觉左上角偏移，高亮框/点击覆盖需同步偏移
+            Vector2 cvOff = GetCardPivotOffset(DeckReplaceScale);
+
+            // 高亮框（置于卡牌下方，位置需加上pivot偏移以对齐卡牌视觉位置）
             var highlight = new ColorRect();
-            highlight.Position = new Vector2(x, y);
+            highlight.Position = new Vector2(x, y) + cvOff;
             highlight.Size = new Vector2(cardW, cardH);
             highlight.Color = new Color(0, 0, 0, 0);
             highlight.MouseFilter = Control.MouseFilterEnum.Ignore;
@@ -335,9 +338,9 @@ public partial class PostBattleReward : CanvasLayer
             cardContainer.AddChild(highlight);
             highlightRects.Add(highlight);
 
-            // 透明点击覆盖层（无子节点，确保点击事件可靠捕获）
+            // 透明点击覆盖层（位置需加上pivot偏移以对齐卡牌视觉位置）
             var clickArea = new ColorRect();
-            clickArea.Position = new Vector2(x, y);
+            clickArea.Position = new Vector2(x, y) + cvOff;
             clickArea.Size = new Vector2(cardW, cardH);
             clickArea.Color = new Color(0, 0, 0, 0);
             clickArea.MouseFilter = Control.MouseFilterEnum.Stop;
@@ -414,6 +417,18 @@ public partial class PostBattleReward : CanvasLayer
         // 同步到BattleStateManager
         if (BattleStateManager.IsCampaignMode)
             BattleStateManager.Deck = deck;
+    }
+
+    /// <summary>
+    /// 卡牌pivot位于中心(90,120)，缩放后视觉左上角偏移 = pivot * (1 - Scale)。
+    /// 高亮框/点击覆盖层需加上此偏移才能与卡牌视觉位置对齐。
+    /// 参考battlefield_中 arrowOffset = Vector2(90, 120) 的偏移设计。
+    /// </summary>
+    private static Vector2 GetCardPivotOffset(float scale)
+    {
+        float pivotX = CardDisplayWidth / 2f;
+        float pivotY = CardDisplayHeight / 2f;
+        return new Vector2(pivotX * (1f - scale), pivotY * (1f - scale));
     }
 
     // ============================ UI辅助 ============================
