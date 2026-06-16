@@ -131,19 +131,28 @@ public static class BattleStateManager
 
     /// <summary>
     /// 以CanvasLayer叠加显示卡组查看界面。
-    /// 使用传入的cardBase_列表渲染，不依赖场景中Player的deck状态。
+    /// 将展示用卡牌挂到holder上确保Godot管理其生命周期，DisplayCard关闭时一并清理。
     /// </summary>
     public static void ShowDeckViewer(Node parent, List<cardBase_> deckCards)
     {
-        // DisplayCard._Ready 从 Deck 属性读取卡组，需先设置
-        Deck = deckCards ?? new List<cardBase_>();
+        deckCards ??= new();
+        Deck = deckCards;
 
         var canvasLayer = new CanvasLayer();
         canvasLayer.Layer = 2;
         parent.AddChild(canvasLayer);
 
+        // 将展示卡牌挂到不可见holder上，确保Godot统一管理生命周期（避免GC时native handle失效）
+        var holder = new Control { Visible = false, MouseFilter = Control.MouseFilterEnum.Ignore };
+        canvasLayer.AddChild(holder);
+        foreach (var card in deckCards)
+            holder.AddChild(card);
+
         var displayScene = ResourceLoader.Load<PackedScene>("res://bin/display_card.tscn");
         var display = displayScene.Instantiate() as DisplayCard;
         canvasLayer.AddChild(display);
+
+        // DisplayCard关闭时清理整个CanvasLayer（holder及其中的display cards一起释放）
+        display.TreeExiting += () => canvasLayer.QueueFree();
     }
 }
