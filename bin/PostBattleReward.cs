@@ -15,10 +15,10 @@ public partial class PostBattleReward : CanvasLayer
     private List<CardData> _chosenGroup;
     private readonly HashSet<cardBase_> _selectedToRemove = new();
 
-    private const float CardDisplayScale = 0.65f; // 奖励组选择界面卡牌缩放
+    private const float CardDisplayScale = 0.75f; // 奖励组选择界面卡牌缩放
     private const float CardDisplayWidth = 180f;
     private const float CardDisplayHeight = 240f;
-    private const float DeckReplaceScale = 0.7f;  // 替换界面卡牌缩放
+    private const float DeckReplaceScale = 0.75f;  // 替换界面卡牌缩放（与组选择一致）
     private const int GroupsCount = 3;
     private const int CardsPerGroup = 5;
     private const int MaxSwapCards = 5;
@@ -261,8 +261,8 @@ public partial class PostBattleReward : CanvasLayer
             float x = gridStartX + col * (cardW + cardGapX);
             float y = 10 + row * (cardH + cardGapY);
 
-            // 卡牌显示（忽略鼠标，仅作视觉展示）
-            var card = CreateCardFromSource(deckCard);
+            // 使用Duplicate复制牌库卡牌，保留完整视觉状态（与DisplayCard一致）
+            var card = deckCard.Duplicate() as cardBase_;
             card.Scale = new Vector2(DeckReplaceScale, DeckReplaceScale);
             card.Position = new Vector2(x, y);
             card.MouseFilter = Control.MouseFilterEnum.Ignore;
@@ -380,30 +380,4 @@ public partial class PostBattleReward : CanvasLayer
         return lb;
     }
 
-    private cardBase_ CreateCardFromSource(cardBase_ source)
-    {
-        var card = _cardRes.Instantiate() as cardBase_;
-        // 尝试从CardMaganer获取完整数据，否则手动构建
-        var cd = _bf.GetCardMaganer().GetCard(source.id);
-        if (cd != null)
-        {
-            card.SetCardInformation(cd);
-        }
-        else
-        {
-            card.name = source.name;
-            card.id = source.id;
-            card.description = source.description;
-            card.cardType = source.cardType;
-            card.rarity = source.rarity;
-            card.traits = source.traits;
-            card.cost = source.ReadCost();
-            card.attack = source.ReadAttack();
-            card.defence = source.ReadDefence();
-            card.effect = source.effect;
-        }
-        card.SetIsFriend(IsFriend.friend);
-        card.ZIndex = 50;
-        return card;
-    }
 }
