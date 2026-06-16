@@ -4716,7 +4716,7 @@ public class Player
         }
 
         if (newCard == null)
-            return Task.CompletedTask;
+            return;
 
         newCard.SetCardInformation(card);
         newCard.SetIsFriend(isFriend);
