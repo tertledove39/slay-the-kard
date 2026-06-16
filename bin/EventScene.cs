@@ -48,10 +48,10 @@ public partial class EventScene : CanvasLayer
         imgRect.Position = new Vector2(startX, startY);
         imgRect.Size = new Vector2(ImageWidth, ImageHeight);
         imgRect.StretchMode = TextureRect.StretchModeEnum.Scale;
-        if (ResourceLoader.Exists(_event.Image))
+        if (Godot.FileAccess.FileExists(_event.Image))
             imgRect.Texture = ResourceLoader.Load<Texture2D>(_event.Image);
         else
-            imgRect.Color = new Color(0.3f, 0.3f, 0.3f);
+            imgRect.SelfModulate = new Color(0.3f, 0.3f, 0.3f);
         AddChild(imgRect);
 
         // --- 上方标题栏 ---
