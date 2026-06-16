@@ -882,6 +882,8 @@ public partial class cardBase_ : Control
             names.Append("免疫 ");
         if ((traits & UnitTraits.Mobilize) != 0)
             names.Append("动员 ");
+        if ((traits & UnitTraits.SharedHatred) != 0)
+            names.Append("同仇 ");
 
         if (names.Length == 0) return "";
         // 去除末尾空格
@@ -1013,6 +1015,7 @@ public partial class cardBase_ : Control
         UnitTraits.Ambush => "伏击：被攻击时先造成反击伤害",
         UnitTraits.Immunity => "免疫：不受到战斗伤害",
         UnitTraits.Mobilize => "动员：友方回合开始时+1+1，受伤后消失",
+        UnitTraits.SharedHatred => "同仇：被指向时，其他友方同仇单位+1+1",
         _ => ""
     };
 
@@ -1649,7 +1652,9 @@ public enum UnitTraits
     /// <summary>免疫：不受到战斗伤害</summary>
     Immunity = 1 << 7,
     /// <summary>动员：友方回合开始时+1攻击+1防御，受到伤害后消失</summary>
-    Mobilize = 1 << 8
+    Mobilize = 1 << 8,
+    /// <summary>同仇：被指向时，所有其他友方同仇单位+1攻击+1防御</summary>
+    SharedHatred = 1 << 9
 }
 
 
@@ -1744,7 +1749,7 @@ public static class IconCache
         "action", "Determination", "Guardian",
         "greenLight", "yellowLight", "redLight",
         "blitz", "mobilize", "smoke", "impact",
-        "ambush", "heavyArmour", "beGuardianed"
+        "ambush", "heavyArmour", "beGuardianed", "hatred"
     };
 
     // trait -> icon 映射
@@ -1759,6 +1764,7 @@ public static class IconCache
         { UnitTraits.Ambush, "ambush" },
         { UnitTraits.Immunity, "Immunity" },
         { UnitTraits.Mobilize, "mobilize" },
+        { UnitTraits.SharedHatred, "hatred" },
     };
 
     public static void Init()

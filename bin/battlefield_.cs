@@ -1219,6 +1219,8 @@ InputState currentInputState = InputState.nil;
                         {
                             // 触发被指向时点
                             _ = TriggerUnitEffects("BePicked", result.GetMyCard(), new List<cardBase_> { cardNowChoose }, checkOnlySourceCard: true);
+                            // 同仇特性：被指向时友方同仇单位+1+1
+                            _ = TriggerSharedHatred(result.GetMyCard());
                              _ = ParseAndExecuteEffect(cardNowChoose.effect, cardNowChoose, [result.GetMyCard()]);
                             CheckIfAnyUnitDiedAsync(); // 结算单位变化
                             cardNowChoose = null;
@@ -1685,6 +1687,9 @@ InputState currentInputState = InputState.nil;
 
         // 触发被指向时点（目标被选为攻击对象）
         await TriggerUnitEffects("BePicked", to, new List<cardBase_> { from }, checkOnlySourceCard: true);
+
+        // 同仇特性：被指向时友方同仇单位+1+1
+        await TriggerSharedHatred(to);
 
         // 触发攻击者的 Attacking 效果
         await TriggerUnitEffects("Attacking", from, new List<cardBase_> { to }, checkOnlySourceCard: true);
@@ -2854,6 +2859,33 @@ InputState currentInputState = InputState.nil;
         cardInPlaces.Remove(card);
         card.Dead();
         RefreshAllBeGuardianedStatus(); // 单位离场后刷新被守护状态
+    }
+
+    /// <summary>
+    /// 同仇特性：当拥有同仇的单位被指向时，使所有其他友方同仇单位获得+1攻击+1防御
+    /// </summary>
+    private async Task TriggerSharedHatred(cardBase_ targetedUnit)
+    {
+        if (targetedUnit == null) return;
+        if (!targetedUnit.HasTrait(UnitTraits.SharedHatred)) return;
+
+        var sameSide = targetedUnit.GetIsFriend();
+        var sharedHatredUnits = ReadCardInPlaces()
+            .Where(x => x.getState() == CardState.placed
+                     && x.GetIsFriend() == sameSide
+                     && x.HasTrait(UnitTraits.SharedHatred)
+                     && x != targetedUnit)
+            .ToList();
+
+        if (sharedHatredUnits.Count == 0) return;
+
+        foreach (var unit in sharedHatredUnits)
+        {
+            unit.AddChange(ChangeType.GetAttack, 1);
+            unit.AddChange(ChangeType.GetDefence, 1);
+        }
+
+        await ExecuteChangeLists();
     }
 
     private int _discardZCounter = 50;

@@ -8,6 +8,10 @@
 - 单位具有特性（闪击、奋战、重甲、烟幕、守护、冲击、伏击、免疫）
 
 ## 最新修改 (2026-06-16)
+- 新增"同仇"(SharedHatred)特性：拥有同仇的单位被指向时，所有其他友方同仇单位获得+1攻击+1防御
+  - 被指向判定：友方指令点选目标时 / 敌方单位攻击选为目标时（复用已有 BePicked 时点）
+  - icon=hatred，已添加到 IconCache/KnownIcons/TraitIcons 映射
+  - AddTrait/RemoveTrait 通过 Enum.TryParse 自动支持新 trait
 - 指挥点数显示改为电表式滚动效果：每个数位独立裁剪窗口+垂直数字滚条+Tween动画，低位先动高位级联
 - 新增 MeterLabel 组件（bin/MeterLabel.cs），可复用于任意需要数字滚动动画的场景
 - 移除旧的 RollLabelNumber 逐步计数方法，统一使用 MeterLabel.AnimateTo
