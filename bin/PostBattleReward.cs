@@ -195,7 +195,7 @@ public partial class PostBattleReward : CanvasLayer
 
     /// <summary>
     /// 在一行中横向创建一组5张缩小版卡牌显示。
-    /// 确保先加入场景树再设置信息，避免字体/布局测量错误导致渲染错位。
+    /// 确保先入树、重置锚点、再设置信息，避免模板锚点导致渲染错位。
     /// </summary>
     private List<cardBase_> CreateGroupCardRow(List<CardData> group, float startX, float startY, Node parent)
     {
@@ -205,6 +205,9 @@ public partial class PostBattleReward : CanvasLayer
         for (int i = 0; i < group.Count; i++)
         {
             var card = _bf.GetCardMaganer().GetCardTemplate().Duplicate() as cardBase_;
+            // 重置模板继承的锚点，切换为固定位置/尺寸模式
+            card.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
+            card.Size = new Vector2(CardDisplayWidth, CardDisplayHeight);
             parent.AddChild(card); // 先入场景树触发_Ready，确保字体测量可用
             card.SetCardInformation(group[i]); // SetCardInformation内部已调用RefreshState
             card.SetIsFriend(IsFriend.friend);
@@ -295,8 +298,10 @@ public partial class PostBattleReward : CanvasLayer
             float x = gridStartX + col * (cardW + cardGapX);
             float y = 10 + row * (cardH + cardGapY);
 
-            // 先加入场景树触发_Ready，再设置卡牌信息，确保字体测量/布局正确
+            // 先重置模板锚点→入树→再设置信息，确保渲染位置与高亮框对齐
             var card = _bf.GetCardMaganer().GetCardTemplate().Duplicate() as cardBase_;
+            card.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
+            card.Size = new Vector2(CardDisplayWidth, CardDisplayHeight);
             cardContainer.AddChild(card); // 先入树，originalScale记录为1.0
 
             var cd = _bf.GetCardMaganer().GetCard(deckCard.id);
@@ -399,6 +404,8 @@ public partial class PostBattleReward : CanvasLayer
         foreach (var cardData in _chosenGroup)
         {
             var newCard = _bf.GetCardMaganer().GetCardTemplate().Duplicate() as cardBase_;
+            newCard.SetAnchorsPreset(Control.LayoutPreset.TopLeft); // 重置模板锚点
+            newCard.Size = new Vector2(CardDisplayWidth, CardDisplayHeight);
             newCard.SetCardInformation(cardData);
             newCard.SetIsFriend(IsFriend.friend);
             deck.Add(newCard);
