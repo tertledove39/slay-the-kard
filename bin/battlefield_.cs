@@ -193,9 +193,11 @@ public partial class battlefield_ : Control
                     continue;
 
                 if (card == cardNowChoose)
-                {
                     continue;
-                }
+
+                // 弃牌动画中的卡不参与Z-index/子节点顺序重置
+                if (card.isDiscarding)
+                    continue;
 
                 MoveChild(card, 1);
 
@@ -2832,6 +2834,7 @@ InputState currentInputState = InputState.nil;
     /// </summary>
     public async Task CardDiscardAndRemove(cardBase_ card)
     {
+        card.isDiscarding = true;
         card.ZIndex = _discardZCounter--;
         await card.DiscardCard();
         RemoveCard(card);

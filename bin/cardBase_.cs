@@ -451,6 +451,7 @@ public partial class cardBase_ : Control
     }
 
     public int shouldBeRemoved = 0;
+    public bool isDiscarding = false; // 正在播放弃牌动画，不参与ZIndex重置
     List<Change> ChangeList = new List<Change>();
     public async Task ExecChangeList()
     {
