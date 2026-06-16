@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="新建游戏项目"
-run/main_scene="uid://evqf3f0uq3ao"
+run/main_scene="uid://d35dy87rvq1mc"
 config/features=PackedStringArray("4.5", "C#", "Mobile")
 run/max_fps=144
 config/icon="res://icon.svg"

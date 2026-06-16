@@ -3185,23 +3185,28 @@ InputState currentInputState = InputState.nil;
                 // foreach - 进入循环并保存当前 targets
                 if (ins == "foreach")
                 {
+                    var savedTargets = new List<cardBase_>(targets);
+
+                    // 空列表时跳过整个循环体，避免循环体内条件错误求值
+                    if (savedTargets.Count == 0)
+                    {
+                        int endIndex = FindMatchingEndAndForIndex(parts, i);
+                        if (endIndex > i)
+                        {
+                            // 跳转到End&之后（循环自增后为endIndex+1）
+                            i = endIndex;
+                        }
+                        continue;
+                    }
+
                     if (foreachStack.Count == 0)
                     {
                         // 记录进入第一层循环前的 targets，以便循环结束后恢复
                         preForeachTargets = new List<cardBase_>(targets);
                     }
 
-                    var savedTargets = new List<cardBase_>(targets);
                     foreachStack.Push((savedTargets, 0, i + 1));
-
-                    if (savedTargets.Count > 0)
-                    {
-                        targets = new List<cardBase_> { savedTargets[0] };
-                    }
-                    else
-                    {
-                        targets = new List<cardBase_>();
-                    }
+                    targets = new List<cardBase_> { savedTargets[0] };
 
                     continue;
                 }
@@ -4637,6 +4642,34 @@ InputState currentInputState = InputState.nil;
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// 查找与指定foreach指令匹配的End&指令索引，支持嵌套
+    /// </summary>
+    /// <param name="parts">已分割的效果指令数组</param>
+    /// <param name="foreachIndex">foreach指令在parts中的索引</param>
+    /// <returns>匹配的End&索引，若未找到则返回foreachIndex</returns>
+    private int FindMatchingEndAndForIndex(string[] parts, int foreachIndex)
+    {
+        int depth = 0;
+        for (int j = foreachIndex + 1; j < parts.Length; j++)
+        {
+            string p = parts[j].Trim().ToLowerInvariant();
+            if (p == "foreach")
+            {
+                depth++;
+            }
+            else if (p == "end&")
+            {
+                if (depth == 0)
+                {
+                    return j;
+                }
+                depth--;
+            }
+        }
+        return foreachIndex; // 未找到匹配的End&
     }
 
 }

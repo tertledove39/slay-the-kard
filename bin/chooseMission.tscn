@@ -1,6 +1,7 @@
 [gd_scene load_steps=3 format=3 uid="uid://dvbulsso8ffup"]
 
 [ext_resource type="Script" uid="uid://hn0wy5xlxby7" path="res://bin/ChooseMission.cs" id="1_ihdb6"]
+[ext_resource type="Texture2D" uid="uid://c17c0d6olkwms" path="res://assest/battleButton.png" id="2_r4pno"]
 
 [node name="Control" type="Control"]
 layout_mode = 3
@@ -13,22 +14,27 @@ script = ExtResource("1_ihdb6")
 
 [node name="TextureButton" type="TextureButton" parent="."]
 layout_mode = 0
-offset_left = 156.0
-offset_top = 181.0
-offset_right = 472.0
-offset_bottom = 680.0
+offset_left = 189.0
+offset_top = 233.0
+offset_right = 505.0
+offset_bottom = 732.0
+texture_normal = ExtResource("2_r4pno")
+stretch_mode = 0
 
 [node name="TextureButton2" type="TextureButton" parent="."]
 layout_mode = 0
-offset_left = 585.0
-offset_top = 196.0
-offset_right = 901.0
-offset_bottom = 695.0
+offset_left = 639.0
+offset_top = 233.0
+offset_right = 955.0
+offset_bottom = 732.0
+texture_normal = ExtResource("2_r4pno")
+stretch_mode = 0
 
 [node name="TextureButton3" type="TextureButton" parent="."]
 layout_mode = 0
-offset_left = 1080.0
-offset_top = 201.0
-offset_right = 1396.0
-offset_bottom = 700.0
-
+offset_left = 1089.0
+offset_top = 233.0
+offset_right = 1405.0
+offset_bottom = 732.0
+texture_normal = ExtResource("2_r4pno")
+stretch_mode = 0
