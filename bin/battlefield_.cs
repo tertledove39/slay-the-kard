@@ -454,8 +454,12 @@ TextureButton buttonNextTurn;
         enemyHq = cardMaganer.LoadHq(2);
         AddCardToPlace(enemyHq,enemySupprotLine[2]);
         
-        // 加载敌方行动队列
-        LoadEnemyActionQueue("berlin");
+        // 加载敌方行动队列（战役模式从BattleStateManager读取，否则默认berlin）
+        string enemyPreset = BattleStateManager.IsCampaignMode
+            ? BattleStateManager.SelectedEnemy
+            : "berlin";
+        LoadEnemyActionQueue(enemyPreset);
+        GD.Print($"Loaded enemy preset: {enemyPreset}");
 
         //初始化敌人
         EnemyInit();
@@ -2855,10 +2859,25 @@ InputState currentInputState = InputState.nil;
         if(card.GetIsFriend()== IsFriend.enemy && card.isHq == HQ.hq)
         {
             DarkenScreen();
+            // 战役模式：胜利后返回世界地图
+            if (BattleStateManager.IsCampaignMode)
+            {
+                _ = ReturnToWorldMapAfterVictory();
+            }
         }
         cardInPlaces.Remove(card);
         card.Dead();
         RefreshAllBeGuardianedStatus(); // 单位离场后刷新被守护状态
+    }
+
+    /// <summary>
+    /// 战役模式下敌方总部被摧毁后，延迟2.5秒返回世界地图
+    /// </summary>
+    private async System.Threading.Tasks.Task ReturnToWorldMapAfterVictory()
+    {
+        await ToSignal(GetTree().CreateTimer(2.5f), SceneTreeTimer.SignalName.Timeout);
+        BattleStateManager.IsCampaignMode = false;
+        GetTree().ChangeSceneToFile("res://bin/worldMap.tscn");
     }
 
     /// <summary>

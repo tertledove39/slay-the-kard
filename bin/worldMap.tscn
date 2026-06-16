@@ -1,0 +1,131 @@
+[gd_scene load_steps=6 format=3 uid="uid://d35dy87rvq1mc"]
+
+[ext_resource type="Script" uid="uid://dbkfpoeflekpg" path="res://bin/WorldMap.cs" id="1_kanex"]
+[ext_resource type="Texture2D" uid="uid://1wq05532vpn4" path="res://assest/worldMap.png" id="1_wpv1p"]
+[ext_resource type="Texture2D" uid="uid://cn2kgl0dgbhey" path="res://assest/chooseThisArea.png" id="2_cs12g"]
+[ext_resource type="Texture2D" uid="uid://tijuuut6gmwa" path="res://assest/chooseThisAreaPresssed.png" id="3_kanex"]
+[ext_resource type="Texture2D" uid="uid://cl2c37lfu3l2y" path="res://assest/chooseThisAreaHover.png" id="4_ord10"]
+
+[node name="Control" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_kanex")
+
+[node name="WorldMap" type="Sprite2D" parent="."]
+position = Vector2(797, 453)
+scale = Vector2(0.83391005, 0.83391005)
+texture = ExtResource("1_wpv1p")
+
+[node name="area1" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 1190.0
+offset_top = 180.0
+offset_right = 1379.0
+offset_bottom = 355.0
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0
+
+[node name="area2" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 1470.0
+offset_top = 645.0
+offset_right = 1659.0
+offset_bottom = 820.0
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0
+
+[node name="area3" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 1063.0
+offset_top = 491.0
+offset_right = 1252.0
+offset_bottom = 666.0
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0
+
+[node name="area4" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 889.0
+offset_top = 345.0
+offset_right = 1078.0
+offset_bottom = 520.0
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0
+
+[node name="area5" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 744.0
+offset_top = 412.0
+offset_right = 933.0
+offset_bottom = 587.0
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0
+
+[node name="area6" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 661.0
+offset_top = 531.0
+offset_right = 850.0
+offset_bottom = 706.0
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0
+
+[node name="area7" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 559.0
+offset_top = 362.0
+offset_right = 748.0
+offset_bottom = 537.0
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0
+
+[node name="area8" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 458.0
+offset_top = 528.0
+offset_right = 647.0
+offset_bottom = 703.0
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0
+
+[node name="area9" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 370.0
+offset_top = 427.0
+offset_right = 559.0
+offset_bottom = 602.0
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0
+
+[node name="area10" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 189.0
+offset_top = 406.0
+offset_right = 378.0
+offset_bottom = 581.0
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0

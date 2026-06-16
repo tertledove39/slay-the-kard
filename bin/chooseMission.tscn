@@ -1,0 +1,34 @@
+[gd_scene load_steps=3 format=3 uid="uid://dvbulsso8ffup"]
+
+[ext_resource type="Script" uid="uid://dhi65sjnxv8vs" path="res://bin/ChooseMission.cs" id="1_ihdb6"]
+
+[node name="Control" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_ihdb6")
+
+[node name="TextureButton" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 156.0
+offset_top = 181.0
+offset_right = 472.0
+offset_bottom = 680.0
+
+[node name="TextureButton2" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 585.0
+offset_top = 196.0
+offset_right = 901.0
+offset_bottom = 695.0
+
+[node name="TextureButton3" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 1080.0
+offset_top = 201.0
+offset_right = 1396.0
+offset_bottom = 700.0
+
