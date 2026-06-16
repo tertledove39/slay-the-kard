@@ -443,6 +443,9 @@ TextureButton buttonNextTurn;
 
         cardMaganer.SetCardDictionary(_items);
 
+        // 缓存到BattleStateManager供跨场景访问（WorldMap查看卡组等）
+        BattleStateManager.CacheAllCards(_items);
+
         // 创建电表式指挥点数字显示（替换原有Label）
         SetupMeterLabels();
 
@@ -477,7 +480,7 @@ TextureButton buttonNextTurn;
     }
 
     /// <summary>
-    /// 在屏幕右上角创建"查看卡组"按钮，点击可查看当前完整卡组
+    /// 在屏幕右上角创建"查看卡组"按钮，显示持久化的原始卡组（不含战斗临时卡）
     /// </summary>
     private void CreateDeckViewButton()
     {
@@ -489,8 +492,8 @@ TextureButton buttonNextTurn;
         viewDeckBtn.ZIndex = 1000;
         viewDeckBtn.Pressed += () =>
         {
-            BattleStateManager.Deck = player1.ReadMyDeck();
-            BattleStateManager.ShowDeckViewer(this);
+            var displayDeck = BattleStateManager.BuildDisplayDeck();
+            BattleStateManager.ShowDeckViewer(this, displayDeck);
         };
         AddChild(viewDeckBtn);
     }
@@ -4939,56 +4942,64 @@ public class Player
     }
     
     /// <summary>
-    /// 从deck.ini文件初始化卡组
+    /// 初始化卡组：首次从deck.ini加载并持久化DeckCardIds，后续从DeckCardIds重建。
+    /// 保证跨战役的奖励卡牌不会丢失。
     /// </summary>
     private void InitializeDeckFromIni()
     {
+        // 如果已初始化，从持久化的ID列表重建卡组
+        if (BattleStateManager.IsDeckInitialized)
+        {
+            GD.Print("[Deck] 从持久化DeckCardIds重建卡组，卡片数: " + BattleStateManager.DeckCardIds.Count);
+            var template = battlefield.GetCardMaganer().GetCardTemplate();
+            foreach (var cardId in BattleStateManager.DeckCardIds)
+            {
+                var cardData = battlefield.GetCardMaganer().GetCard(cardId);
+                if (cardData != null)
+                {
+                    var card = template.Duplicate() as cardBase_;
+                    card.SetAnchorsPreset(Godot.Control.LayoutPreset.TopLeft);
+                    card.Size = new Godot.Vector2(180, 240);
+                    card.SetCardInformation(cardData);
+                    card.SetIsFriend(isFriend);
+                    deck.Add(card);
+                }
+            }
+            ShuffleDeck();
+            return;
+        }
+
+        PackedScene cardRes = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
+
+        // 首次加载：从deck.ini读取并持久化
         var deckIniPath = "res://bin/deck.ini";
-        
-        // 使用Godot的FileAccess读取资源文件
         if (!Godot.FileAccess.FileExists(deckIniPath))
         {
             GD.PushError($"Deck INI file not found: {deckIniPath}");
             return;
         }
-        
-        // 读取文件内容到内存
+
         using var file = Godot.FileAccess.Open(deckIniPath, Godot.FileAccess.ModeFlags.Read);
         string deckIniContent = file.GetAsText();
         file.Close();
-        
-        GD.Print($"Deck INI content:\n{deckIniContent}");
-        
-        // 使用临时文件保存内容，然后加载
+
         var tempPath = OS.GetUserDataDir() + "/temp_deck.ini";
-        GD.Print($"Temp path: {tempPath}");
         using (var writer = System.IO.File.CreateText(tempPath))
-        {
             writer.Write(deckIniContent);
-        }
-        
+
         var deckIni = new IniFile();
         deckIni.Load(tempPath);
-        GD.Print($"INI loaded, sections count: {deckIni.Count}");
-        
+
         if (!deckIni.HasSection("deck"))
         {
             GD.PushError("Deck INI file does not contain [deck] section");
             return;
         }
-        
-        PackedScene cardRes = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
-        
-        // 遍历deck节中的所有键
+
         var deckKeys = deckIni.GetSectionKeys("deck");
-        GD.Print($"Deck keys count: {deckKeys.Count}");
         foreach (var key in deckKeys)
         {
-            // 获取键对应的值（卡牌ID和数量）
             string cardIdValue = deckIni["deck"][key].ToString().Trim();
-            GD.Print($"Processing card: {cardIdValue}");
-            
-            // 检查是否包含数量标记（如"t70*2"）
             int count = 1;
             string actualCardId = cardIdValue;
             if (cardIdValue.Contains("*"))
@@ -4996,13 +5007,9 @@ public class Player
                 string[] parts = cardIdValue.Split("*");
                 actualCardId = parts[0].Trim();
                 if (parts.Length > 1 && int.TryParse(parts[1].Trim(), out int parsedCount))
-                {
                     count = parsedCount;
-                }
-                GD.Print($"Card {actualCardId} count: {count}");
             }
-            
-            // 根据数量添加卡牌
+
             for (int i = 0; i < count; i++)
             {
                 var cardData = battlefield.GetCardMaganer().GetCard(actualCardId);
@@ -5012,16 +5019,15 @@ public class Player
                     card.SetCardInformation(cardData);
                     card.SetIsFriend(isFriend);
                     deck.Add(card);
-                }
-                else
-                {
-                    GD.Print($"Failed to load card: {actualCardId}, cardData is null: {cardData == null}");
+                    // 持久化卡牌ID
+                    BattleStateManager.DeckCardIds.Add(actualCardId);
                 }
             }
         }
-        GD.Print($"Total cards in deck: {deck.Count}");
-        
-        ShuffleDeck(); // 洗牌
+
+        BattleStateManager.IsDeckInitialized = true;
+        GD.Print($"[Deck] 首次加载完成，共{deck.Count}张卡，DeckCardIds已持久化");
+        ShuffleDeck();
     }
 
 /// <summary>

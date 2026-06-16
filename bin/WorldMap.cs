@@ -39,16 +39,80 @@ public partial class WorldMap : Control
         // 预加载选择任务界面
         _chooseMissionScene = ResourceLoader.Load<PackedScene>("res://bin/chooseMission.tscn");
 
-        // 右上角"查看卡组"按钮
+        // 右上角"查看卡组"按钮（从持久化DeckCardIds构建显示）
         var viewSize = GetViewportRect().Size;
         var viewDeckBtn = new Button();
         viewDeckBtn.Text = "卡组";
         viewDeckBtn.Position = new Vector2(viewSize.X - 110, 10);
         viewDeckBtn.Size = new Vector2(90, 36);
         viewDeckBtn.ZIndex = 1000;
-        viewDeckBtn.Pressed += () => BattleStateManager.ShowDeckViewer(this);
+        viewDeckBtn.Pressed += () =>
+        {
+            // 若CardData尚未缓存（直接从WorldMap启动），加载一次
+            if (BattleStateManager.GetCachedCard("t70") == null)
+            {
+                LoadCardDataCache();
+            }
+            var displayDeck = BattleStateManager.BuildDisplayDeck();
+            BattleStateManager.ShowDeckViewer(this, displayDeck);
+        };
         AddChild(viewDeckBtn);
     }
+
+    /// <summary>从card.ini加载所有卡牌数据到BattleStateManager缓存中</summary>
+    private static void LoadCardDataCache()
+    {
+        var iniPath = "res://cards/card.ini";
+        if (!Godot.FileAccess.FileExists(iniPath)) return;
+        var configFile = new IniFile();
+        configFile.Load(iniPath);
+        var items = new Dictionary<string, CardData>();
+        foreach (var section in configFile)
+        {
+            var cd = new CardData();
+            cd.Id = section.Key;
+            cd.Name = configFile[section.Key]["name"].ToString().Trim();
+            cd.Attack = configFile[section.Key]["attack"].ToInt();
+            cd.Defense = configFile[section.Key]["defense"].ToInt();
+            cd.Cost = configFile[section.Key]["price"].ToInt();
+            cd.Rarity = GetRarity(configFile[section.Key]["rarity"].ToString().Trim());
+            cd.IconPath = configFile[section.Key]["icon"].ToString().Trim();
+            cd.CardType = GetTypes(configFile[section.Key]["cardType"].ToString().Trim());
+            cd.TargetType = GetTargetType(configFile[section.Key]["targetType"].ToString().Trim());
+            items[cd.Id] = cd;
+        }
+        BattleStateManager.CacheAllCards(items);
+    }
+
+    private static Rarity GetRarity(string s) => s.ToLowerInvariant() switch
+    {
+        "common" => Rarity.Common,
+        "rare" => Rarity.Rare,
+        "epic" => Rarity.Epic,
+        "legendary" => Rarity.Legendary,
+        _ => Rarity.Unobtainable
+    };
+
+    private static CardTypes GetTypes(string s) => s.ToLowerInvariant() switch
+    {
+        "plane" => CardTypes.Plane,
+        "bomber" => CardTypes.Bomber,
+        "tank" => CardTypes.Tank,
+        "infantry" => CardTypes.Infantry,
+        "artillery" => CardTypes.Artillery,
+        "command" => CardTypes.Command,
+        _ => CardTypes.Infantry
+    };
+
+    private static TargetType GetTargetType(string s) => s.ToLowerInvariant() switch
+    {
+        "enemytarget" => TargetType.enemyTarget,
+        "anenemyunit" => TargetType.anEnemyUnit,
+        "afriendlyunit" => TargetType.aFriendlyUnit,
+        "friendlytarget" => TargetType.friendlyTarget,
+        "anytarget" => TargetType.anyTarget,
+        _ => TargetType.NOTarget
+    };
 
     public override void _Input(InputEvent @event)
     {

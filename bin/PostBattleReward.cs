@@ -417,9 +417,13 @@ public partial class PostBattleReward : CanvasLayer
             deck.Add(newCard);
         }
 
-        // 同步到BattleStateManager
-        if (BattleStateManager.IsCampaignMode)
-            BattleStateManager.Deck = deck;
+        // 同步持久化卡组ID列表：移除被替换的卡，加入新卡
+        var toRemoveIds = cardsToRemove.Select(c => c.id).ToList();
+        foreach (var id in toRemoveIds)
+            BattleStateManager.DeckCardIds.Remove(id);
+        foreach (var cardData in _chosenGroup)
+            BattleStateManager.DeckCardIds.Add(cardData.Id);
+        GD.Print($"[PostBattleReward] DeckCardIds已更新，当前{ BattleStateManager.DeckCardIds.Count}张卡");
     }
 
     /// <summary>

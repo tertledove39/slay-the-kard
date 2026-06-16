@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 /// <summary>
@@ -6,28 +7,20 @@ using Godot;
 /// </summary>
 public static class BattleStateManager
 {
-    // 准备传递给战斗场景的数据
     public static string PlayerDeckId { get; set; } = "default_deck";
-    public static List<cardBase_> Deck { get; set; } = new List<cardBase_>();
-
     public static battlefield_ battlefield { get; set; }
 
-    // 战役模式：选中的敌人预设名（对应 enemyTurn.ini 中的节名）
+    // 战役模式：选中的敌人预设名
     public static string SelectedEnemy { get; set; } = "berlin";
-
     // 战役模式：当前选中的区域名
     public static string SelectedArea { get; set; } = "";
-
-    // 是否处于战役模式（从WorldMap进入的）
+    // 是否处于战役模式
     public static bool IsCampaignMode { get; set; } = false;
-
-    // 已完成的区域集合（静态持久，跨场景保留）
+    // 已完成的区域集合（跨场景持久）
     public static HashSet<string> CompletedAreas { get; private set; } = new();
 
-    // 所有区域的顺序列表（area1 → area10，莫斯科 → 柏林）
     private static readonly string[] AreaOrder = { "area1", "area2", "area3", "area4", "area5", "area6", "area7", "area8", "area9", "area10" };
 
-    // 敌人预设名 → 中文显示名 映射
     public static readonly Dictionary<string, string> EnemyDisplayNames = new()
     {
         { "wehrmacht", "德国国防军" },
@@ -39,12 +32,61 @@ public static class BattleStateManager
         { "berlin", "柏林保卫战" },
     };
 
+    // ============================ 卡组持久化 ============================
+
+    /// <summary>临时卡牌引用列表（当前场景的Player.deck引用，不跨场景持久）</summary>
+    public static List<cardBase_> Deck { get; set; } = new();
+    /// <summary>从deck.ini或奖励交换中生成的持久卡牌ID列表（不含战斗中临时卡）</summary>
+    public static List<string> DeckCardIds { get; set; } = new();
+    /// <summary>deck.ini是否已加载（避免重复加载）</summary>
+    public static bool IsDeckInitialized { get; set; } = false;
+    /// <summary>所有卡牌的CardData缓存（card.ini解析结果，跨场景复用）</summary>
+    private static Dictionary<string, CardData> _allCards;
+
+    /// <summary>缓存所有卡牌数据，供跨场景访问</summary>
+    public static void CacheAllCards(Dictionary<string, CardData> cards)
+    {
+        if (cards != null && cards.Count > 0)
+            _allCards = cards;
+    }
+
+    /// <summary>根据ID获取缓存的卡牌数据</summary>
+    public static CardData GetCachedCard(string id)
+    {
+        if (_allCards != null && _allCards.TryGetValue(id, out var card))
+            return card;
+        return null;
+    }
+
+    /// <summary>从DeckCardIds构建cardBase_列表（仅用于显示，不入战斗）</summary>
+    public static List<cardBase_> BuildDisplayDeck()
+    {
+        var result = new List<cardBase_>();
+        if (DeckCardIds == null || DeckCardIds.Count == 0) return result;
+
+        var cardScene = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
+        foreach (var id in DeckCardIds)
+        {
+            var cd = GetCachedCard(id);
+            if (cd == null) continue;
+            var card = cardScene.Instantiate() as cardBase_;
+            card.SetCardInformation(cd);
+            card.SetIsFriend(IsFriend.friend);
+            result.Add(card);
+        }
+        return result;
+    }
+
+    // ============================ 区域管理 ============================
+
     /// <summary>
-    /// 检查给定区域是否已解锁
-    /// area1始终解锁，areaN需要在area(N-1)完成后解锁
+    /// 检查区域是否可进入：未完成且前序区域已完成（area1始终解锁但完成后锁定）
     /// </summary>
     public static bool IsAreaUnlocked(string areaName)
     {
+        // 已完成区域不可再进入
+        if (CompletedAreas.Contains(areaName)) return false;
+
         if (areaName == "area1") return true;
 
         int idx = System.Array.IndexOf(AreaOrder, areaName);
@@ -54,35 +96,37 @@ public static class BattleStateManager
         return CompletedAreas.Contains(prevArea);
     }
 
-    /// <summary>
-    /// 标记区域为已完成（战斗胜利后调用）
-    /// </summary>
+    /// <summary>标记区域为已完成</summary>
     public static void MarkAreaCompleted(string areaName)
     {
         if (!string.IsNullOrEmpty(areaName))
             CompletedAreas.Add(areaName);
     }
 
-    /// <summary>
-    /// 解锁所有区域（控制台调试用）
-    /// </summary>
+    /// <summary>解锁所有区域（控制台调试用）</summary>
     public static void UnlockAllAreas()
     {
         foreach (var area in AreaOrder)
             CompletedAreas.Add(area);
     }
 
+    // ============================ UI辅助 ============================
+
     /// <summary>
-    /// 在parent上以CanvasLayer叠加显示卡组查看界面。
-    /// 调用前需确保Deck已设置为当前卡组。
+    /// 以CanvasLayer叠加显示卡组查看界面。
+    /// 使用传入的cardBase_列表渲染，不依赖场景中Player的deck状态。
     /// </summary>
-    public static void ShowDeckViewer(Node parent)
+    public static void ShowDeckViewer(Node parent, List<cardBase_> deckCards)
     {
+        // DisplayCard._Ready 从 Deck 属性读取卡组，需先设置
+        Deck = deckCards ?? new List<cardBase_>();
+
         var canvasLayer = new CanvasLayer();
         canvasLayer.Layer = 2;
         parent.AddChild(canvasLayer);
+
         var displayScene = ResourceLoader.Load<PackedScene>("res://bin/display_card.tscn");
-        var displayCard = displayScene.Instantiate();
-        canvasLayer.AddChild(displayCard);
+        var display = displayScene.Instantiate() as DisplayCard;
+        canvasLayer.AddChild(display);
     }
 }
