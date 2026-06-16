@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://dvbulsso8ffup"]
 
-[ext_resource type="Script" uid="uid://dhi65sjnxv8vs" path="res://bin/ChooseMission.cs" id="1_ihdb6"]
+[ext_resource type="Script" uid="uid://hn0wy5xlxby7" path="res://bin/ChooseMission.cs" id="1_ihdb6"]
 
 [node name="Control" type="Control"]
 layout_mode = 3
