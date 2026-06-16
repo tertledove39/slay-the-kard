@@ -4289,6 +4289,20 @@ InputState currentInputState = InputState.nil;
 
         // 等300ms让动画开始并飞出一段距离，然后执行效果
         await Task.Delay(300);
+
+        // 对每个目标触发被指向时点和同仇特性
+        if (targets != null)
+        {
+            foreach (var target in targets)
+            {
+                if (target != null)
+                {
+                    await TriggerUnitEffects("BePicked", target, new List<cardBase_> { commandCard }, checkOnlySourceCard: true);
+                    await TriggerSharedHatred(target);
+                }
+            }
+        }
+
         await ParseAndExecuteEffect(commandCard.effect, commandCard, targets);
 
         // 等动画完全播完再移除
