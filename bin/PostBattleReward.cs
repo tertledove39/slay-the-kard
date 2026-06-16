@@ -21,6 +21,7 @@ public partial class PostBattleReward : CanvasLayer
     private const int GroupsCount = 3;
     private const int CardsPerGroup = 5;
     private const int MaxSwapCards = 5;
+    private const float HighlightBorderMargin = 3f; // 高亮框比卡牌多出的边框宽度
 
     // 每种稀有度在牌组中的最大拥有数量（按卡牌ID计）
     private static readonly Dictionary<Rarity, int> RarityMaxCopies = new()
@@ -328,10 +329,12 @@ public partial class PostBattleReward : CanvasLayer
             // 因卡牌pivot在中心(90,120)，缩放后视觉左上角偏移，高亮框/点击覆盖需同步偏移
             Vector2 cvOff = GetCardPivotOffset(DeckReplaceScale);
 
-            // 高亮框（置于卡牌下方，位置需加上pivot偏移以对齐卡牌视觉位置）
+            // 高亮框比卡牌大一圈（边框外扩），置于卡牌下方避免遮挡但边缘可见
             var highlight = new ColorRect();
-            highlight.Position = new Vector2(x, y) + cvOff;
-            highlight.Size = new Vector2(cardW, cardH);
+            var hlPos = new Vector2(x, y) + cvOff;
+            var hlSize = new Vector2(cardW, cardH) + new Vector2(HighlightBorderMargin * 2, HighlightBorderMargin * 2);
+            highlight.Position = hlPos - new Vector2(HighlightBorderMargin, HighlightBorderMargin);
+            highlight.Size = hlSize;
             highlight.Color = new Color(0, 0, 0, 0);
             highlight.MouseFilter = Control.MouseFilterEnum.Ignore;
             highlight.ZIndex = 9;
