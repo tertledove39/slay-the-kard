@@ -2825,11 +2825,14 @@ InputState currentInputState = InputState.nil;
         RefreshAllBeGuardianedStatus(); // 单位离场后刷新被守护状态
     }
 
+    private int _discardZCounter = 50;
+
     /// <summary>
-    /// 播放弃牌动画并在完成后移除（用于fire-and-forget模式）
+    /// 播放弃牌动画并在完成后移除（fire-and-forget，Z-index递增确保后弃置的在上方）
     /// </summary>
     public async Task CardDiscardAndRemove(cardBase_ card)
     {
+        card.ZIndex = _discardZCounter++;
         await card.DiscardCard();
         RemoveCard(card);
     }
@@ -4967,7 +4970,7 @@ public class Player
             {
                 battlefield.AddToBattleField(card);
                 _ = battlefield.CardDiscardAndRemove(card);
-                await Task.Delay(1000);
+                await Task.Delay(500);
                 return;
             }
             card.SetPosition(new Godot.Vector2(-2000, 800));
