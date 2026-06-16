@@ -15,10 +15,10 @@ public partial class PostBattleReward : CanvasLayer
     private List<CardData> _chosenGroup;
     private readonly HashSet<cardBase_> _selectedToRemove = new();
 
-    private const float CardDisplayScale = 0.55f;
+    private const float CardDisplayScale = 0.65f; // 奖励组选择界面卡牌缩放
     private const float CardDisplayWidth = 180f;
     private const float CardDisplayHeight = 240f;
-    private const float DeckReplaceScale = 0.58f; // 替换界面卡牌缩放略大于奖励界面
+    private const float DeckReplaceScale = 0.7f;  // 替换界面卡牌缩放
     private const int GroupsCount = 3;
     private const int CardsPerGroup = 5;
     private const int MaxSwapCards = 5;
@@ -186,8 +186,9 @@ public partial class PostBattleReward : CanvasLayer
     // ============================ 卡组替换界面 ============================
 
     /// <summary>
-    /// 显示玩家卡组，选择最多5张卡牌替换。卡牌按费用→名称→攻击力排序，与牌库展示一致。
-    /// 点击检测通过背景GuiInput+全局矩形判断，避免子控件拦截点击。
+    /// 显示玩家卡组（可滚动），选择最多5张卡牌替换。
+    /// 卡牌按费用→名称→攻击力排序（与牌库展示一致）。
+    /// 使用透明ColorRect覆盖层处理点击，避免卡牌内部子控件拦截事件。
     /// </summary>
     private async Task<List<cardBase_>> ShowDeckReplaceUI()
     {
@@ -213,7 +214,7 @@ public partial class PostBattleReward : CanvasLayer
         countLabel.Size = new Vector2(200, 30);
         AddChild(countLabel);
 
-        // 卡组网格展示：按费用→名称→攻击力降序排序（与DisplayCard一致）
+        // 排序牌库：费用→名称→攻击力降序（与DisplayCard一致）
         var deck = _player.ReadMyDeck();
         var sortedDeck = deck
             .OrderBy(c => c.ReadCost())
@@ -221,13 +222,35 @@ public partial class PostBattleReward : CanvasLayer
             .ThenByDescending(c => c.ReadAttack())
             .ToList();
 
-        var cardDisplays = new List<cardBase_>();
-        var highlightRects = new List<ColorRect>();
+        // 网格布局参数
         float cardW = CardDisplayWidth * DeckReplaceScale;
         float cardH = CardDisplayHeight * DeckReplaceScale;
-        int cols = 7;
-        float gridStartX = (viewSize.X - cols * (cardW + 8)) / 2;
-        float gridStartY = 100;
+        float cardGapX = 8f;
+        float cardGapY = 4f;
+        const int cols = 7;
+        int rows = (sortedDeck.Count + cols - 1) / cols;
+        float gridContentW = cols * cardW + (cols - 1) * cardGapX; // 网格实际宽度，用于居中
+        float gridStartX = (viewSize.X - gridContentW) / 2;
+        float gridContentH = rows * cardH + (rows - 1) * cardGapY + 20; // 内容总高度（含上下边距）
+
+        // 滚动容器区域：从标题下方到底部按钮上方
+        float scrollTop = 90;
+        float scrollBottomPad = 70;
+        var scrollContainer = new ScrollContainer();
+        scrollContainer.Position = new Vector2(0, scrollTop);
+        scrollContainer.Size = new Vector2(viewSize.X, viewSize.Y - scrollTop - scrollBottomPad);
+        scrollContainer.HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled;
+        scrollContainer.FollowFocus = true;
+        AddChild(scrollContainer);
+
+        // 内容容器
+        var cardContainer = new Control();
+        cardContainer.CustomMinimumSize = new Vector2(viewSize.X, Mathf.Max(gridContentH, scrollContainer.Size.Y));
+        scrollContainer.AddChild(cardContainer);
+
+        // 创建卡牌显示、高亮框和透明点击覆盖层
+        var cardDisplays = new List<cardBase_>();
+        var highlightRects = new List<ColorRect>();
 
         for (int i = 0; i < sortedDeck.Count; i++)
         {
@@ -235,48 +258,51 @@ public partial class PostBattleReward : CanvasLayer
             int col = i % cols;
             int row = i / cols;
 
+            float x = gridStartX + col * (cardW + cardGapX);
+            float y = 10 + row * (cardH + cardGapY);
+
+            // 卡牌显示（忽略鼠标，仅作视觉展示）
             var card = CreateCardFromSource(deckCard);
             card.Scale = new Vector2(DeckReplaceScale, DeckReplaceScale);
-            card.Position = new Vector2(gridStartX + col * (cardW + 8), gridStartY + row * (cardH + 4));
-            card.MouseFilter = Control.MouseFilterEnum.Ignore; // 忽略点击，由背景统一处理
-            card.ZIndex = 50;
-            AddChild(card);
+            card.Position = new Vector2(x, y);
+            card.MouseFilter = Control.MouseFilterEnum.Ignore;
+            card.ZIndex = 10;
+            cardContainer.AddChild(card);
             cardDisplays.Add(card);
 
-            // 高亮框
+            // 高亮框（置于卡牌下方）
             var highlight = new ColorRect();
-            highlight.Position = card.Position;
+            highlight.Position = new Vector2(x, y);
             highlight.Size = new Vector2(cardW, cardH);
             highlight.Color = new Color(0, 0, 0, 0);
             highlight.MouseFilter = Control.MouseFilterEnum.Ignore;
-            highlight.ZIndex = 49;
-            AddChild(highlight);
+            highlight.ZIndex = 9;
+            cardContainer.AddChild(highlight);
             highlightRects.Add(highlight);
+
+            // 透明点击覆盖层（无子节点，确保点击事件可靠捕获）
+            var clickArea = new ColorRect();
+            clickArea.Position = new Vector2(x, y);
+            clickArea.Size = new Vector2(cardW, cardH);
+            clickArea.Color = new Color(0, 0, 0, 0);
+            clickArea.MouseFilter = Control.MouseFilterEnum.Stop;
+            clickArea.ZIndex = 20;
+            int idx = i;
+            clickArea.GuiInput += (e) =>
+            {
+                if (e is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
+                    ToggleCardSelection(sortedDeck[idx], highlightRects[idx], countLabel);
+            };
+            cardContainer.AddChild(clickArea);
         }
 
-        // 通过背景GuiInput统一处理点击（避免卡牌子控件拦截）
-        bg.GuiInput += (e) =>
-        {
-            if (e is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
-            {
-                for (int i = 0; i < cardDisplays.Count; i++)
-                {
-                    if (cardDisplays[i].GetGlobalRect().HasPoint(mb.GlobalPosition))
-                    {
-                        ToggleCardSelection(sortedDeck[i], highlightRects[i], countLabel);
-                        break;
-                    }
-                }
-            }
-        };
-
-        // 确认按钮
-        float btnY = gridStartY + ((sortedDeck.Count - 1) / cols + 1) * (cardH + 4) + 20;
+        // 确认按钮（固定在PostBattleReward中，不随滚动移动）
         var confirmBtn = new Button();
         confirmBtn.Text = $"确认替换（需选{MaxSwapCards}张）";
-        confirmBtn.Position = new Vector2(viewSize.X / 2 - 90, btnY);
+        confirmBtn.Position = new Vector2(viewSize.X / 2 - 90, viewSize.Y - 60);
         confirmBtn.Size = new Vector2(180, 44);
         confirmBtn.Disabled = true;
+        confirmBtn.ZIndex = 60;
         AddChild(confirmBtn);
 
         confirmBtn.Pressed += () =>
