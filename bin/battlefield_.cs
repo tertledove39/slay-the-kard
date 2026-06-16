@@ -2871,10 +2871,13 @@ InputState currentInputState = InputState.nil;
     }
 
     /// <summary>
-    /// 战役模式下敌方总部被摧毁后，延迟2.5秒返回世界地图
+    /// 战役模式下敌方总部被摧毁后，标记区域已完成，延迟2.5秒返回世界地图
     /// </summary>
     private async System.Threading.Tasks.Task ReturnToWorldMapAfterVictory()
     {
+        // 标记当前区域已完成，解锁下一区域
+        BattleStateManager.MarkAreaCompleted(BattleStateManager.SelectedArea);
+
         await ToSignal(GetTree().CreateTimer(2.5f), SceneTreeTimer.SignalName.Timeout);
         BattleStateManager.IsCampaignMode = false;
         GetTree().ChangeSceneToFile("res://bin/worldMap.tscn");
