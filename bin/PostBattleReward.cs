@@ -18,6 +18,7 @@ public partial class PostBattleReward : CanvasLayer
     private const float CardDisplayScale = 0.55f;
     private const float CardDisplayWidth = 180f;
     private const float CardDisplayHeight = 240f;
+    private const float DeckReplaceScale = 0.58f; // 替换界面卡牌缩放略大于奖励界面
     private const int GroupsCount = 3;
     private const int CardsPerGroup = 5;
     private const int MaxSwapCards = 5;
@@ -98,7 +99,7 @@ public partial class PostBattleReward : CanvasLayer
     // ============================ 组选择界面 ============================
 
     /// <summary>
-    /// 显示3组卡牌供玩家选择一组（或跳过）
+    /// 显示3组卡牌供玩家选择一组（或跳过），每组5张横向排列，各组纵向堆叠
     /// </summary>
     private async Task<List<CardData>> ShowGroupSelection(List<List<CardData>> groups)
     {
@@ -108,42 +109,36 @@ public partial class PostBattleReward : CanvasLayer
         AddChild(bg);
 
         // 标题
+        var viewSize = GetViewport().GetVisibleRect().Size;
         var title = MakeLabel("[center]选择一组卡牌奖励[/center]", 30, Colors.Gold);
-        title.Position = new Vector2(GetViewport().GetVisibleRect().Size.X / 2 - 250, 30);
+        title.Position = new Vector2(viewSize.X / 2 - 250, 30);
         title.Size = new Vector2(500, 50);
         AddChild(title);
 
-        // 三组面板居中排列
-        float viewWidth = GetViewport().GetVisibleRect().Size.X;
-        float panelW = CardDisplayWidth * CardDisplayScale + 20;
-        float totalW = GroupsCount * (panelW + 40);
-        float startX = (viewWidth - totalW) / 2;
-
-        var selectedGroupIdx = new int[] { -1 };
-        var groupButtons = new List<Button>();
-        var groupHighlights = new List<ColorRect>();
+        // 计算横向布局参数：5张卡牌一行
+        float scaledW = CardDisplayWidth * CardDisplayScale;
+        float scaledH = CardDisplayHeight * CardDisplayScale;
+        float cardGap = 4f;
+        float rowWidth = CardsPerGroup * scaledW + (CardsPerGroup - 1) * cardGap;
+        float btnWidth = 130f;
+        float btnHeight = 38f;
+        float rowTotalWidth = rowWidth + 30 + btnWidth; // 卡牌行 + 间距 + 按钮
+        float startX = (viewSize.X - rowTotalWidth) / 2;
+        float groupGap = 10f;
+        float groupHeight = scaledH + btnHeight + groupGap;
+        float startY = 120;
 
         for (int g = 0; g < groups.Count; g++)
         {
-            float gx = startX + g * (panelW + 40);
-            var cards = CreateGroupCardRow(groups[g], gx, panelW);
+            float gy = startY + g * groupHeight;
+            var cards = CreateGroupCardRow(groups[g], startX, gy);
             foreach (var c in cards) AddChild(c);
 
-            // 高亮框
-            var highlight = new ColorRect();
-            highlight.Position = new Vector2(gx - 4, 100);
-            highlight.Size = new Vector2(panelW + 8, CardDisplayHeight * CardDisplayScale * CardsPerGroup + 160);
-            highlight.Color = new Color(0, 0, 0, 0);
-            highlight.MouseFilter = Control.MouseFilterEnum.Ignore;
-            AddChild(highlight);
-            groupHighlights.Add(highlight);
-
-            // 选择按钮
-            float btnY = 100 + CardDisplayHeight * CardDisplayScale * CardsPerGroup + 8;
+            // 选择按钮放在卡牌行右侧垂直居中
             var btn = new Button();
             btn.Text = $"选择第{g + 1}组";
-            btn.Position = new Vector2(gx, btnY);
-            btn.Size = new Vector2(panelW, 40);
+            btn.Position = new Vector2(startX + rowWidth + 30, gy + (scaledH - btnHeight) / 2);
+            btn.Size = new Vector2(btnWidth, btnHeight);
             int gi = g;
             btn.Pressed += () =>
             {
@@ -151,13 +146,13 @@ public partial class PostBattleReward : CanvasLayer
                     tcs.SetResult(groups[gi]);
             };
             AddChild(btn);
-            groupButtons.Add(btn);
         }
 
         // "跳过"按钮
+        float btnAreaBottom = startY + GroupsCount * groupHeight;
         var skipBtn = new Button();
         skipBtn.Text = "跳过奖励";
-        skipBtn.Position = new Vector2(viewWidth / 2 - 70, 720);
+        skipBtn.Position = new Vector2(viewSize.X / 2 - 70, btnAreaBottom + 20);
         skipBtn.Size = new Vector2(140, 44);
         skipBtn.Pressed += () => { if (!tcs.Task.IsCompleted) tcs.SetResult(null); };
         AddChild(skipBtn);
@@ -166,13 +161,13 @@ public partial class PostBattleReward : CanvasLayer
     }
 
     /// <summary>
-    /// 在一列中创建一组5张缩小版卡牌显示
+    /// 在一行中横向创建一组5张缩小版卡牌显示
     /// </summary>
-    private List<cardBase_> CreateGroupCardRow(List<CardData> group, float startX, float panelW)
+    private List<cardBase_> CreateGroupCardRow(List<CardData> group, float startX, float startY)
     {
         var result = new List<cardBase_>();
-        float scaledH = CardDisplayHeight * CardDisplayScale;
-        float startY = 100;
+        float scaledW = CardDisplayWidth * CardDisplayScale;
+        float gap = 4f;
         for (int i = 0; i < group.Count; i++)
         {
             var card = _cardRes.Instantiate() as cardBase_;
@@ -181,9 +176,7 @@ public partial class PostBattleReward : CanvasLayer
             card.Scale = new Vector2(CardDisplayScale, CardDisplayScale);
             card.MouseFilter = Control.MouseFilterEnum.Ignore;
             card.ZIndex = 50;
-            // 在面板内居中排列
-            card.Position = new Vector2(startX + (panelW - CardDisplayWidth * CardDisplayScale) / 2,
-                                       startY + i * (scaledH + 2));
+            card.Position = new Vector2(startX + i * (scaledW + gap), startY);
             card.RefreshState();
             result.Add(card);
         }
@@ -193,7 +186,8 @@ public partial class PostBattleReward : CanvasLayer
     // ============================ 卡组替换界面 ============================
 
     /// <summary>
-    /// 显示玩家卡组，选择最多5张卡牌替换
+    /// 显示玩家卡组，选择最多5张卡牌替换。卡牌按费用→名称→攻击力排序，与牌库展示一致。
+    /// 点击检测通过背景GuiInput+全局矩形判断，避免子控件拦截点击。
     /// </summary>
     private async Task<List<cardBase_>> ShowDeckReplaceUI()
     {
@@ -208,36 +202,43 @@ public partial class PostBattleReward : CanvasLayer
         AddChild(bg);
 
         // 标题与计数
+        var viewSize = GetViewport().GetVisibleRect().Size;
         var title = MakeLabel($"[center]选择{MaxSwapCards}张要替换的卡牌[/center]", 26, Colors.Gold);
-        title.Position = new Vector2(GetViewport().GetVisibleRect().Size.X / 2 - 250, 20);
+        title.Position = new Vector2(viewSize.X / 2 - 250, 20);
         title.Size = new Vector2(500, 40);
         AddChild(title);
 
         var countLabel = MakeLabel($"[center]已选: 0/{MaxSwapCards}[/center]", 20, Colors.White);
-        countLabel.Position = new Vector2(GetViewport().GetVisibleRect().Size.X / 2 - 100, 58);
+        countLabel.Position = new Vector2(viewSize.X / 2 - 100, 58);
         countLabel.Size = new Vector2(200, 30);
         AddChild(countLabel);
 
-        // 卡组网格展示
+        // 卡组网格展示：按费用→名称→攻击力降序排序（与DisplayCard一致）
         var deck = _player.ReadMyDeck();
+        var sortedDeck = deck
+            .OrderBy(c => c.ReadCost())
+            .ThenBy(c => c.name)
+            .ThenByDescending(c => c.ReadAttack())
+            .ToList();
+
         var cardDisplays = new List<cardBase_>();
         var highlightRects = new List<ColorRect>();
-        float cardW = CardDisplayWidth * 0.58f;
-        float cardH = CardDisplayHeight * 0.58f;
+        float cardW = CardDisplayWidth * DeckReplaceScale;
+        float cardH = CardDisplayHeight * DeckReplaceScale;
         int cols = 7;
-        float gridStartX = (GetViewport().GetVisibleRect().Size.X - cols * (cardW + 8)) / 2;
+        float gridStartX = (viewSize.X - cols * (cardW + 8)) / 2;
         float gridStartY = 100;
 
-        for (int i = 0; i < deck.Count; i++)
+        for (int i = 0; i < sortedDeck.Count; i++)
         {
-            var deckCard = deck[i];
+            var deckCard = sortedDeck[i];
             int col = i % cols;
             int row = i / cols;
 
             var card = CreateCardFromSource(deckCard);
-            card.Scale = new Vector2(0.58f, 0.58f);
+            card.Scale = new Vector2(DeckReplaceScale, DeckReplaceScale);
             card.Position = new Vector2(gridStartX + col * (cardW + 8), gridStartY + row * (cardH + 4));
-            card.MouseFilter = Control.MouseFilterEnum.Stop;
+            card.MouseFilter = Control.MouseFilterEnum.Ignore; // 忽略点击，由背景统一处理
             card.ZIndex = 50;
             AddChild(card);
             cardDisplays.Add(card);
@@ -251,20 +252,29 @@ public partial class PostBattleReward : CanvasLayer
             highlight.ZIndex = 49;
             AddChild(highlight);
             highlightRects.Add(highlight);
-
-            int idx = i;
-            card.GuiInput += (e) =>
-            {
-                if (e is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
-                    ToggleCardSelection(deck[idx], highlightRects[idx], countLabel);
-            };
         }
 
+        // 通过背景GuiInput统一处理点击（避免卡牌子控件拦截）
+        bg.GuiInput += (e) =>
+        {
+            if (e is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
+            {
+                for (int i = 0; i < cardDisplays.Count; i++)
+                {
+                    if (cardDisplays[i].GetGlobalRect().HasPoint(mb.GlobalPosition))
+                    {
+                        ToggleCardSelection(sortedDeck[i], highlightRects[i], countLabel);
+                        break;
+                    }
+                }
+            }
+        };
+
         // 确认按钮
-        float btnY = gridStartY + ((deck.Count - 1) / cols + 1) * (cardH + 4) + 20;
+        float btnY = gridStartY + ((sortedDeck.Count - 1) / cols + 1) * (cardH + 4) + 20;
         var confirmBtn = new Button();
         confirmBtn.Text = $"确认替换（需选{MaxSwapCards}张）";
-        confirmBtn.Position = new Vector2(GetViewport().GetVisibleRect().Size.X / 2 - 90, btnY);
+        confirmBtn.Position = new Vector2(viewSize.X / 2 - 90, btnY);
         confirmBtn.Size = new Vector2(180, 44);
         confirmBtn.Disabled = true;
         AddChild(confirmBtn);
