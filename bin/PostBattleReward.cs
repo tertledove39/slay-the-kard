@@ -261,8 +261,23 @@ public partial class PostBattleReward : CanvasLayer
             float x = gridStartX + col * (cardW + cardGapX);
             float y = 10 + row * (cardH + cardGapY);
 
-            // 使用Duplicate复制牌库卡牌，保留完整视觉状态（与DisplayCard一致）
-            var card = deckCard.Duplicate() as cardBase_;
+            // 从卡池获取完整CardData并初始化（与CreateGroupCardRow方式一致，确保渲染正确）
+            var card = _cardRes.Instantiate() as cardBase_;
+            var cd = _bf.GetCardMaganer().GetCard(deckCard.id);
+            if (cd != null)
+                card.SetCardInformation(cd); // SetCardInformation内部已调用RefreshState
+            else
+                card.SetCardInformation(new CardData
+                {
+                    Name = deckCard.name, Id = deckCard.id,
+                    Attack = deckCard.ReadAttack(), Defense = deckCard.ReadDefence(),
+                    Cost = deckCard.ReadCost(), CardType = deckCard.cardType,
+                    Rarity = deckCard.rarity, IconPath = deckCard.IconPath,
+                    Description = deckCard.description, Effect = deckCard.effect,
+                    Traits = deckCard.traits, TargetType = deckCard.targetType,
+                    IsHq = deckCard.isHq
+                });
+            card.SetIsFriend(IsFriend.friend);
             card.Scale = new Vector2(DeckReplaceScale, DeckReplaceScale);
             card.Position = new Vector2(x, y);
             card.MouseFilter = Control.MouseFilterEnum.Ignore;
