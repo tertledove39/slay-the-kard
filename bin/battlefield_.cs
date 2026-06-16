@@ -4207,12 +4207,11 @@ InputState currentInputState = InputState.nil;
     }
 
     /// <summary>
-    /// 执行指令卡效果，等待完成后播放弃置动画，最后移除卡牌。
-    /// 确保效果执行完毕 -> DiscardCard动画完整播放 -> RemoveCard的顺序，避免冲突。
+    /// 执行指令卡效果。先启动弃牌动画让指令卡飞向左侧，
+    /// 等动画开始一小会后执行效果，效果在动画背景中结算。
     /// </summary>
     private async void ExecuteCommandAndDiscard(cardBase_ commandCard, List<cardBase_> targets, bool needRestoreColor = false)
     {
-        // 立即清理视觉状态并移出手牌，避免卡牌悬停在空中等待效果执行
         commandCard.ResetVisualsInstant();
         player1.RemoveFromHand(commandCard);
 
@@ -4223,9 +4222,15 @@ InputState currentInputState = InputState.nil;
             RestoreAllTargetsColor();
         }
 
-        // 等待效果执行完毕后再播放丢弃动画并移除
+        // 先启动弃牌动画（飞入→停留→飞出，总约3.5s）
+        var discardTask = commandCard.DiscardCard();
+
+        // 等300ms让动画开始并飞出一段距离，然后执行效果
+        await Task.Delay(300);
         await ParseAndExecuteEffect(commandCard.effect, commandCard, targets);
-        await commandCard.DiscardCard();
+
+        // 等动画完全播完再移除
+        await discardTask;
         RemoveCard(commandCard);
         CheckIfAnyUnitDiedAsync();
     }
