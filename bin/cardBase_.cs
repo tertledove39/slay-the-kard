@@ -1756,7 +1756,7 @@ public static class IconCache
         { UnitTraits.Guardian, "Guardian" },
         { UnitTraits.Shock, "impact" },
         { UnitTraits.Ambush, "ambush" },
-        { UnitTraits.Immunity, "heavyArmour" },
+        { UnitTraits.Immunity, "Immunity" },
         { UnitTraits.Mobilize, "mobilize" },
     };
 

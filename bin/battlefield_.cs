@@ -4665,15 +4665,15 @@ public class Player
     /// 将卡牌添加到手牌
     /// </summary>
     /// <param name="card"></param>
-    public Task AddCardToHand(cardBase_ card)
+    public async Task AddCardToHand(cardBase_ card)
     {
-        // 如果手牌已满，直接弃掉（与 DrawCard 保持一致）
+        // 如果手牌已满，等待弃牌动画完成后再移除
         if (cardsInHand.Count >= maxHandSize)
         {
             battlefield.AddToBattleField(card);
-            var discardTask = card.DiscardCard();
+            await card.DiscardCard();
             battlefield.RemoveCard(card);
-            return discardTask;
+            return;
         }
         if(!cardsInHand.Contains(card))
     {
@@ -4685,27 +4685,25 @@ public class Player
         }
         card.setState(CardState.inHand);
         RefreshMyHand();
-        return Task.CompletedTask;
     }
 
-    public Task AddCardToHand(CardData card)
+    public async Task AddCardToHand(CardData card)
     {
-        // 如果手牌已满，直接弃掉（与 DrawCard 保持一致）
+        // 如果手牌已满，等待弃牌动画完成后再移除
         if (cardsInHand.Count >= maxHandSize)
         {
-            // 先创建再弃掉，保持与其他路径一致
             var cardRes = ResourceManager.Instance?.GetScene("res://bin/cardbase.tscn")
                           ?? ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
             var _card = cardRes?.Instantiate() as cardBase_;
             if (_card == null)
-                return Task.CompletedTask;
+                return;
 
             _card.SetCardInformation(card);
             _card.SetIsFriend(isFriend);
             battlefield.AddToBattleField(_card);
-            var discardTask = _card.DiscardCard();
+            await _card.DiscardCard();
             battlefield.RemoveCard(_card);
-            return discardTask;
+            return;
         }
 
         // 尝试从资源池获取一个空卡牌（减少实例化开销）
