@@ -11,6 +11,8 @@
 - 实现战后卡牌奖励系统：战役胜利后显示3组卡牌（每组5张），可选择一组替换卡组中的5张
   - PostBattleReward(CanvasLayer) 处理完整奖励流程：生成随机卡组 → 组选择 → 卡组替换
   - CardMaganer新增GetAllCards()方法获取所有卡牌数据
+  - 奖励组选择界面：3组横向排列（每组5张一行），各组纵向堆叠，按钮在行右侧
+  - 卡牌替换界面：按费用→名称→攻击力排序（与牌库展示一致），点击通过背景GuiInput碰撞检测避免子控件拦截
 - 实现战役推进功能：WorldMap(世界地图) → ChooseMission(选择任务) → Battlefield(战斗)
   - 10个可点击区域(TextureButton)，WorldMap动态连接所有按钮
   - 每个区域对应AreaPool.ini中的敌人池，随机抽取3个互不相同的敌人
