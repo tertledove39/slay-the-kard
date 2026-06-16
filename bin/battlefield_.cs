@@ -439,6 +439,9 @@ TextureButton buttonNextTurn;
 
         cardMaganer.SetCardDictionary(_items);
 
+        // 创建电表式指挥点数字显示（替换原有Label）
+        SetupMeterLabels();
+
         player1 = new Player(new Vector2(700,700), this,IsFriend.friend);
         player2 = new Player(new Vector2(700,0), this,IsFriend.enemy);
 
@@ -460,6 +463,55 @@ TextureButton buttonNextTurn;
         GetNode<End>("end").Visible = false;
 
         player1.DrawCard(5);
+    }
+
+    /// <summary>
+    /// 创建电表式滚动数字组件，替换场景中原有的 point/pointMax Label
+    /// </summary>
+    private void SetupMeterLabels()
+    {
+        var font = ResourceLoader.Load<FontFile>("res://bin/FRADMCN.TTF");
+        var meterColor = new Color(1, 0.725f, 0, 1);
+
+        // 读取原Label位置作为参考
+        var oldPoint = GetNode<Label>("point");
+        var oldPointMax = GetNode<Label>("pointMax");
+        var oldSlash = GetNode<Label>("charleft");
+
+        // 创建指挥点电表
+        var pointMeter = new MeterLabel();
+        pointMeter.Name = "pointMeter";
+        pointMeter.ZIndex = 100;
+        pointMeter.Position = oldPoint.Position;
+        pointMeter.Initialize(font, 145, meterColor, digitCount: 1, initialValue: 1);
+        AddChild(pointMeter);
+
+        // 创建指挥点上限电表
+        var pointMaxMeter = new MeterLabel();
+        pointMaxMeter.Name = "pointMaxMeter";
+        pointMaxMeter.ZIndex = 100;
+        pointMaxMeter.Position = oldPointMax.Position;
+        pointMaxMeter.DigitWidthRatio = 0.5f;
+        pointMaxMeter.Initialize(font, 130, meterColor, digitCount: 1, initialValue: 1);
+        AddChild(pointMaxMeter);
+
+        // 隐藏原有Label
+        oldPoint.Visible = false;
+        oldPointMax.Visible = false;
+        oldSlash.Visible = false;
+
+        // 创建新的 "/" 分隔符Label，放置在两个电表之间
+        var slashLabel = new Label();
+        slashLabel.Name = "slashMeter";
+        slashLabel.Text = "/";
+        slashLabel.ZIndex = 100;
+        slashLabel.AddThemeFontOverride("font", font);
+        slashLabel.AddThemeFontSizeOverride("font_size", 130);
+        slashLabel.AddThemeColorOverride("font_color", meterColor);
+        slashLabel.Set("theme_override_constants/outline_size", 12);
+        slashLabel.Set("theme_override_colors/outline_color", meterColor);
+        slashLabel.Position = oldSlash.Position;
+        AddChild(slashLabel);
     }
 
     private void CreateChoiceOverlay()
@@ -1936,29 +1988,6 @@ InputState currentInputState = InputState.nil;
         if (card.GetIsFriend() == IsFriend.enemy && enemySupprotLine.Contains(place))
             return CheckIfFrontLineIsFriend() != IsFriend.friend;
         return true;
-    }
-
-    /// <summary>
-    /// Label数字滚动动画：从旧值逐步滚动到新值（用于费用、指挥点等）
-    /// </summary>
-    public async Task RollLabelNumber(Label label, int fromValue, int toValue)
-    {
-        if (fromValue == toValue || label == null) return;
-
-        int steps = Math.Abs(toValue - fromValue);
-        int direction = toValue > fromValue ? 1 : -1;
-        // 每步间隔80-150ms，变化越多越快但确保每步可见
-        float delaySec = Math.Clamp(1.0f / Math.Max(steps, 1), 0.08f, 0.15f);
-
-        int current = fromValue;
-        label.Text = current.ToString();
-        while (current != toValue)
-        {
-            await ToSignal(GetTree().CreateTimer(delaySec), SceneTreeTimer.SignalName.Timeout);
-            current += direction;
-            if (IsInstanceValid(label))
-                label.Text = current.ToString();
-        }
     }
 
     List<cardBase_> enemyDeck;
@@ -4576,8 +4605,8 @@ public class Player
 
     int maxHandSize = 9;
     IsFriend isFriend;
-    Label pointLabel;
-    Label pointMaxLabel;
+    MeterLabel pointLabel;
+    MeterLabel pointMaxLabel;
 
     int      point              = 1;
     int      pointMax           = 1;
@@ -4599,7 +4628,7 @@ public class Player
         int oldPoint = point;
         if(point + i >= pointMaxMaxMax) {point = pointMaxMaxMax;}
         else point += i;
-        _ = battlefield.RollLabelNumber(pointLabel, oldPoint, point);
+        _ = pointLabel.AnimateTo(point);
     }
 
     public void AddPointMax(int i = 1)
@@ -4607,7 +4636,7 @@ public class Player
         int oldMax = pointMax;
         if(pointMax + i >= pointMaxMaxMax) {pointMax = pointMaxMaxMax;}
         else pointMax += i;
-        _ = battlefield.RollLabelNumber(pointMaxLabel, oldMax, pointMax);
+        _ = pointMaxLabel.AnimateTo(pointMax);
     }
 
     public Boolean UsePoint(int x)
@@ -4616,7 +4645,7 @@ public class Player
         {
             int oldPoint = point;
             point -= x;
-            _ = battlefield.RollLabelNumber(pointLabel, oldPoint, point);
+            _ = pointLabel.AnimateTo(point);
             return true;
         }
         else
@@ -4642,14 +4671,14 @@ public class Player
         int oldPoint = point;
         point += x;
         if (point > pointMax) point = pointMax;
-        _ = battlefield.RollLabelNumber(pointLabel, oldPoint, point);
+        _ = pointLabel.AnimateTo(point);
     }
 
     public void RefreshPoint()
     {
         int oldPoint = point;
         point = pointMax;
-        _ = battlefield.RollLabelNumber(pointLabel, oldPoint, point);
+        _ = pointLabel.AnimateTo(point);
     }
 
 
@@ -4659,7 +4688,7 @@ public class Player
         {
             int oldMax = pointMax;
             pointMax += 1;
-            _ = battlefield.RollLabelNumber(pointMaxLabel, oldMax, pointMax);
+            _ = pointMaxLabel.AnimateTo(pointMax);
         }
         RefreshPoint();
 
@@ -4769,11 +4798,11 @@ public class Player
         deck = new List<cardBase_>();
         InitializeDeckFromIni();
         
-        pointLabel = battlefield.GetNode<Label>("point");
-        pointMaxLabel = battlefield.GetNode<Label>("pointMax");
+        pointLabel = battlefield.GetNode<MeterLabel>("pointMeter");
+        pointMaxLabel = battlefield.GetNode<MeterLabel>("pointMaxMeter");
         // 初始化点数显示（无需动画）
-        pointLabel.Text = $"{point}";
-        pointMaxLabel.Text = $"{pointMax}";
+        pointLabel.DisplayImmediate(point);
+        pointMaxLabel.DisplayImmediate(pointMax);
     }
     
     /// <summary>

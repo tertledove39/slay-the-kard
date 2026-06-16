@@ -7,6 +7,11 @@
 - 卡牌分为坦克、步兵、飞机、轰炸机、火炮、指令等类型
 - 单位具有特性（闪击、奋战、重甲、烟幕、守护、冲击、伏击、免疫）
 
+## 最新修改 (2026-06-16)
+- 指挥点数显示改为电表式滚动效果：每个数位独立裁剪窗口+垂直数字滚条+Tween动画，低位先动高位级联
+- 新增 MeterLabel 组件（bin/MeterLabel.cs），可复用于任意需要数字滚动动画的场景
+- 移除旧的 RollLabelNumber 逐步计数方法，统一使用 MeterLabel.AnimateTo
+
 ## 最新修改 (2026-06-15)
 - 修复 EvaluateCondition 中 target.name 条件判断使用 id 而非 name 字段的bug（导致正面突击等卡牌效果异常）
 - 修复 AddToHand 数量参数逻辑错误（count<1 时错误设为0而非1）
