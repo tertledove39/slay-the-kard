@@ -4836,6 +4836,11 @@ public class Player
         {
             battlefield.AddToBattleField(card);
         }
+        else if (card.GetParent() != battlefield)
+        {
+            // 卡已在追踪中但被Reparent到其他节点（如ShowCardChoice的choiceLayer）
+            card.Reparent(battlefield);
+        }
         card.setState(CardState.inHand);
         RefreshMyHand();
     }
