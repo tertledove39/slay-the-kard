@@ -32,6 +32,9 @@ public partial class WorldMap : Control
 
     public override void _Ready()
     {
+        // 启动时立即初始化卡牌数据和卡组（之后所有场景均可直接使用）
+        LoadCardDataCache();
+        LoadDeck();
         LoadEvents();
         LoadAreaPools();
         ConnectAreaButtons();
@@ -40,7 +43,7 @@ public partial class WorldMap : Control
         // 预加载选择任务界面
         _chooseMissionScene = ResourceLoader.Load<PackedScene>("res://bin/chooseMission.tscn");
 
-        // 右上角"查看卡组"按钮（从持久化DeckCardIds构建显示）
+        // 右上角"查看卡组"按钮
         var viewSize = GetViewportRect().Size;
         var viewDeckBtn = new Button();
         viewDeckBtn.Text = "卡组";
@@ -49,11 +52,6 @@ public partial class WorldMap : Control
         viewDeckBtn.ZIndex = 1000;
         viewDeckBtn.Pressed += () =>
         {
-            // 若CardData尚未缓存（直接从WorldMap启动），加载一次
-            if (BattleStateManager.GetCachedCard("t70") == null)
-            {
-                LoadCardDataCache();
-            }
             var displayDeck = BattleStateManager.BuildDisplayDeck();
             BattleStateManager.ShowDeckViewer(this, displayDeck);
         };
@@ -168,6 +166,45 @@ public partial class WorldMap : Control
         }
 
         GD.Print($"Loaded area pools: {_areaPools.Count} areas");
+    }
+
+    /// <summary>首次启动时从deck.ini加载卡组并持久化DeckCardIds</summary>
+    private static void LoadDeck()
+    {
+        // 已经初始化过则跳过
+        if (BattleStateManager.IsDeckInitialized) return;
+
+        var iniPath = "res://bin/deck.ini";
+        if (!Godot.FileAccess.FileExists(iniPath)) return;
+
+        var content = Godot.FileAccess.Open(iniPath, Godot.FileAccess.ModeFlags.Read).GetAsText();
+        var configFile = new IniFile();
+        var tempPath = OS.GetUserDataDir() + "/temp_deck.ini";
+        using (var writer = System.IO.File.CreateText(tempPath))
+            writer.Write(content);
+        configFile.Load(tempPath);
+
+        if (!configFile.HasSection("deck")) return;
+
+        var deckKeys = configFile.GetSectionKeys("deck");
+        foreach (var key in deckKeys)
+        {
+            string cardIdValue = configFile["deck"][key].GetString();
+            int count = 1;
+            string actualCardId = cardIdValue;
+            if (cardIdValue.Contains("*"))
+            {
+                string[] parts = cardIdValue.Split("*");
+                actualCardId = parts[0].Trim();
+                if (parts.Length > 1 && int.TryParse(parts[1].Trim(), out int parsedCount))
+                    count = parsedCount;
+            }
+            for (int i = 0; i < count; i++)
+                BattleStateManager.DeckCardIds.Add(actualCardId);
+        }
+
+        BattleStateManager.IsDeckInitialized = true;
+        GD.Print($"[WorldMap] 卡组初始化完成，共{BattleStateManager.DeckCardIds.Count}张卡");
     }
 
     /// <summary>加载event.ini并缓存到BattleStateManager</summary>
