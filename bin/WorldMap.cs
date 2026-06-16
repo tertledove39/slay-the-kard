@@ -65,8 +65,10 @@ public partial class WorldMap : Control
     {
         var iniPath = "res://cards/card.ini";
         if (!Godot.FileAccess.FileExists(iniPath)) return;
+        var content = Godot.FileAccess.Open(iniPath, Godot.FileAccess.ModeFlags.Read).GetAsText();
         var configFile = new IniFile();
-        configFile.Load(iniPath);
+        using (var stream = new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(content)))
+            configFile.Load(stream);
         var items = new Dictionary<string, CardData>();
         foreach (var section in configFile)
         {
@@ -173,8 +175,10 @@ public partial class WorldMap : Control
     {
         var iniPath = "res://bin/event.ini";
         if (!Godot.FileAccess.FileExists(iniPath)) return;
+        var content = Godot.FileAccess.Open(iniPath, Godot.FileAccess.ModeFlags.Read).GetAsText();
         var configFile = new IniFile();
-        configFile.Load(iniPath);
+        using (var stream = new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(content)))
+            configFile.Load(stream);
         var events = new Dictionary<string, EventData>();
 
         foreach (var section in configFile)
