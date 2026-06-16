@@ -8,6 +8,9 @@
 - 单位具有特性（闪击、奋战、重甲、烟幕、守护、冲击、伏击、免疫）
 
 ## 最新修改 (2026-06-16)
+- 实现战后卡牌奖励系统：战役胜利后显示3组卡牌（每组5张），可选择一组替换卡组中的5张
+  - PostBattleReward(CanvasLayer) 处理完整奖励流程：生成随机卡组 → 组选择 → 卡组替换
+  - CardMaganer新增GetAllCards()方法获取所有卡牌数据
 - 实现战役推进功能：WorldMap(世界地图) → ChooseMission(选择任务) → Battlefield(战斗)
   - 10个可点击区域(TextureButton)，WorldMap动态连接所有按钮
   - 每个区域对应AreaPool.ini中的敌人池，随机抽取3个互不相同的敌人

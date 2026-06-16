@@ -2889,6 +2889,9 @@ InputState currentInputState = InputState.nil;
         // 标记当前区域已完成，解锁下一区域
         BattleStateManager.MarkAreaCompleted(BattleStateManager.SelectedArea);
 
+        // 显示战后卡牌奖励选择
+        await PostBattleReward.Show(this, player1);
+
         await ToSignal(GetTree().CreateTimer(2.5f), SceneTreeTimer.SignalName.Timeout);
         BattleStateManager.IsCampaignMode = false;
         GetTree().ChangeSceneToFile("res://bin/worldMap.tscn");
@@ -5376,6 +5379,15 @@ public class CardMaganer
             return null;
         }
     }
+
+    /// <summary>
+    /// 获取所有卡牌数据列表
+    /// </summary>
+    public List<CardData> GetAllCards()
+    {
+        return _items.Values.ToList();
+    }
+
 /// <summary>
 /// 加载hq isfriend 0表示敌方 1表示我方
 /// </summary>
