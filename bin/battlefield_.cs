@@ -2162,37 +2162,42 @@ InputState currentInputState = InputState.nil;
         string currentTurnKey = $"t{turn}";
         if (enemyActionQueue.ContainsKey(currentTurnKey))
         {
-            foreach (var action in enemyActionQueue[currentTurnKey])
+            // 快照行动列表，避免执行期间列表被修改导致迭代异常
+            var turnActions = enemyActionQueue[currentTurnKey].ToList();
+            foreach (var action in turnActions)
             {
                 await ExecuteEnemyAction(action);
                 hasAction = true;
             }
         }
-        
+
         // 如果当前回合没有行动，执行default行动
         if (!hasAction && enemyActionQueue.ContainsKey("default"))
         {
-            foreach (var action in enemyActionQueue["default"])
+            // 快照行动列表，避免执行期间列表被修改导致迭代异常
+            var defaultActions = enemyActionQueue["default"].ToList();
+            foreach (var action in defaultActions)
             {
                 await ExecuteEnemyAction(action);
             }
         }
         
         // 执行everyXXt格式的行动（如every5t、every10t等）
-        foreach (var key in enemyActionQueue.Keys)
+        // 快照键集合，避免ExecuteEnemyAction内部修改字典导致迭代异常
+        var everyKeys = enemyActionQueue.Keys.Where(k => k.StartsWith("every") && k.EndsWith("t")).ToList();
+        foreach (var key in everyKeys)
         {
-            if (key.StartsWith("every") && key.EndsWith("t"))
+            // 提取数字部分
+            string numberStr = key.Substring(5, key.Length - 6); // "every"长度为5，"t"长度为1
+            if (int.TryParse(numberStr, out int interval))
             {
-                // 提取数字部分
-                string numberStr = key.Substring(5, key.Length - 6); // "every"长度为5，"t"长度为1
-                if (int.TryParse(numberStr, out int interval))
+                if (interval > 0 && turn % interval == 0)
                 {
-                    if (interval > 0 && turn % interval == 0)
+                    // 快照行动列表，避免执行期间列表被修改
+                    var actions = enemyActionQueue[key].ToList();
+                    foreach (var action in actions)
                     {
-                        foreach (var action in enemyActionQueue[key])
-                        {
-                            await ExecuteEnemyAction(action);
-                        }
+                        await ExecuteEnemyAction(action);
                     }
                 }
             }
@@ -2201,7 +2206,9 @@ InputState currentInputState = InputState.nil;
         // 执行ADD行动（每回合都执行）
         if (enemyActionQueue.ContainsKey("ADD"))
         {
-            foreach (var action in enemyActionQueue["ADD"])
+            // 快照行动列表，避免执行期间列表被修改导致迭代异常
+            var addActions = enemyActionQueue["ADD"].ToList();
+            foreach (var action in addActions)
             {
                 await ExecuteEnemyAction(action);
             }
