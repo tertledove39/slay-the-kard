@@ -72,14 +72,18 @@ public partial class WorldMap : Control
         {
             var cd = new CardData();
             cd.Id = section.Key;
-            cd.Name = configFile[section.Key]["name"].ToString().Trim();
+            cd.Name = configFile[section.Key]["name"].GetString();
+            cd.Description = configFile[section.Key]["description"].GetString();
             cd.Attack = configFile[section.Key]["attack"].ToInt();
             cd.Defense = configFile[section.Key]["defense"].ToInt();
             cd.Cost = configFile[section.Key]["price"].ToInt();
-            cd.Rarity = GetRarity(configFile[section.Key]["rarity"].ToString().Trim());
-            cd.IconPath = configFile[section.Key]["icon"].ToString().Trim();
-            cd.CardType = GetTypes(configFile[section.Key]["cardType"].ToString().Trim());
-            cd.TargetType = GetTargetType(configFile[section.Key]["targetType"].ToString().Trim());
+            cd.Effect = configFile[section.Key]["effect"].GetString();
+            cd.IsHq = (HQ)configFile[section.Key]["isHq"].ToInt();
+            cd.Rarity = GetRarity(configFile[section.Key]["rarity"].GetString());
+            cd.IconPath = configFile[section.Key]["icon"].GetString();
+            cd.CardType = GetTypes(configFile[section.Key]["cardType"].GetString());
+            cd.TargetType = GetTargetType(configFile[section.Key]["targetType"].GetString());
+            cd.Traits = GetTraitList(configFile[section.Key]["traits"].GetString());
             items[cd.Id] = cd;
         }
         BattleStateManager.CacheAllCards(items);
@@ -114,6 +118,21 @@ public partial class WorldMap : Control
         "anytarget" => TargetType.anyTarget,
         _ => TargetType.NOTarget
     };
+
+    /// <summary>从逗号分隔字符串解析特性位掩码</summary>
+    private static UnitTraits GetTraitList(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return UnitTraits.None;
+        try
+        {
+            var list = s.Split(',').Select(x => (UnitTraits)Enum.Parse(typeof(UnitTraits), x.Trim()));
+            UnitTraits result = UnitTraits.None;
+            foreach (var t in list)
+                result |= t;
+            return result;
+        }
+        catch { return UnitTraits.None; }
+    }
 
     public override void _Input(InputEvent @event)
     {
