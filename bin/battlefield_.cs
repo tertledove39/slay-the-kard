@@ -5339,6 +5339,7 @@ public class CardMaganer
 {
     private Dictionary<string, CardData> _items = [];
     private Random random = new Random();
+    private cardBase_ _cardTemplate; // 惰性缓存的卡牌模板，用于Duplicate()
 
     /// <summary>
     /// 随机获得一张卡的数据
@@ -5395,7 +5396,7 @@ public class CardMaganer
     public cardBase_ LoadHq(int isFriend)
     {
         PackedScene cardRes = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
-            var card = cardRes.Instantiate() as cardBase_; 
+            var card = cardRes.Instantiate() as cardBase_;
             // 根据isFriend参数加载不同的HQ卡牌数据
             if(isFriend == 1)
             {
@@ -5409,6 +5410,20 @@ public class CardMaganer
             }
             return card;
 
+    }
+
+    /// <summary>
+    /// 获取卡牌模板实例（惰性创建），供外部通过Duplicate()复制卡牌。
+    /// 模板不入场景树，避免不必要的渲染开销。
+    /// </summary>
+    public cardBase_ GetCardTemplate()
+    {
+        if (_cardTemplate == null)
+        {
+            PackedScene cardRes = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
+            _cardTemplate = cardRes.Instantiate() as cardBase_;
+        }
+        return _cardTemplate;
     }
 
 }

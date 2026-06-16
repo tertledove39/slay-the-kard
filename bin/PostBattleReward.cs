@@ -11,7 +11,6 @@ public partial class PostBattleReward : CanvasLayer
 {
     private battlefield_ _bf;
     private Player _player;
-    private PackedScene _cardRes;
     private List<CardData> _chosenGroup;
     private readonly HashSet<cardBase_> _selectedToRemove = new();
 
@@ -48,7 +47,6 @@ public partial class PostBattleReward : CanvasLayer
     {
         _bf = bf;
         _player = player;
-        _cardRes = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
 
         // 步骤1: 生成3组奖励卡牌
         var groups = GenerateRewardGroups();
@@ -206,7 +204,7 @@ public partial class PostBattleReward : CanvasLayer
         float gap = 4f;
         for (int i = 0; i < group.Count; i++)
         {
-            var card = _cardRes.Instantiate() as cardBase_;
+            var card = _bf.GetCardMaganer().GetCardTemplate().Duplicate() as cardBase_;
             parent.AddChild(card); // 先入场景树触发_Ready，确保字体测量可用
             card.SetCardInformation(group[i]); // SetCardInformation内部已调用RefreshState
             card.SetIsFriend(IsFriend.friend);
@@ -298,7 +296,7 @@ public partial class PostBattleReward : CanvasLayer
             float y = 10 + row * (cardH + cardGapY);
 
             // 先加入场景树触发_Ready，再设置卡牌信息，确保字体测量/布局正确
-            var card = _cardRes.Instantiate() as cardBase_;
+            var card = _bf.GetCardMaganer().GetCardTemplate().Duplicate() as cardBase_;
             cardContainer.AddChild(card); // 先入树，originalScale记录为1.0
 
             var cd = _bf.GetCardMaganer().GetCard(deckCard.id);
@@ -400,7 +398,7 @@ public partial class PostBattleReward : CanvasLayer
 
         foreach (var cardData in _chosenGroup)
         {
-            var newCard = _cardRes.Instantiate() as cardBase_;
+            var newCard = _bf.GetCardMaganer().GetCardTemplate().Duplicate() as cardBase_;
             newCard.SetCardInformation(cardData);
             newCard.SetIsFriend(IsFriend.friend);
             deck.Add(newCard);
