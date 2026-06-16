@@ -38,6 +38,16 @@ public partial class WorldMap : Control
 
         // 预加载选择任务界面
         _chooseMissionScene = ResourceLoader.Load<PackedScene>("res://bin/chooseMission.tscn");
+
+        // 右上角"查看卡组"按钮
+        var viewSize = GetViewportRect().Size;
+        var viewDeckBtn = new Button();
+        viewDeckBtn.Text = "卡组";
+        viewDeckBtn.Position = new Vector2(viewSize.X - 110, 10);
+        viewDeckBtn.Size = new Vector2(90, 36);
+        viewDeckBtn.ZIndex = 1000;
+        viewDeckBtn.Pressed += () => BattleStateManager.ShowDeckViewer(this);
+        AddChild(viewDeckBtn);
     }
 
     public override void _Input(InputEvent @event)

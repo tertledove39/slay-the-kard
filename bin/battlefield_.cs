@@ -471,6 +471,28 @@ TextureButton buttonNextTurn;
         GetNode<End>("end").Visible = false;
 
         player1.DrawCard(5);
+
+        // 右上角"查看卡组"按钮
+        CreateDeckViewButton();
+    }
+
+    /// <summary>
+    /// 在屏幕右上角创建"查看卡组"按钮，点击可查看当前完整卡组
+    /// </summary>
+    private void CreateDeckViewButton()
+    {
+        var viewSize = GetViewportRect().Size;
+        var viewDeckBtn = new Button();
+        viewDeckBtn.Text = "卡组";
+        viewDeckBtn.Position = new Vector2(viewSize.X - 110, 10);
+        viewDeckBtn.Size = new Vector2(90, 36);
+        viewDeckBtn.ZIndex = 1000;
+        viewDeckBtn.Pressed += () =>
+        {
+            BattleStateManager.Deck = player1.ReadMyDeck();
+            BattleStateManager.ShowDeckViewer(this);
+        };
+        AddChild(viewDeckBtn);
     }
 
     /// <summary>

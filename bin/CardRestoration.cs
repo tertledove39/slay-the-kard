@@ -71,4 +71,18 @@ public static class BattleStateManager
         foreach (var area in AreaOrder)
             CompletedAreas.Add(area);
     }
+
+    /// <summary>
+    /// 在parent上以CanvasLayer叠加显示卡组查看界面。
+    /// 调用前需确保Deck已设置为当前卡组。
+    /// </summary>
+    public static void ShowDeckViewer(Node parent)
+    {
+        var canvasLayer = new CanvasLayer();
+        canvasLayer.Layer = 2;
+        parent.AddChild(canvasLayer);
+        var displayScene = ResourceLoader.Load<PackedScene>("res://bin/display_card.tscn");
+        var displayCard = displayScene.Instantiate();
+        canvasLayer.AddChild(displayCard);
+    }
 }
