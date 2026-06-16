@@ -23,6 +23,15 @@ public partial class PostBattleReward : CanvasLayer
     private const int CardsPerGroup = 5;
     private const int MaxSwapCards = 5;
 
+    // 每种稀有度在牌组中的最大拥有数量（按卡牌ID计）
+    private static readonly Dictionary<Rarity, int> RarityMaxCopies = new()
+    {
+        { Rarity.Common, 4 },
+        { Rarity.Rare, 3 },
+        { Rarity.Epic, 2 },
+        { Rarity.Legendary, 1 },
+    };
+
     /// <summary>
     /// 静态入口：创建实例并执行奖励流程
     /// </summary>
@@ -66,22 +75,49 @@ public partial class PostBattleReward : CanvasLayer
     // ============================ 卡牌生成 ============================
 
     /// <summary>
-    /// 从卡池中随机生成3组各5张不重复的非总部/非不可获得卡牌
+    /// 从卡池中随机生成3组各5张不重复的非总部/非不可获得卡牌。
+    /// 按稀有度过滤：若牌组中某卡已达到稀有度上限，则该卡不会出现在奖励中。
     /// </summary>
     private List<List<CardData>> GenerateRewardGroups()
     {
         var rnd = new Random();
         var allCards = _bf.GetCardMaganer().GetAllCards();
+
+        // 统计当前牌组中各卡牌ID的数量
+        var deckCounts = new Dictionary<string, int>();
+        foreach (var c in _player.ReadMyDeck())
+        {
+            if (!string.IsNullOrEmpty(c.id))
+            {
+                deckCounts.TryGetValue(c.id, out int count);
+                deckCounts[c.id] = count + 1;
+            }
+        }
+
+        // 过滤：非HQ、非不可获得，且加入后不超过稀有度上限
         var validCards = allCards
             .Where(c => c.IsHq == HQ.normalCard && c.Rarity != Rarity.Unobtainable)
+            .Where(c =>
+            {
+                if (!RarityMaxCopies.TryGetValue(c.Rarity, out int maxCopies))
+                    return true; // 未配置稀有度限制的默认允许
+                deckCounts.TryGetValue(c.Id, out int currentCount);
+                return currentCount < maxCopies;
+            })
             .ToList();
 
-        if (validCards.Count < GroupsCount * CardsPerGroup)
+        // 如果过滤后卡牌不足，回退为不限稀有度（保障始终能生成奖励）
+        if (validCards.Count < CardsPerGroup)
         {
-            // 允许重复以满足数量要求
-            while (validCards.Count < GroupsCount * CardsPerGroup)
-                validCards.Add(validCards[rnd.Next(validCards.Count)]);
+            GD.Print($"[PostBattleReward] 稀有度过滤后仅{validCards.Count}张可用卡，回退为不限稀有度");
+            validCards = allCards
+                .Where(c => c.IsHq == HQ.normalCard && c.Rarity != Rarity.Unobtainable)
+                .ToList();
         }
+
+        // 允许重复以满足数量要求
+        while (validCards.Count < GroupsCount * CardsPerGroup)
+            validCards.Add(validCards[rnd.Next(validCards.Count)]);
 
         var shuffled = validCards.OrderBy(_ => rnd.Next()).ToList();
         var groups = new List<List<CardData>>();
@@ -131,8 +167,7 @@ public partial class PostBattleReward : CanvasLayer
         for (int g = 0; g < groups.Count; g++)
         {
             float gy = startY + g * groupHeight;
-            var cards = CreateGroupCardRow(groups[g], startX, gy);
-            foreach (var c in cards) AddChild(c);
+            var cards = CreateGroupCardRow(groups[g], startX, gy, this);
 
             // 选择按钮放在卡牌行右侧垂直居中
             var btn = new Button();
@@ -161,9 +196,10 @@ public partial class PostBattleReward : CanvasLayer
     }
 
     /// <summary>
-    /// 在一行中横向创建一组5张缩小版卡牌显示
+    /// 在一行中横向创建一组5张缩小版卡牌显示。
+    /// 确保先加入场景树再设置信息，避免字体/布局测量错误导致渲染错位。
     /// </summary>
-    private List<cardBase_> CreateGroupCardRow(List<CardData> group, float startX, float startY)
+    private List<cardBase_> CreateGroupCardRow(List<CardData> group, float startX, float startY, Node parent)
     {
         var result = new List<cardBase_>();
         float scaledW = CardDisplayWidth * CardDisplayScale;
@@ -171,13 +207,13 @@ public partial class PostBattleReward : CanvasLayer
         for (int i = 0; i < group.Count; i++)
         {
             var card = _cardRes.Instantiate() as cardBase_;
-            card.SetCardInformation(group[i]);
+            parent.AddChild(card); // 先入场景树触发_Ready，确保字体测量可用
+            card.SetCardInformation(group[i]); // SetCardInformation内部已调用RefreshState
             card.SetIsFriend(IsFriend.friend);
             card.Scale = new Vector2(CardDisplayScale, CardDisplayScale);
             card.MouseFilter = Control.MouseFilterEnum.Ignore;
             card.ZIndex = 50;
             card.Position = new Vector2(startX + i * (scaledW + gap), startY);
-            card.RefreshState();
             result.Add(card);
         }
         return result;
@@ -261,8 +297,10 @@ public partial class PostBattleReward : CanvasLayer
             float x = gridStartX + col * (cardW + cardGapX);
             float y = 10 + row * (cardH + cardGapY);
 
-            // 从卡池获取完整CardData并初始化（与CreateGroupCardRow方式一致，确保渲染正确）
+            // 先加入场景树触发_Ready，再设置卡牌信息，确保字体测量/布局正确
             var card = _cardRes.Instantiate() as cardBase_;
+            cardContainer.AddChild(card); // 先入树，originalScale记录为1.0
+
             var cd = _bf.GetCardMaganer().GetCard(deckCard.id);
             if (cd != null)
                 card.SetCardInformation(cd); // SetCardInformation内部已调用RefreshState
@@ -282,7 +320,6 @@ public partial class PostBattleReward : CanvasLayer
             card.Position = new Vector2(x, y);
             card.MouseFilter = Control.MouseFilterEnum.Ignore;
             card.ZIndex = 10;
-            cardContainer.AddChild(card);
             cardDisplays.Add(card);
 
             // 高亮框（置于卡牌下方）
