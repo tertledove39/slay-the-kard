@@ -4212,6 +4212,7 @@ InputState currentInputState = InputState.nil;
     /// </summary>
     private async void ExecuteCommandAndDiscard(cardBase_ commandCard, List<cardBase_> targets, bool needRestoreColor = false)
     {
+        ForbidControl();
         commandCard.ResetVisualsInstant();
         player1.RemoveFromHand(commandCard);
 
@@ -4232,6 +4233,7 @@ InputState currentInputState = InputState.nil;
         // 等动画完全播完再移除
         await discardTask;
         RemoveCard(commandCard);
+        AllowControl();
         CheckIfAnyUnitDiedAsync();
     }
 
@@ -4687,12 +4689,11 @@ public class Player
     /// <param name="card"></param>
     public async Task AddCardToHand(cardBase_ card)
     {
-        // 如果手牌已满，等待弃牌动画完成后再移除
+        // 如果手牌已满，直接弃掉（动画后台播放，不阻塞效果结算）
         if (cardsInHand.Count >= maxHandSize)
         {
             battlefield.AddToBattleField(card);
             _ = battlefield.CardDiscardAndRemove(card);
-            await Task.Delay(1000);
             return;
         }
         if(!cardsInHand.Contains(card))
@@ -4709,7 +4710,7 @@ public class Player
 
     public async Task AddCardToHand(CardData card)
     {
-        // 如果手牌已满，等待弃牌动画完成后再移除
+        // 如果手牌已满，直接弃掉（动画后台播放，不阻塞效果结算）
         if (cardsInHand.Count >= maxHandSize)
         {
             var cardRes = ResourceManager.Instance?.GetScene("res://bin/cardbase.tscn")
@@ -4722,7 +4723,6 @@ public class Player
             _card.SetIsFriend(isFriend);
             battlefield.AddToBattleField(_card);
             _ = battlefield.CardDiscardAndRemove(_card);
-            await Task.Delay(1000);
             return;
         }
 
@@ -4978,7 +4978,6 @@ public class Player
             {
                 battlefield.AddToBattleField(card);
                 _ = battlefield.CardDiscardAndRemove(card);
-                await Task.Delay(500);
                 return;
             }
             card.SetPosition(new Godot.Vector2(-2000, 800));
