@@ -13,6 +13,7 @@ public partial class ResourceManager : Node
 
     private Dictionary<string, Texture2D> textureCache = new Dictionary<string, Texture2D>();
     private Dictionary<string, PackedScene> sceneCache = new Dictionary<string, PackedScene>();
+    private Dictionary<string, FontFile> fontCache = new Dictionary<string, FontFile>();
     private Queue<cardBase_> emptyCardPool = new Queue<cardBase_>();
 
     // 默认的空卡牌池大小
@@ -137,6 +138,27 @@ public partial class ResourceManager : Node
             GetTexture(path);
             await ToSignal(GetTree(), "physics_frame");
         }
+    }
+
+    /// <summary>
+    /// 获取或加载字体并缓存
+    /// </summary>
+    public FontFile GetFont(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return null;
+
+        if (fontCache.TryGetValue(path, out var font))
+            return font;
+
+        if (!FileAccess.FileExists(path))
+            return null;
+
+        font = GD.Load<FontFile>(path);
+        if (font != null)
+            fontCache[path] = font;
+
+        return font;
     }
 
     /// <summary>

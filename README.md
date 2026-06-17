@@ -7,6 +7,16 @@
 - 卡牌分为坦克、步兵、飞机、轰炸机、火炮、指令等类型
 - 单位具有特性（闪击、奋战、重甲、烟幕、守护、冲击、伏击、免疫）
 
+## 最新修改 (2026-06-17)
+- 场景切换性能优化：异步加载+加载覆盖层，消除切换黑屏等待感
+  - 新建 SceneLoader 静态类，切换场景前先显示半透明Loading覆盖层
+  - ChooseMission→Battlefield、EventScene→WorldMap、战场胜利→WorldMap 三处均改为异步加载
+- battlefield 启动加速：跳过 card.ini 重复解析（最大瓶颈）
+  - WorldMap 已通过 BattleStateManager 缓存卡牌数据，battlefield 直接复用
+  - 新增 IsCardDataCached / GetAllCachedCards 公开接口，冷启动时回退到手动加载
+- ResourceManager 扩展：新增字体缓存（GetFont），避免 FRADMCN.TTF 重复加载
+- EnemyInit 使用 ResourceManager.GetScene 缓存场景引用，避免重复 Load
+
 ## 最新修改 (2026-06-16)
 - 修复战后奖励界面的卡牌渲染错位问题：确保AddChild先于SetCardInformation执行，避免字体测量在节点入树前失效
 - 实现按稀有度限制的卡牌奖励生成：

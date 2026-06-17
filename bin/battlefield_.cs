@@ -405,25 +405,27 @@ TextureButton buttonNextTurn;
         //初始化按钮
         buttonNextTurn           = GetNode<TextureButton>("NextTurnButton");
 
-        //初始化卡组
-
-         var INIpath = "res://cards/card.ini";
-
-        if (!Godot.FileAccess.FileExists(INIpath))
+        // 初始化卡组：优先复用WorldMap已缓存的卡牌数据，避免重复解析card.ini
+        if (BattleStateManager.IsCardDataCached)
         {
-            GD.PushError($"INI file not found: {INIpath}");
-            return;
+            cardMaganer.SetCardDictionary(BattleStateManager.GetAllCachedCards());
+            GD.Print("[battlefield] 复用已缓存的卡牌数据，跳过INI加载");
         }
-
-        var configFile = new IniFile();
-        configFile.Load("cards\\card.ini");
-        //_item 所有卡的数据组成的数组
-        Dictionary<string, CardData> _items = [];
-
-        foreach (var section in configFile)
+        else
         {
-            var card = new CardData();
+            // 冷启动回退：独立调试battlefield场景时手动加载
+            var INIpath = "res://cards/card.ini";
+            if (!Godot.FileAccess.FileExists(INIpath))
             {
+                GD.PushError($"INI file not found: {INIpath}");
+                return;
+            }
+            var configFile = new IniFile();
+            configFile.Load("cards\\card.ini");
+            Dictionary<string, CardData> _items = [];
+            foreach (var section in configFile)
+            {
+                var card = new CardData();
                 card.Id          = section.Key;
                 card.Name        = configFile[section.Key]["name"].ToString().Trim();
                 card.Description = configFile[section.Key]["description"].ToString().Trim();
@@ -437,14 +439,11 @@ TextureButton buttonNextTurn;
                 card.IconPath    = configFile[section.Key]["icon"].ToString().Trim();
                 card.TargetType  = GetTargetType(configFile[section.Key]["targetType"].ToString().Trim());
                 card.Traits      = GetTraitList(configFile[section.Key]["traits"].ToString().Trim());
+                _items[card.Id] = card;
             }
-            _items[card.Id] = card;
+            cardMaganer.SetCardDictionary(_items);
+            BattleStateManager.CacheAllCards(_items);
         }
-
-        cardMaganer.SetCardDictionary(_items);
-
-        // 缓存到BattleStateManager供跨场景访问（WorldMap查看卡组等）
-        BattleStateManager.CacheAllCards(_items);
 
         // 创建电表式指挥点数字显示（替换原有Label）
         SetupMeterLabels();
@@ -503,7 +502,7 @@ TextureButton buttonNextTurn;
     /// </summary>
     private void SetupMeterLabels()
     {
-        var font = ResourceLoader.Load<FontFile>("res://bin/FRADMCN.TTF");
+        var font = ResourceManager.Instance?.GetFont("res://bin/FRADMCN.TTF") ?? ResourceLoader.Load<FontFile>("res://bin/FRADMCN.TTF");
         var meterColor = new Color(1, 0.725f, 0, 1);
 
         // 读取原Label位置作为参考
@@ -2036,9 +2035,9 @@ InputState currentInputState = InputState.nil;
     void EnemyInit()
     {
         enemyDeck = new List<cardBase_>();
-        PackedScene cardRes = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
+        var cardRes = ResourceManager.Instance?.GetScene("res://bin/cardbase.tscn") ?? ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
         for(int i = 0; i < 30; i++)
-        {   
+        {
             var card = cardRes.Instantiate() as cardBase_;
             card.SetCardInformation(GetCardMaganer().GetRandomCard());
             card.SetIsFriend(IsFriend.enemy);
@@ -2919,7 +2918,7 @@ InputState currentInputState = InputState.nil;
 
         await ToSignal(GetTree().CreateTimer(2.5f), SceneTreeTimer.SignalName.Timeout);
         BattleStateManager.IsCampaignMode = false;
-        GetTree().ChangeSceneToFile("res://bin/worldMap.tscn");
+        await SceneLoader.ChangeSceneAsync(this, "res://bin/worldMap.tscn");
     }
 
     /// <summary>

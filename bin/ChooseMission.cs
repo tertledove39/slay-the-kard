@@ -90,11 +90,11 @@ public partial class ChooseMission : Control
         }
     }
 
-    private void StartBattle(string enemyId)
+    private async void StartBattle(string enemyId)
     {
         BattleStateManager.SelectedEnemy = enemyId;
         BattleStateManager.IsCampaignMode = true;
-        GetTree().ChangeSceneToFile("res://bin/battleField.tscn");
+        await SceneLoader.ChangeSceneAsync(this, "res://bin/battleField.tscn");
     }
 
     private async void StartEvent(string eventId)

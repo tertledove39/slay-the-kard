@@ -60,6 +60,15 @@ public static class BattleStateManager
         return null;
     }
 
+    /// <summary>获取所有已缓存的卡牌数据（复用缓存，避免重复解析INI文件）</summary>
+    public static Dictionary<string, CardData> GetAllCachedCards()
+    {
+        return _allCards != null ? new Dictionary<string, CardData>(_allCards) : new Dictionary<string, CardData>();
+    }
+
+    /// <summary>卡牌数据是否已缓存（WorldMap加载完成后即为true）</summary>
+    public static bool IsCardDataCached => _allCards != null && _allCards.Count > 0;
+
     /// <summary>缓存所有事件数据</summary>
     public static void CacheAllEvents(Dictionary<string, EventData> events)
     {

@@ -119,7 +119,7 @@ public partial class EventScene : CanvasLayer
         // 标记区域已完成，返回WorldMap
         BattleStateManager.MarkAreaCompleted(_areaName);
         GD.Print($"[EventScene] 事件完成，区域 {_areaName} 已标记");
-        GetTree().ChangeSceneToFile("res://bin/worldMap.tscn");
+        await SceneLoader.ChangeSceneAsync(this, "res://bin/worldMap.tscn");
     }
 
     // ============================ 效果执行 ============================
