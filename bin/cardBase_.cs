@@ -1214,10 +1214,9 @@ public partial class cardBase_ : Control
 
         int bestSize = FindBestFontSizeForLabel(label, font, text, 6, maxSize, effectiveSize);
 
-        // 确保 Label 有 LabelSettings 并正确设置字体
-        label.LabelSettings = new LabelSettings();
-        label.LabelSettings.Font = font;
-        label.LabelSettings.FontSize = bestSize;
+        // 使用ThemeOverride设置字体和字号，避免创建LabelSettings导致GC时native handle失效
+        label.AddThemeFontOverride("font", font);
+        label.AddThemeFontSizeOverride("font_size", bestSize);
     }
 
     private int FindBestFontSizeForLabel(Label label, Font font, string text, int minSize, int maxSize, Vector2 containerSize)
@@ -1226,11 +1225,10 @@ public partial class cardBase_ : Control
         int high = maxSize;
         int best = minSize;
 
-        // 创建临时 Label 用于测量，避免修改原 Label 的属性
+        // 创建临时 Label 用于测量，使用ThemeOverride避免创建LabelSettings
         Label tempLabel = new Label();
         tempLabel.Text = text;
-        tempLabel.LabelSettings = new LabelSettings();
-        tempLabel.LabelSettings.Font = font;
+        tempLabel.AddThemeFontOverride("font", font);
         // 临时添加到场景树以确保正确测量
         AddChild(tempLabel);
 
@@ -1239,7 +1237,7 @@ public partial class cardBase_ : Control
             int mid = (low + high) / 2;
 
             // 设置临时 Label 的字体大小
-            tempLabel.LabelSettings.FontSize = mid;
+            tempLabel.AddThemeFontSizeOverride("font_size", mid);
 
             // 获取实际内容大小
             Vector2 measuredSize = tempLabel.GetMinimumSize();
@@ -1255,7 +1253,7 @@ public partial class cardBase_ : Control
             }
         }
 
-        // 清理临时 Label
+        // 清理临时 Label：先移除再释放
         RemoveChild(tempLabel);
         tempLabel.QueueFree();
 
