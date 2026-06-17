@@ -8,9 +8,14 @@
 - 单位具有特性（闪击、奋战、重甲、烟幕、守护、冲击、伏击、免疫）
 
 ## 最新修改 (2026-06-17)
-- 场景切换性能优化：异步加载+加载覆盖层，消除切换黑屏等待感
-  - 新建 SceneLoader 静态类，切换场景前先显示半透明Loading覆盖层
-  - ChooseMission→Battlefield、EventScene→WorldMap、战场胜利→WorldMap 三处均改为异步加载
+- 场景切换性能优化：缓存复用+异步加载+资源预缓存
+  - 修复Loading覆盖层残留在Root视口不消失的bug（改为添加到CurrentScene随切换自动销毁）
+  - SceneLoader 新增 PackedScene 预缓存后台加载：
+    - BeginPreload(path) 使用 ResourceLoader.LoadThreadedRequest 在后台线程加载场景
+    - ChangeSceneAsync 优先用已缓存的 PackedScene 调用 ChangeSceneToPacked（极快）
+    - 轮询间隔配置为 PollIntervalSec=0.05s，避免高频 ToSignal 开销
+  - WorldMap 启动时后台预加载 battleField.tscn + worldMap.tscn
+  - 回退机制：后台加载失败时自动回退到同步 ChangeSceneToFile
 - battlefield 启动加速：跳过 card.ini 重复解析（最大瓶颈）
   - WorldMap 已通过 BattleStateManager 缓存卡牌数据，battlefield 直接复用
   - 新增 IsCardDataCached / GetAllCachedCards 公开接口，冷启动时回退到手动加载

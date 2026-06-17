@@ -43,6 +43,10 @@ public partial class WorldMap : Control
         // 预加载选择任务界面
         _chooseMissionScene = ResourceLoader.Load<PackedScene>("res://bin/chooseMission.tscn");
 
+        // 后台预加载大型场景（非阻塞），让玩家浏览地图时在后台完成加载
+        SceneLoader.BeginPreload("res://bin/battleField.tscn");
+        SceneLoader.BeginPreload("res://bin/worldMap.tscn");
+
         // 右上角"查看卡组"按钮
         var viewSize = GetViewportRect().Size;
         var viewDeckBtn = new Button();
