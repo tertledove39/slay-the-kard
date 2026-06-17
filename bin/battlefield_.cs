@@ -712,8 +712,8 @@ TextureButton buttonNextTurn;
         foreach(var trait in tritList)
         {
             outTrait |= trait;
-            return outTrait;
         }
+        return outTrait;
         }
         catch(Exception e)
         {
