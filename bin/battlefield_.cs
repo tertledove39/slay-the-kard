@@ -1404,7 +1404,12 @@ InputState currentInputState = InputState.nil;
                         sb.Append(player1?.ReadDeckCount() ?? 0);
                         break;
                     case "lifeTime":
-                        sb.Append(targets != null && targets.Count > 0 ? targets[0].ReadLifeTime() : 0);
+                        if (targets != null && targets.Count > 0)
+                            sb.Append(targets[0].ReadLifeTime());
+                        else if (sourceCard != null)
+                            sb.Append(sourceCard.ReadLifeTime());
+                        else
+                            sb.Append(0);
                         break;
                     default:
                         sb.Append(ReadMemory(varName));
@@ -2060,7 +2065,10 @@ InputState currentInputState = InputState.nil;
         turn++;
         ForbidControl();
         RefreshAllCardInField();
-        
+
+        // 敌方回合开始时，对敌方单位应用动员等trait
+        ApplyEnemyTurnStartTraits();
+
         // 执行敌方行动队列
         await ExecuteEnemyActionQueue();
 
@@ -2837,6 +2845,26 @@ InputState currentInputState = InputState.nil;
 
         // 刷新被守护状态
         RefreshAllBeGuardianedStatus();
+    }
+
+    /// <summary>
+    /// 敌方回合开始时处理trait效果：敌方动员buff
+    /// </summary>
+    private void ApplyEnemyTurnStartTraits()
+    {
+        foreach (var card in cardInPlaces.Where(x => x.getState() == CardState.placed).ToList())
+        {
+            if (card == null) continue;
+
+            // 动员：敌方回合开始时+1攻击+1防御
+            if (card.GetIsFriend() == IsFriend.enemy && card.HasMobilizeActive())
+            {
+                card.AddChange(ChangeType.GetAttack, 1);
+                card.AddChange(ChangeType.GetDefence, 1);
+            }
+        }
+
+        _ = ExecuteChangeLists();
     }
 
     /// <summary>

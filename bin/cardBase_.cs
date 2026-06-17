@@ -1566,23 +1566,23 @@ public partial class cardBase_ : Control
             // 检查对象是否已被释放
             if (!IsInstanceValid(this) || !IsInstanceValid(targetLabel))
                 return;
-            
-            targetLabel.LabelSettings.FontColor = targetColor;
+
+            targetLabel.AddThemeColorOverride("font_color", targetColor);
             await Task.Delay(100);
-            
+
             // 再次检查对象是否已被释放
             if (!IsInstanceValid(this) || !IsInstanceValid(targetLabel))
                 return;
-            
-            targetLabel.LabelSettings.FontColor = Colors.White;
+
+            targetLabel.AddThemeColorOverride("font_color", Colors.White);
             await Task.Delay(100);
         }
-        
+
         // 最后一次检查
         if (!IsInstanceValid(this) || !IsInstanceValid(targetLabel))
             return;
-        
-        targetLabel.LabelSettings.FontColor = targetColor;
+
+        targetLabel.AddThemeColorOverride("font_color", targetColor);
 
 
             // 创建闪烁动画：快速变亮再变暗
