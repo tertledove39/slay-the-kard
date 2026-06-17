@@ -1693,34 +1693,62 @@ public enum CardState
     commandCardCaught,
 }
 
+/// <summary>
+/// 游戏中的效果触发时间点枚举。每个值代表一种特定的游戏时机，
+/// 卡牌效果可通过 Times:标签 绑定到特定时点自动触发。
+/// </summary>
 public enum Times
 {
+    /// <summary>卡牌从手牌中打出进入战场的那一刻。指令卡和单位卡的入场效果如造成伤害、增益友方等通常在此刻触发。此乃卡牌发挥价值的最常见时机。</summary>
     played,
+    /// <summary>单位主动对敌方目标发起攻击的时刻。攻击方的攻击时效果和目标的被攻击时效果均在此刻依次触发。奋战特性允许单位一回合内多次触发此时点。</summary>
     attack,
+    /// <summary>单位被敌方选为攻击目标的时刻。伏击特性会在此刻先于攻击方造成反击伤害，免疫特性则完全抵消本次战斗伤害。守护单位可替相邻单位承受此时点。</summary>
     beingAttack,
+    /// <summary>单位防御力降至零以下被摧毁的时刻。离场效果与亡语效果在此刻结算。总部被摧毁则直接判定该方战败对局结束。此乃决定胜负的最终时点。</summary>
     dead,
+    /// <summary>单位卡牌被放置到战场格子上的时刻。闪击特性在此刻刷新行动次数使单位可立即战斗。Deployed前缀效果在此时触发，是单位入场发挥价值的第二时机。</summary>
     deployed,
+    /// <summary>空时点用作默认值或占位符。当效果无需绑定特定时机或作为无条件持续效果的标记时使用。在效果循环中表示不响应任何具体游戏事件。</summary>
     none,
+    /// <summary>我方任意单位被部署到战场上时触发。适用于响应友军增援的全员效果，如友方单位入场时全体获得增益，或动员类群体战术的连锁触发窗口。</summary>
     aFriendlyUnitDeployed,
+    /// <summary>我方任意单位对敌方发起攻击时触发。可用于全体友方攻击增益效果，如友方单位攻击时对目标额外造成伤害或触发连携攻击等协同战术。</summary>
     aFriendlyUnitAttacked,
+    /// <summary>我方任意单位成为敌方攻击目标时触发。可用于全体友方防御类响应效果，如友方单位被攻击时获得防御增益、在被攻击前给予护盾或进行反击。</summary>
     aFriendlyUnitBeingAttacked,
+    /// <summary>我方任意单位被摧毁离场时触发。适用于友方阵亡触发的复仇效果，如友方单位死亡时抽一张牌或对敌方全体造成伤害的复仇类连锁战术。</summary>
     aFriendlyUnitDead,
+    /// <summary>敌方任意单位被部署到战场上时触发。可用于响应敌方增援的反制效果，如敌方单位部署时对其造成伤害或在敌方援军入场时抽取卡牌抢占先机。</summary>
     aEnemyUnitDeployed,
+    /// <summary>敌方任意单位对我方发起攻击时触发。适用于我方全体对敌方攻击的响应效果，如敌方单位攻击时使其攻击力降低或触发反伤类被动防御机制。</summary>
     aEnemyUnitAttacked,
+    /// <summary>敌方任意单位成为攻击目标时触发。可用于敌方内斗或我方指定敌方为目标时的额外响应，如趁敌方被攻击时追加额外伤害的收割类补刀效果。</summary>
     aEnemyUnitBeingAttacked,
+    /// <summary>敌方任意单位被摧毁离场时触发。适用于敌方阵亡时的扩大优势效果，如敌方单位死亡时所有友方获得增益或抽牌类收割奖励形成滚雪球优势。</summary>
     aEnemyUnitDead,
+    /// <summary>我方总部被敌方单位选为攻击目标时触发。总部是战局的生命线被攻击意味着防线已被突破。适用于绝境反击类效果，如总部的应急防御增益或临死反扑。</summary>
     myHqBeingAttacked,
+    /// <summary>敌方总部被我方单位选为攻击目标时触发。攻击敌方总部是取胜的直接途径。适用于加强总攻力度的效果，如攻击敌方总部时额外造成伤害加速胜利。</summary>
     enemyHqBeingAttacked,
-    // 新增时点
-    friendlyTankDeployed,      // 友方坦克部署时
-    friendlyTurnBegin,         // 友方回合开始时
-    enemyTurnBegin,            // 敌方回合开始时
-    becomingAttackTarget,      // 成为敌方攻击的目标时
-    friendlyInfantryDeployed,  // 友方步兵部署/加入时
-    fightingInfantry,          // 对战步兵时
-    attackingHq,               // 攻击总部时
-    takingDamage,              // 本单位收到伤害时
-    bePicked                   // 被指向（成为友方/敌方选择目标时）
+    /// <summary>友方坦克类单位被部署到战场上时触发。坦克作为重型装甲单位入场时可触发专属增益，如火炮配合坦克推进、装甲集群战术等需要特定兵种配合的协同效果。</summary>
+    friendlyTankDeployed,
+    /// <summary>新的友方回合开始、所有友方单位行动次数刷新时触发。这是每回合最先触发的时间点，适用于回合初的自动增益效果——如动员特性的+1+1、抽牌前的准备效果。</summary>
+    friendlyTurnBegin,
+    /// <summary>新的敌方回合开始时触发。在敌方行动之前给予我方最后的预警响应窗口，适用于回合初的预警效果——如敌方回合开始时对随机敌人造成伤害或获得临时防御。</summary>
+    enemyTurnBegin,
+    /// <summary>本单位被敌方宣布为攻击目标但伤害尚未结算之前的时刻。适用于在被攻击前触发防护效果——如烟幕取消首次攻击、同仇特性为所有同仇单位提供增益。</summary>
+    becomingAttackTarget,
+    /// <summary>友方步兵类单位被部署或通过效果加入战场时触发。步兵是数量最多的基础兵种，此时点可为步兵集群战术提供触发窗口——如步兵入场时抽牌或获得群体防御增益。</summary>
+    friendlyInfantryDeployed,
+    /// <summary>本单位对敌方步兵发起攻击时触发。适用于针对步兵的特殊战术效果——如坦克碾压步兵时获得额外伤害、飞机扫射步兵时的范围杀伤等兵种克制机制。</summary>
+    fightingInfantry,
+    /// <summary>本单位对敌方总部发起直接攻击时触发。攻击总部意味着跳过前线单位直取要害。此时点可触发攻城类效果——如对总部造成额外伤害或摧毁总部后的连锁反应。</summary>
+    attackingHq,
+    /// <summary>本单位受到任意来源的伤害、防御力实际减少时触发。伤害可来自战斗、效果或指令。适用于受伤响应的效果——如受到伤害后获得攻击力提升或动员特性在受伤后消失。</summary>
+    takingDamage,
+    /// <summary>本单位被任意玩家选为效果或攻击的目标时触发——包括友方指令点选目标、敌方攻击选择目标等。同仇特性在此刻触发，使该方所有同仇单位获得+1攻击+1防御。</summary>
+    bePicked
 }
 
 /// <summary>
