@@ -678,6 +678,15 @@ public partial class cardBase_ : Control
 
         }
 
+        // 为attack/defence/cost标签克隆独立的LabelSettings，
+        // 避免场景模板中共享的sub_resource导致改一张卡颜色影响所有卡
+        foreach (var labelName in new[] { "attack", "defence", "cost" })
+        {
+            var label = GetNode<Label>(labelName);
+            if (label?.LabelSettings != null)
+                label.LabelSettings = (LabelSettings)label.LabelSettings.Duplicate();
+        }
+
         // 初始化移动/攻击状态指示灯——使用编辑器中已摆放的Sprite2D
         moveableLight = GetNode<Sprite2D>("moveableDisplay");
         greenLightTex = ResourceManager.Instance?.GetTexture("res://assest/greenLight.png")
@@ -1584,6 +1593,15 @@ public partial class cardBase_ : Control
 
 
             // 创建闪烁动画：快速变亮再变暗
+        targetLabel.Visible=false;
+        await Task.Delay(300);
+        targetLabel.Visible=true;
+        await Task.Delay(300);
+        targetLabel.Visible=false;
+        await Task.Delay(300);
+        targetLabel.Visible=true;
+        await Task.Delay(300);
+        return;
     }
 
     /// <summary>
