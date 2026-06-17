@@ -102,12 +102,13 @@ public partial class EventScene : CanvasLayer
         AddChild(scroll);
 
         var descLabel = new RichTextLabel();
-        descLabel.Size = new Vector2(480, 0);
-        descLabel.FitContent = true;
         descLabel.BbcodeEnabled = true;
-        descLabel.Text = "[font_size=18]" + _event.Description + "[/font_size]";
+        descLabel.FitContent = true;
+        descLabel.CustomMinimumSize = new Vector2(480, 0);
         descLabel.AddThemeColorOverride("default_color", Colors.White);
+        // 必须先AddChild再设Text，否则节点不在树中无法正确测量字体大小
         scroll.AddChild(descLabel);
+        descLabel.Text = "[font_size=18]" + _event.Description + "[/font_size]";
 
         // --- 选项按钮区 ---
         float choicesY = startY + textAreaH + 20;
