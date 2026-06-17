@@ -3,17 +3,21 @@ using System;
 using System.Collections.Generic;
 
 /// <summary>
-/// 任务类型：战斗或事件
+/// 任务类型：战斗（进入Battlefield对战）或事件（进入EventScene剧情）
 /// </summary>
 public enum MissionType { Battle, Event }
 
 /// <summary>
-/// 任务条目：标识符(ID)、显示名称、类型
+/// 任务条目数据结构：包含标识符、显示名称和任务类型。
+/// 由WorldMap从AreaPool.ini中随机抽取并转换为MissionEntry后传递给ChooseMission面板。
 /// </summary>
 public struct MissionEntry
 {
+    /// <summary>任务标识符。战斗类型时是敌人ID（如"wehrmacht"），事件类型时是事件ID（如"supply_drop"）</summary>
     public string Id;
+    /// <summary>在ChooseMission按钮下方显示的名称，如"德国国防军"或"补给空投"</summary>
     public string DisplayName;
+    /// <summary>任务类型：Battle=进入战斗场景，Event=进入事件剧情</summary>
     public MissionType Type;
 }
 
