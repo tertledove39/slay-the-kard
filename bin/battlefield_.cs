@@ -3242,6 +3242,14 @@ InputState currentInputState = InputState.nil;
                 string instruction = part.Trim();
                 string ins = instruction.ToLowerInvariant(); // 大小写不敏感
 
+                // 剥离末尾[icon=...]元数据后缀，避免污染精确匹配（如drawCard）
+                int bracketIdx = ins.IndexOf('[');
+                if (bracketIdx > 0)
+                {
+                    ins = ins.Substring(0, bracketIdx);
+                    instruction = instruction.Substring(0, bracketIdx);
+                }
+
                 // 跳过标签定义（End& 需要被处理以支持 foreach 结构）
                 if (instruction.EndsWith("&") && ins != "end&")
                 {
