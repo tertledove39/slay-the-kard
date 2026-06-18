@@ -936,14 +936,24 @@ public partial class cardBase_ : Control
         string iconName = "action";
         string desc = "";
 
-        foreach (var part in meta.Split(','))
+        // 用 icon= 和 ,description= 定位，避免 description 内部的逗号被错误分割
+        int iconEq = meta.IndexOf("icon=");
+        int descEq = meta.IndexOf(",description=");
+        if (descEq < 0) descEq = meta.IndexOf("description=");
+
+        if (iconEq >= 0)
         {
-            var kv = part.Split('=', 2);
-            if (kv.Length == 2)
-            {
-                if (kv[0].Trim() == "icon") iconName = kv[1].Trim();
-                if (kv[0].Trim() == "description") desc = kv[1].Trim();
-            }
+            int iconValEnd = descEq >= 0 ? descEq : meta.Length;
+            if (iconValEnd < 0) iconValEnd = meta.Length;
+            iconName = meta.Substring(iconEq + 5, iconValEnd - iconEq - 5).Trim();
+        }
+        if (descEq >= 0)
+        {
+            int descValStart = descEq;
+            if (meta[descEq] == ',') descValStart++;
+            int eqPos = meta.IndexOf('=', descValStart);
+            if (eqPos >= 0)
+                desc = meta.Substring(eqPos + 1).Trim();
         }
 
         return new EffectAttribute { IconName = iconName, Description = desc, IsTrait = false };

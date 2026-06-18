@@ -105,3 +105,4 @@ addToSupportLine(t70)|GetCardBeingAddToSupportLine|addDefence(1)
 - trait 属性各自显示独立图标
 - 被守护状态也有独立图标
 - `BuildAttributePanel` 缓存 attribute 列表，内容未变时跳过重建
+- `[icon=xxx,description=yyy]` 中的 description 支持包含逗号，解析时用 `icon=`/`description=` 定位而非 `meta.Split(',')`

@@ -2795,10 +2795,10 @@ InputState currentInputState = InputState.nil;
     {
         // 触发友方回合结束时点
         await TriggerUnitEffects("FriendlyTurnEnd", null);
-        
+
         // 触发双方回合结束时点
         await TriggerUnitEffects("TurnEnd", null);
-        CheckIfAnyUnitDiedAsync(); // 检查死亡
+        await CheckIfAnyUnitDiedAsync(); // 检查死亡
         
         
         // 触发敌方回合开始时点
