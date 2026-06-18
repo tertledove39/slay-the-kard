@@ -51,3 +51,16 @@
 15. 战后移动限制处理
 16. 恢复死亡检查，检查单位死亡
 17. 解锁控制
+
+## 支援阵线相关方法
+
+| 方法 | 说明 | 代码位置 |
+|------|------|----------|
+| `GetCardBeingAddToSupportLine()` | 获得上一个被加入支援阵线（含敌方）的卡牌引用 | battlefield_.cs |
+| `addToSupportLine(cardId)` | 向友方支援阵线添加卡牌，同时更新 lastCardAddedToSupportLine | battlefield_.cs ParseAndExecuteEffect() |
+| `addToEnemySupportLine(cardId)` | 向敌方支援阵线添加卡牌，同时更新 lastCardAddedToSupportLine | battlefield_.cs ParseAndExecuteEffect() |
+
+### 实现细节
+- **存储位置**: `battlefield_.lastCardAddedToSupportLine` 字段
+- **赋值时机**: 在 `addToSupportLine`/`addToEnemySupportLine` 指令中，`AddCardToPlace` 成功后赋值
+- **读取方式**: 通过公开方法 `GetCardBeingAddToSupportLine()` 获取引用

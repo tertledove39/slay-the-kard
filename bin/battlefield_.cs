@@ -120,6 +120,11 @@ public partial class battlefield_ : Control
     List<place_> frontLine = [];
 
     /// <summary>
+    /// 上一个被加入支援阵线的卡牌引用
+    /// </summary>
+    private cardBase_ lastCardAddedToSupportLine = null;
+
+    /// <summary>
     /// 敌方阵线
     /// </summary>
     List<place_> enemySupprotLine = [];
@@ -143,6 +148,14 @@ public partial class battlefield_ : Control
             }
         }
         return null;
+    }
+
+    /// <summary>
+    /// 获得上一个被加入支援阵线的卡的引用
+    /// </summary>
+    public cardBase_ GetCardBeingAddToSupportLine()
+    {
+        return lastCardAddedToSupportLine;
     }
 
     
@@ -3777,6 +3790,7 @@ InputState currentInputState = InputState.nil;
                                 newCard.SetCardInformation(newCardData);
                                 newCard.SetIsFriend(IsFriend.friend);
                                 await AddCardToPlace(newCard, place);
+                                lastCardAddedToSupportLine = newCard;
                             }
                         }
                     }
@@ -3799,6 +3813,7 @@ InputState currentInputState = InputState.nil;
                                 newCard.SetCardInformation(newCardData);
                                 newCard.SetIsFriend(IsFriend.enemy);
                                 await AddCardToPlace(newCard, place);
+                                lastCardAddedToSupportLine = newCard;
                             }
                         }
                     }
