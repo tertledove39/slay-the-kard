@@ -127,6 +127,10 @@ public partial class battlefield_ : Control
     /// 上次攻击溢出的伤害
     /// </summary>
     private int lastOverflowDamage = 0;
+    /// <summary>
+    /// 上一个死亡的友方陆军单位的id
+    /// </summary>
+    private string lastDeadFriendlyLandUnitId = "";
 
     /// <summary>
     /// 敌方阵线
@@ -1440,6 +1444,9 @@ InputState currentInputState = InputState.nil;
                         break;
                     case "overflow":
                         sb.Append(lastOverflowDamage);
+                        break;
+                    case "LastdeadFriendlyLandUnit":
+                        sb.Append(lastDeadFriendlyLandUnitId ?? "");
                         break;
                     case "fieldFriendUnitCount":
                     case "field.friend.unit.count":
@@ -2835,6 +2842,11 @@ InputState currentInputState = InputState.nil;
         // 第二遍：处理所有死亡单位的Dead效果
         foreach (var deadUnit in deadUnits)
         {
+            if (deadUnit.GetIsFriend() == IsFriend.friend &&
+                (deadUnit.cardType == CardTypes.Infantry || deadUnit.cardType == CardTypes.Tank || deadUnit.cardType == CardTypes.Artillery))
+            {
+                lastDeadFriendlyLandUnitId = deadUnit.id ?? "";
+            }
             TriggerUnitEffects("Dead", deadUnit, checkOnlySourceCard:true);
             RemoveCard(deadUnit);
             PlayDeadSound(1);
