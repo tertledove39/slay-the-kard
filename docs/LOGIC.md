@@ -56,11 +56,17 @@
 
 | 方法 | 说明 | 代码位置 |
 |------|------|----------|
-| `GetCardBeingAddToSupportLine()` | 获得上一个被加入支援阵线（含敌方）的卡牌引用 | battlefield_.cs |
+| `GetCardBeingAddToSupportLine` | 效果指令：将上一个加入支援阵线的卡设为 targets，供后续 pipe 指令操作 | battlefield_.cs ParseAndExecuteEffect() |
 | `addToSupportLine(cardId)` | 向友方支援阵线添加卡牌，同时更新 lastCardAddedToSupportLine | battlefield_.cs ParseAndExecuteEffect() |
 | `addToEnemySupportLine(cardId)` | 向敌方支援阵线添加卡牌，同时更新 lastCardAddedToSupportLine | battlefield_.cs ParseAndExecuteEffect() |
+
+### 使用示例
+```
+addToSupportLine(t70)|GetCardBeingAddToSupportLine|addDefence(1)
+```
+向支援阵线添加 t70 后，将 targets 设为该卡，再对其增加 1 点防御力。
 
 ### 实现细节
 - **存储位置**: `battlefield_.lastCardAddedToSupportLine` 字段
 - **赋值时机**: 在 `addToSupportLine`/`addToEnemySupportLine` 指令中，`AddCardToPlace` 成功后赋值
-- **读取方式**: 通过公开方法 `GetCardBeingAddToSupportLine()` 获取引用
+- **指令效果**: 在效果脚本中作为 pipe 指令使用时，将 `targets` 设置为 `{ lastCardAddedToSupportLine }`，若为 null 则不改变 targets

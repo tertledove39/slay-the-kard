@@ -908,7 +908,7 @@ InputState currentInputState = InputState.nil;
     private string _autoCompletePrefix = "";
     private static readonly string[] ConsoleCommands = new[]
     {
-        "myHq", "enemyHq", "this", "target",
+        "myHq", "enemyHq", "this", "target", "GetCardBeingAddToSupportLine",
         "Heal()", "damage()", "GetAttack()", "LoseAttack()", "SetDefence()", "addDefence()",
         "setResult()", "setTarget", "drawCard", "DrawUnitCards()",
         "GetEffect()", "AddToHand()", "addToSupportLine()", "addToEnemySupportLine()",
@@ -3380,6 +3380,15 @@ InputState currentInputState = InputState.nil;
                     else if (targetCard != null)
                     {
                         targets = new List<cardBase_> { targetCard };
+                    }
+                }
+                // GetCardBeingAddToSupportLine - 获取上一个加入支援阵线的卡
+                else if (ins == "getcardbeingaddtosupportline")
+                {
+                    var card = GetCardBeingAddToSupportLine();
+                    if (card != null)
+                    {
+                        targets = new List<cardBase_> { card };
                     }
                 }
                 else if (instruction.StartsWith("GetTargetByIndex", StringComparison.OrdinalIgnoreCase))
