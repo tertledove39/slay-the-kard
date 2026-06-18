@@ -3257,11 +3257,12 @@ InputState currentInputState = InputState.nil;
             return;
         }
 
-        // 移除时间前缀 如 "deployed:"，但要考虑引号内的冒号
+        // 移除时间前缀 如 "deployed:"，但要考虑引号和方括号内
         if (effectString.Contains(":"))
         {
             bool inQuotes = false;
             char quoteChar = '\0';
+            int bracketCount = 0;
             int colonIndex = -1;
             for (int i = 0; i < effectString.Length; i++)
             {
@@ -3276,10 +3277,15 @@ InputState currentInputState = InputState.nil;
                     inQuotes = false;
                     quoteChar = '\0';
                 }
-                else if (c == ':' && !inQuotes)
+                else if (!inQuotes)
                 {
-                    colonIndex = i;
-                    break;
+                    if (c == '[') bracketCount++;
+                    else if (c == ']') bracketCount--;
+                    else if (c == ':' && bracketCount == 0)
+                    {
+                        colonIndex = i;
+                        break;
+                    }
                 }
             }
             if (colonIndex != -1)
