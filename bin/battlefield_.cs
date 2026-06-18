@@ -913,7 +913,7 @@ InputState currentInputState = InputState.nil;
         "setResult()", "setTarget", "drawCard", "DrawUnitCards()",
         "GetEffect()", "AddToHand()", "addToSupportLine()", "addToEnemySupportLine()",
         "addToDeck()", "SetMemory()", "AddPoint()", "AddPointMax()",
-        "GetAllFriendUnits", "GetAllEnemyUnits", "GetAllFriendTargets", "GetAllEnemyTargets",
+        "displayAllCardState", "GetAllFriendUnits", "GetAllEnemyUnits", "GetAllFriendTargets", "GetAllEnemyTargets",
         "GetEnemyHq", "GetFriendHq", "GetRandomFriendUnit", "GetRandomEnemyUnit",
         "GetRandomFriendTarget", "GetRandomEnemyTarget", "GetRandomNumber()",
         "KillAllTargets", "HealAllTargets", "Refresh", "Retreat", "Discard",
@@ -4287,6 +4287,18 @@ InputState currentInputState = InputState.nil;
                         friendTargets.Add(myHq);
                     }
                     targets = friendTargets;
+                }
+
+                // displayAllCardState - 输出场上所有单位的状态信息
+                if (ins == "displayallcardstate")
+                {
+                    var units = ReadCardInPlaces().Where(x => x.getState() == CardState.placed).ToList();
+                    GD.Print("=== 场上单位状态 ===");
+                    foreach (var u in units)
+                    {
+                        GD.Print($"  [{u.name}] atk={u.attack} def={u.defence} traits={u.traits} effect=\"{u.effect}\"");
+                    }
+                    GD.Print($"共 {units.Count} 个单位");
                 }
 
                 // GetEnemyHq() - 获得敌方总部
