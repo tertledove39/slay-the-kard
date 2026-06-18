@@ -73,6 +73,7 @@ public partial class cardBase_ : Control
 
     // 效果/trait的attribute图标面板
     private Control _attrPanel;
+    private List<EffectAttribute> _cachedAttrList;
     private Panel _attrTooltipPanel;
     private Label _attrTooltipLabel;
     private List<Rect2> _attrIconRects = new(); // 图标在_attrPanel中的本地rect
@@ -949,19 +950,46 @@ public partial class cardBase_ : Control
     }
 
     /// <summary>
+    /// 按逗号分割效果字符串，跳过[]括号内的逗号
+    /// </summary>
+    private static List<string> SplitEffectByComma(string s)
+    {
+        var result = new List<string>();
+        int bracketDepth = 0;
+        int segStart = 0;
+        for (int i = 0; i < s.Length; i++)
+        {
+            if (s[i] == '[') bracketDepth++;
+            else if (s[i] == ']') bracketDepth--;
+            else if (s[i] == ',' && bracketDepth == 0)
+            {
+                result.Add(s.Substring(segStart, i - segStart).Trim());
+                segStart = i + 1;
+            }
+        }
+        if (segStart < s.Length)
+            result.Add(s.Substring(segStart).Trim());
+        return result;
+    }
+
+    /// <summary>
     /// 收集该卡所有attribute：effect属性 + trait属性（含状态着色）。
     /// </summary>
     public List<EffectAttribute> GetAllAttributes()
     {
         var list = new List<EffectAttribute>();
 
-        // 效果属性
+        // 效果属性——按逗号分段，每段独立提取[icon=...]
         if (!string.IsNullOrEmpty(effect))
         {
-            string cleanEffect = effect;
-            int colonIdx = cleanEffect.IndexOf(':');
-            if (colonIdx > 0) cleanEffect = cleanEffect.Substring(colonIdx + 1);
-            list.Add(ParseEffectAttribute(cleanEffect));
+            var segments = SplitEffectByComma(effect);
+            foreach (var seg in segments)
+            {
+                string clean = seg;
+                int colonIdx = clean.IndexOf(':');
+                if (colonIdx > 0) clean = clean.Substring(colonIdx + 1);
+                list.Add(ParseEffectAttribute(clean));
+            }
         }
 
         // 被守护指示器（不是trait，是状态）
@@ -1115,6 +1143,26 @@ public partial class cardBase_ : Control
     {
         // 指令卡不显示attribute
         if (cardType == CardTypes.Command) return;
+
+        // 缓存比较：内容未变则跳过重建，避免视觉抖动
+        var newAttrs = GetAllAttributes();
+        if (_cachedAttrList != null && _cachedAttrList.Count == newAttrs.Count)
+        {
+            bool same = true;
+            for (int i = 0; i < newAttrs.Count; i++)
+            {
+                if (newAttrs[i].IconName != _cachedAttrList[i].IconName ||
+                    newAttrs[i].Description != _cachedAttrList[i].Description ||
+                    newAttrs[i].IsTrait != _cachedAttrList[i].IsTrait ||
+                    newAttrs[i].TraitName != _cachedAttrList[i].TraitName ||
+                    newAttrs[i].IconTint != _cachedAttrList[i].IconTint)
+                {
+                    same = false; break;
+                }
+            }
+            if (same) return;
+        }
+        _cachedAttrList = newAttrs;
 
         // 清除旧面板和tooltip
         if (_attrPanel != null)

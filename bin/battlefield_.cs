@@ -3665,12 +3665,13 @@ InputState currentInputState = InputState.nil;
                 // GetEffect(string) - 使targets获得指定的effect
                 if (instruction.StartsWith("GetEffect", StringComparison.OrdinalIgnoreCase))
                 {
-                    // 提取括号内的内容，语法固定为GetEffect("eff")
-                    int startIndex = instruction.IndexOf('(');
-                    int endIndex = instruction.LastIndexOf(')');
+                    // 从原始part提取（避免ReplaceVariables腐蚀内层&变量和&标签）
+                    string raw = part.Trim();
+                    int startIndex = raw.IndexOf('(');
+                    int endIndex = raw.LastIndexOf(')');
                     if (startIndex != -1 && endIndex != -1 && endIndex > startIndex)
                     {
-                        string effectToGive = instruction.Substring(startIndex + 1, endIndex - startIndex - 1);
+                        string effectToGive = raw.Substring(startIndex + 1, endIndex - startIndex - 1);
                         // 移除外层的引号（如果有）
                         if (effectToGive.StartsWith('"') && effectToGive.EndsWith('"'))
                         {
@@ -3687,6 +3688,7 @@ InputState currentInputState = InputState.nil;
                             {
                                 target.effect = effectToGive;
                             }
+                            target.RefreshState();
                         }
                         }
 

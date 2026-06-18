@@ -91,3 +91,17 @@ addToSupportLine(t70)|GetCardBeingAddToSupportLine|addDefence(1)
 - 格式：`if(条件)标签`
 - 条件满足时跳转到标签位置执行
 - 条件不支持跨行
+
+## GetEffect 指令说明
+
+- **功能**: 使 targets 中的单位获得指定的 effect 字符串
+- **用法**: `GetEffect("TriggerName:指令[icon=xxx,description=yyy]")`
+- **内层变量**: 内层效果字符串中的 `&变量` 保留原始形式，不会在外层被求值。当内层效果稍后触发时，用目标单位自身数据动态求值
+- **UI 刷新**: 赋值后自动调用 `RefreshState()` 更新 attribute 图标面板
+
+## 效果图标显示规则
+
+- 每段逗号分隔的效果独立解析其 `[icon=...]` 属性
+- trait 属性各自显示独立图标
+- 被守护状态也有独立图标
+- `BuildAttributePanel` 缓存 attribute 列表，内容未变时跳过重建
