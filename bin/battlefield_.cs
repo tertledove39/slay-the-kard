@@ -1572,6 +1572,43 @@ InputState currentInputState = InputState.nil;
     }
 
     /// <summary>
+    /// 移除字符串中所有引号外的[...]（attribute元数据）
+    /// </summary>
+    private static string StripBracketsOutsideQuotes(string s)
+    {
+        var sb = new System.Text.StringBuilder();
+        bool inQuotes = false;
+        char quoteChar = '\0';
+        int depth = 0;
+        foreach (char c in s)
+        {
+            if ((c == '"' || c == '\'') && !inQuotes)
+            {
+                inQuotes = true;
+                quoteChar = c;
+                sb.Append(c);
+            }
+            else if (c == quoteChar && inQuotes)
+            {
+                inQuotes = false;
+                quoteChar = '\0';
+                sb.Append(c);
+            }
+            else if (inQuotes)
+            {
+                sb.Append(c);
+            }
+            else
+            {
+                if (c == '[') depth++;
+                else if (c == ']') { depth--; continue; }
+                if (depth == 0) sb.Append(c);
+            }
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
     /// 分割效果字符串，忽略括号内的逗号
     /// </summary>
     /// <summary>
@@ -3257,12 +3294,14 @@ InputState currentInputState = InputState.nil;
             return;
         }
 
-        // 移除时间前缀 如 "deployed:"，但要考虑引号和方括号内
+        // 入口处统一剥离所有引号外的[...]元数据，后续无需处理[]
+        effectString = StripBracketsOutsideQuotes(effectString);
+
+        // 移除时间前缀 如 "deployed:"，但要考虑引号内的冒号
         if (effectString.Contains(":"))
         {
             bool inQuotes = false;
             char quoteChar = '\0';
-            int bracketCount = 0;
             int colonIndex = -1;
             for (int i = 0; i < effectString.Length; i++)
             {
@@ -3277,28 +3316,16 @@ InputState currentInputState = InputState.nil;
                     inQuotes = false;
                     quoteChar = '\0';
                 }
-                else if (!inQuotes)
+                else if (c == ':' && !inQuotes)
                 {
-                    if (c == '[') bracketCount++;
-                    else if (c == ']') bracketCount--;
-                    else if (c == ':' && bracketCount == 0)
-                    {
-                        colonIndex = i;
-                        break;
-                    }
+                    colonIndex = i;
+                    break;
                 }
             }
             if (colonIndex != -1)
             {
                 effectString = effectString.Substring(colonIndex + 1);
             }
-        }
-
-        // 剥离末尾的attribute元数据 [icon=xxx,description=yyy]
-        int lastBracket = effectString.LastIndexOf('[');
-        if (lastBracket >= 0 && effectString.EndsWith("]"))
-        {
-            effectString = effectString.Substring(0, lastBracket).TrimEnd();
         }
 
         // 首先用逗号分割 逗号分割优先级更高，但要忽略括号内的逗号
@@ -3331,12 +3358,9 @@ InputState currentInputState = InputState.nil;
             for (int i = 0; i < parts.Length; i++)
             {
                 string part = parts[i].Trim();
-                // 剥离末尾[icon=...]后检测&结尾标签
-                int bracketIdx = part.IndexOf('[');
-                string partForLabel = bracketIdx > 0 ? part.Substring(0, bracketIdx) : part;
-                if (partForLabel.EndsWith("&"))
+                if (part.EndsWith("&"))
                 {
-                    string label = partForLabel.Substring(0, partForLabel.Length - 1);
+                    string label = part.Substring(0, part.Length - 1);
                     labels[label] = i;
                 }
             }
@@ -3350,14 +3374,6 @@ InputState currentInputState = InputState.nil;
                 string part = parts[i];
                 string instruction = part.Trim();
                 string ins = instruction.ToLowerInvariant(); // 大小写不敏感
-
-                // 剥离末尾[icon=...]元数据后缀，避免污染精确匹配（如drawCard）
-                int bracketIdx = ins.IndexOf('[');
-                if (bracketIdx > 0)
-                {
-                    ins = ins.Substring(0, bracketIdx);
-                    instruction = instruction.Substring(0, bracketIdx);
-                }
 
                 // 跳过标签定义（End& 需要被处理以支持 foreach 结构）
                 if (instruction.EndsWith("&") && ins != "end&")
