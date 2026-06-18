@@ -123,6 +123,10 @@ public partial class battlefield_ : Control
     /// 上一个被加入支援阵线的卡牌引用
     /// </summary>
     private cardBase_ lastCardAddedToSupportLine = null;
+    /// <summary>
+    /// 上次攻击溢出的伤害
+    /// </summary>
+    private int lastOverflowDamage = 0;
 
     /// <summary>
     /// 敌方阵线
@@ -1434,6 +1438,9 @@ InputState currentInputState = InputState.nil;
                     case "attackCountThisTurn":
                         sb.Append(sourceCard?.ReadAttackCountThisTurn() ?? 0);
                         break;
+                    case "overflow":
+                        sb.Append(lastOverflowDamage);
+                        break;
                     case "fieldFriendUnitCount":
                     case "field.friend.unit.count":
                         sb.Append(GetFieldUnitCount(IsFriend.friend));
@@ -1736,6 +1743,7 @@ InputState currentInputState = InputState.nil;
     /// <param name="to"></param> 
     public async Task Attack(cardBase_ from,cardBase_ to)
     {
+        lastOverflowDamage = 0;
         ForbidControl();
         PauseDeathCheck(); // 暂停死亡检查
         if (!from.CheckIfCanAttack())
@@ -1865,14 +1873,16 @@ InputState currentInputState = InputState.nil;
         {
             attackDamage = Math.Max(0, attackDamage - 1);
         }
-        
+
         // 免疫特性：不受到战斗伤害
         if (to.HasTrait(UnitTraits.Immunity))
         {
             attackDamage = 0;
         }
-        
+
+        int targetDefenceBeforeAttack = to.ReadDefence();
         await to.LoseDefence(attackDamage);
+        lastOverflowDamage = Math.Max(0, attackDamage - targetDefenceBeforeAttack);
 
         // 动员特性：受到伤害后消失
         if (to.HasMobilizeActive() && attackDamage > 0)
@@ -1930,7 +1940,9 @@ InputState currentInputState = InputState.nil;
                 {
                     to.FlashTraitIcon("Ambush");
                     to.UseAmbush(); // 标记伏击已被使用
+                    int fromDefBeforeCounter = from.ReadDefence();
                     await from.LoseDefence(counterDamage);
+                    lastOverflowDamage += Math.Max(0, counterDamage - fromDefBeforeCounter);
                     // 若敌方单位因此死亡，则不受到来自对方的伤害
                     if (from.ReadDefence() <= 0)
                     {
@@ -1939,7 +1951,9 @@ InputState currentInputState = InputState.nil;
                 }
                 else
                 {
+                    int fromDefBeforeCounter = from.ReadDefence();
                     await from.LoseDefence(counterDamage);
+                    lastOverflowDamage += Math.Max(0, counterDamage - fromDefBeforeCounter);
                 }
             }
         }
