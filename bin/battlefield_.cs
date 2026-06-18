@@ -1826,9 +1826,11 @@ InputState currentInputState = InputState.nil;
         // 同仇特性：被指向时友方同仇单位+1+1
         await TriggerSharedHatred(to);
 
-        // 先计算溢出，供 Attacking 效果中的 &overflow 使用
-        int rawAttack = from.ReadAttack();
-        lastOverflowDamage = Math.Max(0, rawAttack - to.ReadDefence());
+        // 提前计算完整伤害和溢出，供 Attacking 效果中的 &overflow 使用
+        int attackDamage = from.ReadAttack();
+        if (to.HasTrait(UnitTraits.HeavyArmor)) attackDamage = Math.Max(0, attackDamage - 1);
+        if (to.HasTrait(UnitTraits.Immunity)) attackDamage = 0;
+        lastOverflowDamage = Math.Max(0, attackDamage - to.ReadDefence());
 
         // 触发攻击者的 Attacking 效果
         await TriggerUnitEffects("Attacking", from, new List<cardBase_> { to }, checkOnlySourceCard: true);
@@ -1877,12 +1879,7 @@ InputState currentInputState = InputState.nil;
             await TriggerUnitEffects("EnemyUnitBeingAttacked", from, new List<cardBase_> { to, from });
         }
 
-    int attackDamage = from.ReadAttack();
-        if (to.HasTrait(UnitTraits.HeavyArmor)) attackDamage = Math.Max(0, attackDamage - 1);
-        if (to.HasTrait(UnitTraits.Immunity)) attackDamage = 0;
-        int defBeforeDamage = to.ReadDefence();
-        await to.LoseDefence(attackDamage);
-        lastOverflowDamage = Math.Max(0, attackDamage - defBeforeDamage);
+    await to.LoseDefence(attackDamage);
 
         // 动员特性：受到伤害后消失
         if (to.HasMobilizeActive() && attackDamage > 0)
