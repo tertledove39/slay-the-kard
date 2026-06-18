@@ -55,6 +55,8 @@ public partial class cardBase_ : Control
 
     // 单位存活回合数
     private int lifeTime = 0;
+    // 本回合攻击次数（作为攻击方的次数）
+    private int attackCountThisTurn = 0;
     
     CardState state;
     Node2D cardBase;
@@ -94,6 +96,7 @@ public partial class cardBase_ : Control
     {
         moveAble = 1;
         attackAble = 1;
+        attackCountThisTurn = 0;
 
         // 奋战特性：单位可攻击两次
         if (HasTrait(UnitTraits.Determination))
@@ -357,7 +360,22 @@ public partial class cardBase_ : Control
     {
         lifeTime++;
     }
-    
+
+    /// <summary>
+    /// 读取本回合攻击次数
+    /// </summary>
+    public int ReadAttackCountThisTurn()
+    {
+        return attackCountThisTurn;
+    }
+
+    /// <summary>
+    /// 本回合攻击次数+1
+    /// </summary>
+    public void IncrementAttackCountThisTurn()
+    {
+        attackCountThisTurn++;
+    }
 
 
         /// <summary>
@@ -680,7 +698,7 @@ public partial class cardBase_ : Control
 
         // 为attack/defence/cost标签克隆独立的LabelSettings，
         // 避免场景模板中共享的sub_resource导致改一张卡颜色影响所有卡
-        foreach (var labelName in new[] { "attack", "defence", "cost" })
+        foreach (var labelName in new[] { "attack", "defence", "cost", "name" })
         {
             var label = GetNode<Label>(labelName);
             if (label?.LabelSettings != null)
@@ -1223,9 +1241,9 @@ public partial class cardBase_ : Control
 
         int bestSize = FindBestFontSizeForLabel(label, font, text, 6, maxSize, effectiveSize);
 
-        // 使用ThemeOverride设置字体和字号，避免创建LabelSettings导致GC时native handle失效
-        label.AddThemeFontOverride("font", font);
-        label.AddThemeFontSizeOverride("font_size", bestSize);
+        // 直接修改克隆后的LabelSettings字体和字号，避免theme override被LabelSettings覆盖
+        label.LabelSettings.Font = font;
+        label.LabelSettings.FontSize = bestSize;
     }
 
     private int FindBestFontSizeForLabel(Label label, Font font, string text, int minSize, int maxSize, Vector2 containerSize)
@@ -1591,17 +1609,6 @@ public partial class cardBase_ : Control
 
         targetLabel.LabelSettings.FontColor = targetColor;
 
-
-            // 创建闪烁动画：快速变亮再变暗
-        targetLabel.Visible=false;
-        await Task.Delay(300);
-        targetLabel.Visible=true;
-        await Task.Delay(300);
-        targetLabel.Visible=false;
-        await Task.Delay(300);
-        targetLabel.Visible=true;
-        await Task.Delay(300);
-        return;
     }
 
     /// <summary>

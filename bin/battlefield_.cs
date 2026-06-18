@@ -1363,6 +1363,9 @@ InputState currentInputState = InputState.nil;
                     case "source.cost":
                         sb.Append(sourceCard?.ReadCost() ?? 0);
                         break;
+                    case "attackCountThisTurn":
+                        sb.Append(sourceCard?.ReadAttackCountThisTurn() ?? 0);
+                        break;
                     case "fieldFriendUnitCount":
                     case "field.friend.unit.count":
                         sb.Append(GetFieldUnitCount(IsFriend.friend));
@@ -1866,6 +1869,7 @@ InputState currentInputState = InputState.nil;
 
         // 标记单位已经攻击，减少可攻击次数
         from.HaveAttacked();
+        from.IncrementAttackCountThisTurn();
 
         // trait触发闪烁
         if (from.HasTrait(UnitTraits.Determination))
