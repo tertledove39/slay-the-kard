@@ -907,6 +907,10 @@ InputState currentInputState = InputState.nil;
     // 控制台自动补全
     private int _autoCompleteIndex = -1;
     private string _autoCompletePrefix = "";
+    // 控制台指令历史
+    private List<string> _cmdHistory = new List<string>();
+    private int _cmdHistoryIndex = -1;
+    private string _cmdBeforeHistoryScroll = null;
     private static readonly string[] ConsoleCommands = new[]
     {
         "myHq", "enemyHq", "this", "target", "GetCardBeingAddToSupportLine",
@@ -975,6 +979,11 @@ InputState currentInputState = InputState.nil;
         _consoleInput.Text = "";
         _autoCompleteIndex = -1;
         _autoCompletePrefix = "";
+        // 记录到历史（去重相邻相同项）
+        if (_cmdHistory.Count == 0 || _cmdHistory[_cmdHistory.Count - 1] != cmd)
+            _cmdHistory.Add(cmd);
+        _cmdHistoryIndex = _cmdHistory.Count;
+        _cmdBeforeHistoryScroll = null;
         ConsolePrint($"> {cmd}");
         // 以友方总部为sourceCard和targetCard执行，确保setTarget和drawCard等指令能正常工作
         await ParseAndExecuteEffect(cmd, myHq, null, myHq);
@@ -1054,6 +1063,34 @@ InputState currentInputState = InputState.nil;
         HandleConsoleAutocomplete();
         AcceptEvent();
         return;
+    }
+
+    // 控制台↑↓历史回滚
+    if (@event is InputEventKey arrowEvent && arrowEvent.Pressed && _consoleVisible && _consoleInput != null)
+    {
+        if (arrowEvent.Keycode == Key.Up)
+        {
+            if (_cmdHistory.Count == 0) return;
+            if (_cmdHistoryIndex == _cmdHistory.Count)
+                _cmdBeforeHistoryScroll = _consoleInput.Text;
+            if (_cmdHistoryIndex > 0) _cmdHistoryIndex--;
+            _consoleInput.Text = _cmdHistory[_cmdHistoryIndex];
+            _consoleInput.CaretColumn = _consoleInput.Text.Length;
+            AcceptEvent();
+            return;
+        }
+        if (arrowEvent.Keycode == Key.Down)
+        {
+            if (_cmdHistoryIndex == _cmdHistory.Count) return;
+            _cmdHistoryIndex++;
+            if (_cmdHistoryIndex == _cmdHistory.Count)
+                _consoleInput.Text = _cmdBeforeHistoryScroll ?? "";
+            else
+                _consoleInput.Text = _cmdHistory[_cmdHistoryIndex];
+            _consoleInput.CaretColumn = _consoleInput.Text.Length;
+            AcceptEvent();
+            return;
+        }
     }
 
     //如果当前正处于无法操作状态 取消这一次操作
