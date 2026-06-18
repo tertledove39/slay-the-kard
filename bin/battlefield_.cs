@@ -901,6 +901,7 @@ InputState currentInputState = InputState.nil;
     // 控制台面板
     private Panel _consolePanel;
     private LineEdit _consoleInput;
+    private RichTextLabel _consoleOutput;
     private bool _consoleVisible;
 
     // 控制台自动补全
@@ -935,7 +936,7 @@ InputState currentInputState = InputState.nil;
         _consolePanel = new Panel();
         _consolePanel.Visible = false;
         _consolePanel.Position = new Vector2(50, 10);
-        _consolePanel.Size = new Vector2(600, 36);
+        _consolePanel.Size = new Vector2(600, 200);
         _consolePanel.ZIndex = 1000;
         var style = new StyleBoxFlat();
         style.BgColor = new Color(0, 0, 0, 0.85f);
@@ -943,12 +944,28 @@ InputState currentInputState = InputState.nil;
         AddChild(_consolePanel);
 
         _consoleInput = new LineEdit();
-        _consoleInput.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        _consoleInput.Position = new Vector2(0, 0);
+        _consoleInput.Size = new Vector2(600, 30);
         _consoleInput.AddThemeColorOverride("font_color", Colors.LimeGreen);
         _consoleInput.AddThemeFontSizeOverride("font_size", 14);
         _consoleInput.PlaceholderText = "输入效果指令，回车执行...";
         _consoleInput.TextSubmitted += OnConsoleSubmit;
         _consolePanel.AddChild(_consoleInput);
+
+        _consoleOutput = new RichTextLabel();
+        _consoleOutput.Position = new Vector2(4, 34);
+        _consoleOutput.Size = new Vector2(592, 162);
+        _consoleOutput.ScrollFollowing = true;
+        _consoleOutput.BbcodeEnabled = true;
+        _consoleOutput.AddThemeColorOverride("default_color", Colors.LimeGreen);
+        _consoleOutput.AddThemeFontSizeOverride("normal_font_size", 12);
+        _consolePanel.AddChild(_consoleOutput);
+    }
+
+    private void ConsolePrint(string text)
+    {
+        if (_consoleOutput != null)
+            _consoleOutput.AppendText(text + "\n");
     }
 
     private async void OnConsoleSubmit(string text)
@@ -958,6 +975,7 @@ InputState currentInputState = InputState.nil;
         _consoleInput.Text = "";
         _autoCompleteIndex = -1;
         _autoCompletePrefix = "";
+        ConsolePrint($"> {cmd}");
         // 以友方总部为sourceCard和targetCard执行，确保setTarget和drawCard等指令能正常工作
         await ParseAndExecuteEffect(cmd, myHq, null, myHq);
         CheckIfAnyUnitDiedAsync();
@@ -4293,12 +4311,12 @@ InputState currentInputState = InputState.nil;
                 if (ins == "displayallcardstate")
                 {
                     var units = ReadCardInPlaces().Where(x => x.getState() == CardState.placed).ToList();
-                    GD.Print("=== 场上单位状态 ===");
+                    ConsolePrint("=== 场上单位状态 ===");
                     foreach (var u in units)
                     {
-                        GD.Print($"  [{u.name}] atk={u.attack} def={u.defence} traits={u.traits} effect=\"{u.effect}\"");
+                        ConsolePrint($"  [{u.name}] atk={u.attack} def={u.defence} traits={u.traits} effect=\"{u.effect}\"");
                     }
-                    GD.Print($"共 {units.Count} 个单位");
+                    ConsolePrint($"共 {units.Count} 个单位");
                 }
 
                 // GetEnemyHq() - 获得敌方总部
