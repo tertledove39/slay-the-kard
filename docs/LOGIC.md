@@ -70,3 +70,24 @@ addToSupportLine(t70)|GetCardBeingAddToSupportLine|addDefence(1)
 - **存储位置**: `battlefield_.lastCardAddedToSupportLine` 字段
 - **赋值时机**: 在 `addToSupportLine`/`addToEnemySupportLine` 指令中，`AddCardToPlace` 成功后赋值
 - **指令效果**: 在效果脚本中作为 pipe 指令使用时，将 `targets` 设置为 `{ lastCardAddedToSupportLine }`，若为 null 则不改变 targets
+
+## 效果脚本解析规则
+
+### 分隔符处理
+- **逗号**：最高优先级分隔符，分割不同触发时段的效果
+- **竖线 `|`**：分割不同指令（pipe）
+- 分隔符在以下范围内会被忽略：
+  - 引号内 `"..."` 或 `'...'`
+  - 圆括号 `()` 内
+  - 方括号 `[]` 内（如 `[icon=action,description=含,逗号]`）
+
+### 标签定义
+- 以 `&` 结尾的指令为跳转标签定义（如 `Jump&`）
+- `End&` 特例：用于标记 foreach 循环结束
+- 标签收集时会先剥离 `[icon=...]` 后缀再检测 `&`
+- 示例：`Jump&[icon=action,description=跳转]` 会正确识别为标签 `Jump`
+
+### 条件跳转
+- 格式：`if(条件)标签`
+- 条件满足时跳转到标签位置执行
+- 条件不支持跨行

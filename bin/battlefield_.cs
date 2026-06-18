@@ -1516,6 +1516,7 @@ InputState currentInputState = InputState.nil;
         List<string> segments = new List<string>();
         StringBuilder currentSegment = new StringBuilder();
         int parenCount = 0;
+        int bracketCount = 0;
         bool inQuotes = false;
         char quoteChar = '\0';
 
@@ -1550,8 +1551,19 @@ InputState currentInputState = InputState.nil;
                 parenCount--;
                 currentSegment.Append(c);
             }
+            // 处理方括号（不在引号内）
+            else if (c == '[' && !inQuotes)
+            {
+                bracketCount++;
+                currentSegment.Append(c);
+            }
+            else if (c == ']' && !inQuotes)
+            {
+                bracketCount--;
+                currentSegment.Append(c);
+            }
             // 处理分隔符（不在引号内且不在括号内）
-            else if (c == delimiter && parenCount == 0 && !inQuotes)
+            else if (c == delimiter && parenCount == 0 && bracketCount == 0 && !inQuotes)
             {
                 segments.Add(currentSegment.ToString().Trim());
                 currentSegment.Clear();
@@ -3242,9 +3254,12 @@ InputState currentInputState = InputState.nil;
             for (int i = 0; i < parts.Length; i++)
             {
                 string part = parts[i].Trim();
-                if (part.EndsWith("&"))
+                // 剥离末尾[icon=...]后检测&结尾标签
+                int bracketIdx = part.IndexOf('[');
+                string partForLabel = bracketIdx > 0 ? part.Substring(0, bracketIdx) : part;
+                if (partForLabel.EndsWith("&"))
                 {
-                    string label = part.Substring(0, part.Length - 1);
+                    string label = partForLabel.Substring(0, partForLabel.Length - 1);
                     labels[label] = i;
                 }
             }
