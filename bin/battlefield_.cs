@@ -917,7 +917,7 @@ InputState currentInputState = InputState.nil;
         "displayAllCardState", "GetAllFriendUnits", "GetAllEnemyUnits", "GetAllFriendTargets", "GetAllEnemyTargets",
         "GetEnemyHq", "GetFriendHq", "GetRandomFriendUnit", "GetRandomEnemyUnit",
         "GetRandomFriendTarget", "GetRandomEnemyTarget", "GetRandomNumber()",
-        "KillAllTargets", "HealAllTargets", "Refresh", "Retreat", "Discard",
+        "KillAllTargets", "KillAllTarget", "HealAllTargets", "Refresh", "Retreat", "Discard",
         "foreach", "End&", "Develop", "Choose()", "Play",
         "AddTrait()", "RemoveTrait()", "DrawACard()", "GetCardsBeingTreated",
         "getCount()", "setTargets()", "DiscardRandomly()", "DiscardWithName()",
@@ -4035,8 +4035,8 @@ InputState currentInputState = InputState.nil;
                     }
                 }
 
-                // KillAllTargets() - 消灭列表上的所有单位
-                if (ins == "killalltargets")
+                // KillAllTargets() / KillAllTarget() - 消灭列表上的所有单位
+                if (ins == "killalltargets" || ins == "killalltarget")
                 {
                     foreach (var target in targets)
                     {
