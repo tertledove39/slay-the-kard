@@ -1509,6 +1509,9 @@ InputState currentInputState = InputState.nil;
                     case "target.cost":
                         sb.Append((targets != null && targets.Count > 0) ? targets[0].ReadCost() : 0);
                         break;
+                    case "theNumberOfSkirmisher":
+                        sb.Append(ReadCardInPlaces().Count(x => x.getState() == CardState.placed && x.id == "轻步兵"));
+                        break;
                     default:
                         sb.Append(ReadMemory(varName));
                         break;

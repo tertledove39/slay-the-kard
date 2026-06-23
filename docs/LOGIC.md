@@ -27,6 +27,7 @@
 | `&friendCommandPointMax` | 友方最大指挥点 |
 | `&friendHandCount` | 友方手牌数量 |
 | `&friendDeckRemainingCount` | 友方卡组剩余数量 |
+| `&theNumberOfSkirmisher` | 场上轻步兵单位的数量 |
 | `&任意名称` | 自定义内存变量（通过 `SetMemory()` 设置） |
 
 ### 效果脚本解析 (ParseAndExecuteEffect)
