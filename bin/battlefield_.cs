@@ -2957,6 +2957,9 @@ InputState currentInputState = InputState.nil;
         CheckIfAnyUnitDiedAsync(); // 检查死亡
 
         await EnemyTurnAsync();
+        
+        _ = player1.DrawCard();
+        player1.AddPointMaxNatural();
 
         int pendingLoss = ReadMemory("pendingPointLoss");
         if (pendingLoss > 0)
@@ -2968,9 +2971,6 @@ InputState currentInputState = InputState.nil;
                 player1.UsePoint(currentPoint);
             SetMemory("pendingPointLoss", 0);
         }
-        
-        _ = player1.DrawCard();
-        player1.AddPointMaxNatural();
         
     }
 
