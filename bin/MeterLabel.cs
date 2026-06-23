@@ -18,6 +18,7 @@ public partial class MeterLabel : Control
     private bool _isAnimating;
     private float _digitH;
     private float _digitW;
+    private readonly List<Tween> _activeTweens = new();
 
     private readonly List<Control> _windows = new();
     private readonly List<Control> _strips = new();
@@ -129,9 +130,10 @@ public partial class MeterLabel : Control
 
         if (_isAnimating)
         {
-            _currentValue = targetValue;
-            DisplayImmediate(targetValue);
-            return;
+            foreach (var t in _activeTweens)
+                t?.Kill();
+            _activeTweens.Clear();
+            _isAnimating = false;
         }
 
         _isAnimating = true;
@@ -189,6 +191,7 @@ public partial class MeterLabel : Control
         finally
         {
             _isAnimating = false;
+            _activeTweens.Clear();
         }
     }
 
@@ -208,10 +211,18 @@ public partial class MeterLabel : Control
 
         // 向下滚动：正数差直接tween；向上滚动同理
         var tween = CreateTween();
+        _activeTweens.Add(tween);
         tween.TweenProperty(_strips[stripIdx], "position:y", targetY, duration)
              .SetEase(Tween.EaseType.InOut)
              .SetTrans(Tween.TransitionType.Cubic);
 
-        await ToSignal(tween, Tween.SignalName.Finished);
+        try
+        {
+            await ToSignal(tween, Tween.SignalName.Finished);
+        }
+        catch
+        {
+        }
+        _activeTweens.Remove(tween);
     }
 }
