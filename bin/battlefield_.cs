@@ -2962,7 +2962,6 @@ InputState currentInputState = InputState.nil;
         player1.AddPointMaxNatural();
 
         int pendingLoss = ReadMemory("pendingPointLoss");
-        GD.Print($"[losePointAtNextTurnBegin] 回合开始, 待扣除点数: {pendingLoss}, 当前点数: {player1.ReadPoint()}");
         if (pendingLoss > 0)
         {
             int currentPoint = player1.ReadPoint();
@@ -2970,7 +2969,7 @@ InputState currentInputState = InputState.nil;
                 player1.UsePoint(pendingLoss);
             else if (currentPoint > 0)
                 player1.UsePoint(currentPoint);
-            GD.Print($"[losePointAtNextTurnBegin] 扣除后点数: {player1.ReadPoint()}");
+            player1.RefreshPointDisplay();
             SetMemory("pendingPointLoss", 0);
         }
         
@@ -4092,7 +4091,6 @@ InputState currentInputState = InputState.nil;
                     {
                         int value = EvaluateExpression(match.Groups[1].Value, result, targets, sourceCard);
                         SetMemory("pendingPointLoss", value);
-                        GD.Print($"[losePointAtNextTurnBegin] 已存储待扣除点数: {value}, sourceCard: {sourceCard?.id}");
                     }
                 }
 
@@ -5100,6 +5098,11 @@ public class Player
             return false;
         }
 
+    }
+
+    public void RefreshPointDisplay()
+    {
+        pointLabel.DisplayImmediate(point);
     }
 
     /// <summary>
