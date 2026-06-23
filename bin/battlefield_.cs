@@ -925,7 +925,7 @@ InputState currentInputState = InputState.nil;
         "Heal()", "damage()", "GetAttack()", "LoseAttack()", "SetDefence()", "addDefence()",
         "setResult()", "setTarget", "drawCard", "DrawUnitCards()",
         "GetEffect()", "AddToHand()", "addToSupportLine()", "addToEnemySupportLine()",
-        "addToDeck()", "SetMemory()", "AddPoint()", "AddPointMax()",
+        "addToDeck()", "SetMemory()", "AddPoint()", "AddPointMax()", "losePointAtNextTurnBegin()",
         "displayAllCardState", "GetAllFriendUnits", "GetAllEnemyUnits", "GetAllFriendTargets", "GetAllEnemyTargets",
         "GetEnemyHq", "GetFriendHq", "GetRandomFriendUnit", "GetRandomEnemyUnit",
         "GetRandomFriendTarget", "GetRandomEnemyTarget", "GetRandomNumber()",
@@ -2957,6 +2957,17 @@ InputState currentInputState = InputState.nil;
         CheckIfAnyUnitDiedAsync(); // 检查死亡
 
         await EnemyTurnAsync();
+
+        int pendingLoss = ReadMemory("pendingPointLoss");
+        if (pendingLoss > 0)
+        {
+            int currentPoint = player1.ReadPoint();
+            if (currentPoint >= pendingLoss)
+                player1.UsePoint(pendingLoss);
+            else if (currentPoint > 0)
+                player1.UsePoint(currentPoint);
+            SetMemory("pendingPointLoss", 0);
+        }
         
         _ = player1.DrawCard();
         player1.AddPointMaxNatural();
@@ -4068,6 +4079,17 @@ InputState currentInputState = InputState.nil;
                         {
                             player2.AddPoint(value);
                         }
+                    }
+                }
+
+                // losePointAtNextTurnBegin(n) - 下回合开始时失去n点指挥点
+                if (instruction.StartsWith("losePointAtNextTurnBegin", StringComparison.OrdinalIgnoreCase))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
+                    if (match.Success)
+                    {
+                        int value = EvaluateExpression(match.Groups[1].Value, result, targets, sourceCard);
+                        SetMemory("pendingPointLoss", value);
                     }
                 }
 

@@ -86,6 +86,7 @@
 | `GetFriendHq` / `GetEnemyHq` | targets设为友方/敌方总部 |
 | `GetPoint()` / `GetPointMax()` | 读取指挥点/最大点存入result |
 | `AddPoint(n)` / `AddPointMax(n)` | 增加指挥点/最大点 |
+| `losePointAtNextTurnBegin(n)` | 下回合开始时失去n点指挥点（不足则清零） |
 | `DiscardRandomly(n)` | 随机弃n张手牌 |
 | `DiscardWithName(pattern, n)` | 弃ID含pattern的n张手牌 |
 | `GetCardsBeingTreated` | targets设为最近抽到的卡列表 |
