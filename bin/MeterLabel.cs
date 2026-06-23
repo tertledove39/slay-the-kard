@@ -124,8 +124,15 @@ public partial class MeterLabel : Control
     /// </summary>
     public async Task AnimateTo(int targetValue)
     {
-        if (_isAnimating || targetValue == _currentValue)
+        if (targetValue == _currentValue)
             return;
+
+        if (_isAnimating)
+        {
+            _currentValue = targetValue;
+            DisplayImmediate(targetValue);
+            return;
+        }
 
         _isAnimating = true;
 

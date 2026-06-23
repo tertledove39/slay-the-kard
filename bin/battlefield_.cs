@@ -2964,12 +2964,7 @@ InputState currentInputState = InputState.nil;
         int pendingLoss = ReadMemory("pendingPointLoss");
         if (pendingLoss > 0)
         {
-            int currentPoint = player1.ReadPoint();
-            if (currentPoint >= pendingLoss)
-                player1.UsePoint(pendingLoss);
-            else if (currentPoint > 0)
-                player1.UsePoint(currentPoint);
-            player1.RefreshPointDisplay();
+            player1.LosePointDirect(pendingLoss);
             SetMemory("pendingPointLoss", 0);
         }
         
@@ -5076,6 +5071,15 @@ public class Player
         _ = pointLabel.AnimateTo(point);
     }
 
+    public void LosePointDirect(int x)
+    {
+        if (point >= x)
+            point -= x;
+        else
+            point = 0;
+        _ = pointLabel.AnimateTo(point);
+    }
+
     public void AddPointMax(int i = 1)
     {
         int oldMax = pointMax;
@@ -5098,11 +5102,6 @@ public class Player
             return false;
         }
 
-    }
-
-    public void RefreshPointDisplay()
-    {
-        pointLabel.DisplayImmediate(point);
     }
 
     /// <summary>
