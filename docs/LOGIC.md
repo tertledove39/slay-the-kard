@@ -1,108 +1,273 @@
 # 逻辑功能文档
 
-## 效果脚本变量系统
+## 一、效果脚本系统
 
-| 变量名 | 说明 | 代码位置 |
-|--------|------|----------|
-| `&result` | 当前效果段的result值 | battlefield_.cs ReplaceVariables() |
-| `&targetsCount` / `&targets.count` | 目标列表数量 | battlefield_.cs ReplaceVariables() |
-| `&sourceAttack` / `&source.attack` | sourceCard的攻击力 | battlefield_.cs ReplaceVariables() |
-| `&sourceDefence` / `&source.defence` | sourceCard的防御力 | battlefield_.cs ReplaceVariables() |
-| `&sourceCost` / `&source.cost` | sourceCard的费用 | battlefield_.cs ReplaceVariables() |
-| `&lifeTime` | 单位存活回合数（优先读取targets[0]，否则sourceCard） | battlefield_.cs ReplaceVariables() + cardBase_.cs ReadLifeTime() |
-| `&attackCountThisTurn` | 本回合该卡作为攻击方的战斗次数（从sourceCard读取） | battlefield_.cs ReplaceVariables() + cardBase_.cs ReadAttackCountThisTurn() |
-| `&fieldFriendUnitCount` | 友方场上单位数量 | battlefield_.cs ReplaceVariables() |
-| `&fieldEnemyUnitCount` | 敌方场上单位数量 | battlefield_.cs ReplaceVariables() |
-| `&friendHqDefence` | 友方总部防御力 | battlefield_.cs ReplaceVariables() |
-| `&enemyHqDefence` | 敌方总部防御力 | battlefield_.cs ReplaceVariables() |
-| `&friendCommandPoint` | 友方当前指挥点 | battlefield_.cs ReplaceVariables() |
-| `&friendCommandPointMax` | 友方最大指挥点 | battlefield_.cs ReplaceVariables() |
-| `&friendHandCount` | 友方手牌数量 | battlefield_.cs ReplaceVariables() |
-| `&friendDeckRemainingCount` | 友方卡组剩余数量 | battlefield_.cs ReplaceVariables() |
-| `&任意名称` | 自定义变量（通过SetMemory设置，未定义时默认0） | battlefield_.cs ReadMemory() |
+### 变量替换 (ReplaceVariables)
 
-## 攻击次数计数逻辑
+位置：`battlefield_.cs` `ReplaceVariables()` (line 1397)
 
-- **存储位置**: `cardBase_.attackCountThisTurn` 字段
-- **自增时机**: `battlefield_.Attack()` 中，攻击成功后在 `from.HaveAttacked()` 之后调用 `from.IncrementAttackCountThisTurn()`
-- **重置时机**: `cardBase_.RefreshUnit()` 中重置为0（每回合开始时通过 `RefreshAllCardInField()` 触发）
-- **读取方式**: 效果脚本中使用 `&attackCountThisTurn`，从 `sourceCard` 读取
+| 变量名 | 说明 |
+|--------|------|
+| `&result` | 当前效果段的result值 |
+| `&targetsCount` / `&targets.count` | 目标列表数量 |
+| `&sourceAttack` / `&source.attack` | sourceCard的攻击力 |
+| `&sourceDefence` / `&source.defence` | sourceCard的防御力 |
+| `&sourceCost` / `&source.cost` | sourceCard的费用 |
+| `&lifeTime` | 目标单位存活回合数（优先targets[0]，否则sourceCard） |
+| `&attackCountThisTurn` | 本回合该卡作为攻击方的战斗次数 |
+| `&overflow` | 上次攻击溢出的伤害值 (lastOverflowDamage) |
+| `&LastdeadFriendlyLandUnit` | 上一个死亡的友方陆军单位ID |
+| `&fieldFriendUnitCount` / `&field.friend.unit.count` | 友方场上非HQ单位数量 |
+| `&fieldEnemyUnitCount` / `&field.enemy.unit.count` | 敌方场上非HQ单位数量 |
+| `&fieldFriend{Type}Count` | 友方场上某类型单位数量(如&fieldFriendTankCount) |
+| `&fieldEnemy{Type}Count` | 敌方场上某类型单位数量 |
+| `&friendHqDefence` / `&friend.hq.defence` | 友方总部防御力 |
+| `&enemyHqDefence` / `&enemy.hq.defence` | 敌方总部防御力 |
+| `&friendCommandPoint` | 友方当前指挥点 |
+| `&friendCommandPointMax` | 友方最大指挥点 |
+| `&friendHandCount` | 友方手牌数量 |
+| `&friendDeckRemainingCount` | 友方卡组剩余数量 |
+| `&任意名称` | 自定义内存变量（通过 `SetMemory()` 设置） |
 
-## 战斗核心流程 (Attack)
+### 效果脚本解析 (ParseAndExecuteEffect)
 
-### 函数位置
-`battlefield_.cs` - `Attack(cardBase_ from, cardBase_ to)` (行1654)
+位置：`battlefield_.cs` line 3290-4466
 
-### 执行顺序
-1. 控制锁定与死亡检查暂停
-2. 检查攻击者是否可以攻击 (`CheckIfCanAttack`)
-3. 步兵/坦克攻击范围合法性检查
+解析流程：
+1. **去除方括号**：`StripBracketsOutsideQuotes()` 移除 `[icon=...]` 元数据
+2. **去除时间前缀**：剥离 `Deployed:` 等前缀（冒号外的部分）
+3. **逗号分割**：用 `SplitEffectString()` 按逗号分割为多个段
+4. **每段处理**：按 `|` 分割为指令，预收集 `&` 结尾的跳转标签
+5. **指令循环**：处理 `foreach`/`End&` 循环嵌套、`if()` 条件跳转、各指令
+
+### 效果指令一览
+
+位置：`battlefield_.cs` `ParseAndExecuteEffect()` 内
+
+| 指令 | 功能 |
+|------|------|
+| `this` | 设置 targets 为 sourceCard 自身 |
+| `target` | 重置 targets 为传入的原始 targets |
+| `myHq` / `enemyHq` | 设置 targets 为友方/敌方总部 |
+| `GetTargetByIndex(n)` | 从 targets 中取第n个作为新 targets |
+| `GetCardBeingAddToSupportLine` | targets 设为上一个加入支援阵线的卡 |
+| `Heal(n)` / `damage(n)` | 为所有 targets 增减防御 |
+| `GetAttack(n)` / `LoseAttack(n)` | 为所有 targets 增减攻击 |
+| `SetDefence(n)` | 设置 targets 防御力为n |
+| `addDefence(n)` | 同 Heal |
+| `setResult(n)` | 设置 result 变量值 |
+| `SetMemory(name, n)` | 设置自定义内存变量 |
+| `getCount($selector)` | 计数字段上匹配selector的单位 |
+| `setTargets($selector)` | 按selector设置targets列表 |
+| `GetEffect("effectString")` | 为targets附加效果字符串 |
+| `AddTrait(name)` / `RemoveTrait(name)` | 添加/移除targets特性 |
+| `Refresh` | 刷新targets的行动次数 |
+| `Retreat` | 使targets撤退（前线→支援线，支援线→手牌/弃牌） |
+| `Discard` | 标记targets为待弃置 |
+| `drawCard` | 抽result张卡（最少1张） |
+| `DrawUnitCards(n)` | 抽n张单位卡 |
+| `DrawACard(name, n)` | 抽n张ID含name的卡 |
+| `DrawACardWithType(type, n)` | 抽n张指定类型的卡 |
+| `AddToHand(id, count)` | 向手牌添加count张指定ID的卡 |
+| `addToSupportLine(id)` | 向友方支援阵线添加指定ID的卡 |
+| `addToEnemySupportLine(id)` | 向敌方支援阵线添加指定ID的卡 |
+| `addToDeck(id)` | 向卡组添加指定ID的卡并洗牌 |
+| `Play` / `Play(selector)` | 从手牌免费打出一张卡 |
+| `Choose(a, b)` | 显示2选1界面，执行选中卡效果 |
+| `Develop` / `Develop(selector)` | 显示最多3张随机卡选1加入手牌 |
+| `KillAllTargets` | 直接清空targets的防御 |
+| `HealAllTargets` | 将targets恢复到历史最大防御 |
+| `GetAllFriendUnits` / `GetAllEnemyUnits` | 所有友方/敌方非HQ单位 |
+| `GetAllFriendTargets` / `GetAllEnemyTargets` | 所有友方/敌方单位+HQ |
+| `GetRandomFriendUnit` / `GetRandomEnemyUnit` | 随机友方/敌方非HQ单位 |
+| `GetRandomFriendTarget` / `GetRandomEnemyTarget` | 随机友方/敌方单位+HQ |
+| `GetRandomNumber(min, max)` | 随机整数存入result |
+| `GetFriendHq` / `GetEnemyHq` | targets设为友方/敌方总部 |
+| `GetPoint()` / `GetPointMax()` | 读取指挥点/最大点存入result |
+| `AddPoint(n)` / `AddPointMax(n)` | 增加指挥点/最大点 |
+| `DiscardRandomly(n)` | 随机弃n张手牌 |
+| `DiscardWithName(pattern, n)` | 弃ID含pattern的n张手牌 |
+| `GetCardsBeingTreated` | targets设为最近抽到的卡列表 |
+| `If(condition)label` | 条件满足则跳转到标签 |
+| `foreach ... End&` | 遍历当前targets执行循环体 |
+| `displayAllCardState` | 调试：打印所有单位状态 |
+
+### 条件判断 (EvaluateCondition)
+
+位置：`battlefield_.cs` line 4764
+
+支持格式：
+- 数值比较：`result>n`、`target.attack<=n`、`target.defence==n`、`target.cost>=n`、`targets.count<n`
+- 布尔判断：`target.isFriend`、`target.isEnemy`、`source.isFriend`、`source.isEnemy`
+- 类型匹配：`target.cardType==Tank`
+- ID匹配：`target.name==cardId`
+- 变量引用：`&variableName`
+- 表达式计算：支持 `+-*/%()` 和 &变量
+
+### Target Selector (GetTargetsFromSelector)
+
+位置：`battlefield_.cs` line 4653
+
+Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
+- 首段：`allTargets` = 所有场上+HQ的卡
+- 后续段：`unit`=非HQ / `hq`=总部 / `friend`=友方 / `enemy`=敌方 / 类型名=CardTypes过滤
+
+---
+
+## 二、回合流程
+
+### OnNextTurnButtonPressed (battlefield_.cs line 2902)
+
+完整回合顺序：
+```
+1. FriendlyTurnEnd  效果触发
+2. TurnEnd  效果触发
+3. 死亡检查
+4. EnemyTurnBegin  效果触发
+5. ⚠ IncrementLifeTime (ALL) — 第一次
+6. TurnBegin  效果触发
+7. FriendlyTurnBegin  效果触发
+8. ApplyTurnStartTraits (Mobilize+1+1、前线去烟幕、守护刷新)
+9. ⚠ IncrementLifeTime (ALL) — 第二次（疑为BUG，见BUGS.md）
+10. 死亡检查
+11. EnemyTurnAsync() (敌方AI行动)
+12. player1.DrawCard() + AddPointMaxNatural()
+```
+
+### 敌方回合 (EnemyTurnAsync → EnemyPerformActionsAsync)
+
+位置：`battlefield_.cs` line 2195 / 2673
+
+1. `RefreshAllCardInField()` 刷新所有单位
+2. `ApplyEnemyTurnStartTraits()` 敌方动员buff
+3. `ExecuteEnemyActionQueue()` 执行行动脚本（tN/everyNt/ADD/default）
+4. `EnemyPerformActionsAsync()` AI行动：
+   - 阶段1：前线无我方单位时，把敌方支援线非空军单位推到前线
+   - 阶段2：攻击（优先级：能一击杀死HQ > 能杀死单位 > 攻击HQ > 随机攻击）
+
+---
+
+## 三、战斗核心流程 (Attack)
+
+位置：`battlefield_.cs` line 1788
+
+流程顺序：
+1. 控制锁定+死亡检查暂停
+2. 检查 `CheckIfCanAttack`
+3. 步兵/坦克攻击范围合法性检查（只能相邻阵线）
 4. 目标烟幕检查
 5. 守护保护检查
-6. 触发各种时点效果 (BePicked, Attacking, BeingAttacked等)
-7. 计算攻击伤害（考虑重甲、免疫）
-8. 应用伤害，移除动员、烟幕
-9. 冲击特性处理
-10. 反击计算（伏击、重甲、免疫）
-11. 播放战斗音效和飞弹动画
-12. 标记已攻击 (`HaveAttacked`)
-13. 自增本回合攻击计数 (`IncrementAttackCountThisTurn`)
-14. trait闪烁
-15. 战后移动限制处理
-16. 恢复死亡检查，检查单位死亡
-17. 解锁控制
+6. BePicked 时点 + 同仇触发
+7. 预计算伤害（考虑重甲-1、免疫=0）+ 溢出量
+8. Attacking / BeingAttacked 等时点效果触发
+9. 应用伤害（`LoseDefence`）
+10. 移除动员（受伤后）+ 移除烟幕（攻击后）
+11. 冲击特性处理（无视伏击+反击免疫）
+12. 反击计算（伏击先发反击、重甲/免疫影响）
+13. 飞弹动画+音效
+14. `HaveAttacked()` 标记 + `IncrementAttackCountThisTurn()`
+15. trait闪烁
+16. 战后移动限制（非坦克单位攻击后禁止移动，奋战例外）
+17. 恢复死亡检查+单位死亡判定
+18. 解锁控制
 
-## 支援阵线相关方法
+### 特性在战斗中的交互
 
-| 方法 | 说明 | 代码位置 |
-|------|------|----------|
-| `GetCardBeingAddToSupportLine` | 效果指令：将上一个加入支援阵线的卡设为 targets，供后续 pipe 指令操作 | battlefield_.cs ParseAndExecuteEffect() |
-| `addToSupportLine(cardId)` | 向友方支援阵线添加卡牌，同时更新 lastCardAddedToSupportLine | battlefield_.cs ParseAndExecuteEffect() |
-| `addToEnemySupportLine(cardId)` | 向敌方支援阵线添加卡牌，同时更新 lastCardAddedToSupportLine | battlefield_.cs ParseAndExecuteEffect() |
+| 特性 | 攻击方 | 被攻击方 |
+|------|--------|----------|
+| 重甲 | 使反击伤害-1 | 使攻击伤害-1 |
+| 免疫 | 免疫反击伤害 | 免疫攻击伤害 |
+| 冲击 | 不受反击，攻击后失去 | - |
+| 伏击 | - | 先造成反击伤害，杀死攻方则免伤 |
+| 烟幕 | 攻击后失去烟幕 | 不可被选为目标 |
+| 守护 | - | 两侧有守护单位时不可被攻击 |
+| 动员 | - | 受到伤害后消失 |
+| 同仇 | - | 被指向时，所有友方同仇+1+1 |
 
-### 使用示例
-```
-addToSupportLine(t70)|GetCardBeingAddToSupportLine|addDefence(1)
-```
-向支援阵线添加 t70 后，将 targets 设为该卡，再对其增加 1 点防御力。
+---
 
-### 实现细节
-- **存储位置**: `battlefield_.lastCardAddedToSupportLine` 字段
-- **赋值时机**: 在 `addToSupportLine`/`addToEnemySupportLine` 指令中，`AddCardToPlace` 成功后赋值
-- **指令效果**: 在效果脚本中作为 pipe 指令使用时，将 `targets` 设置为 `{ lastCardAddedToSupportLine }`，若为 null 则不改变 targets
+## 四、移动系统 (Move)
 
-## 效果脚本解析规则
+位置：`battlefield_.cs` line 2027
 
-### 分隔符处理
-- **逗号**：最高优先级分隔符，分割不同触发时段的效果
-- **竖线 `|`**：分割不同指令（pipe）
-- 分隔符在以下范围内会被忽略：
-  - 引号内 `"..."` 或 `'...'`
-  - 圆括号 `()` 内
-  - 方括号 `[]` 内（如 `[icon=action,description=含,逗号]`）
+移动规则：
+- 友方单位：手牌→支援阵线（部署） / 支援阵线→前线（推进）
+- 敌方单位：支援阵线→前线（推进）
+- 前线单位不可再移动
+- 部署时触发 `Deployed` / `FriendlyTankDeployed` / `FriendlyInfantryDeployed` 时点
+- 推进时触发 `Moving` 时点
+- 移动后：非坦克单位攻击力归零
+- 烟幕：首次移动失去 + 进入前线失去
 
-### 标签定义
-- 以 `&` 结尾的指令为跳转标签定义（如 `Jump&`）
-- `End&` 特例：用于标记 foreach 循环结束
-- 标签收集时会先剥离 `[icon=...]` 后缀再检测 `&`
-- 示例：`Jump&[icon=action,description=跳转]` 会正确识别为标签 `Jump`
+### 阵线规则
 
-### 条件跳转
-- 格式：`if(条件)标签`
-- 条件满足时跳转到标签位置执行
-- 条件不支持跨行
+- 三条阵线各5格
+- 步兵/坦克只能攻击相邻阵线单位
+- 空军(Plane/Bomber)和火炮(Artillery)可攻击任意阵线
 
-## GetEffect 指令说明
+---
 
-- **功能**: 使 targets 中的单位获得指定的 effect 字符串
-- **用法**: `GetEffect("TriggerName:指令[icon=xxx,description=yyy]")`
-- **内层变量**: 内层效果字符串中的 `&变量` 保留原始形式，不会在外层被求值。当内层效果稍后触发时，用目标单位自身数据动态求值
-- **UI 刷新**: 赋值后自动调用 `RefreshState()` 更新 attribute 图标面板
+## 五、内存变量系统
 
-## 效果图标显示规则
+位置：`battlefield_.cs` line 1533-1552
 
-- 每段逗号分隔的效果独立解析其 `[icon=...]` 属性
-- trait 属性各自显示独立图标
-- 被守护状态也有独立图标
-- `BuildAttributePanel` 缓存 attribute 列表，内容未变时跳过重建
-- `[icon=xxx,description=yyy]` 中的 description 支持包含逗号，解析时用 `icon=`/`description=` 定位而非 `meta.Split(',')`
+| 方法 | 说明 |
+|------|------|
+| `SetMemory(name, value)` | 设置自定义变量 |
+| `ReadMemory(name)` | 读取自定义变量（不存在则返回0并自动创建） |
+
+变量通过 `&variableName` 在效果脚本中引用，未定义时默认值为0。
+
+---
+
+## 六、攻击次数计数
+
+| 方法 | 位置 | 说明 |
+|------|------|------|
+| `IncrementAttackCountThisTurn()` | cardBase_.cs line 376 | 攻击次数+1 |
+| `ReadAttackCountThisTurn()` | cardBase_.cs line 368 | 读取攻击次数 |
+| `RefreshUnit()` | cardBase_.cs line 96 | 重置moveAble=1, attackAble=1, 奋战=2, 恢复伏击 |
+
+---
+
+## 七、时点系统 (TriggerUnitEffects)
+
+位置：`battlefield_.cs` line 1728
+
+所有时点（对应效果脚本前缀，如 `Deployed:` `Attacking:` 等）：
+
+| 时点前缀 | 触发时机 |
+|----------|----------|
+| Deployed | 卡牌从手牌部署到场上 |
+| FriendlyTankDeployed | 友方坦克部署 |
+| FriendlyInfantryDeployed | 友方步兵部署 |
+| FriendlyTurnBegin | 友方回合开始 |
+| FriendlyTurnEnd | 友方回合结束 |
+| TurnBegin | 任意回合开始 |
+| TurnEnd | 任意回合结束 |
+| EnemyTurnBegin | 敌方回合开始 |
+| Attacking | 单位发起攻击时 |
+| BeingAttacked | 单位被攻击时 |
+| BecomingAttackTarget | 成为敌方攻击目标时 |
+| FightingInfantry | 对战步兵时 |
+| AttackingHq | 攻击总部时 |
+| FriendlyUnitAttacking | 友方单位发起攻击 |
+| EnemyUnitAttacking | 敌方单位发起攻击 |
+| FriendlyUnitBeingAttacked | 友方单位被攻击 |
+| EnemyUnitBeingAttacked | 敌方单位被攻击 |
+| Moving | 单位移动（非部署）时 |
+| Dead | 单位死亡时 |
+| FriendlyUnitDead | 友方单位死亡时（所有剩余单位触发） |
+| EnemyUnitDead | 敌方单位死亡时（所有剩余单位触发） |
+| BeingAddedToField | 单位被加入战场时 |
+| BePicked | 被指向（被选为目标时） |
+
+---
+
+## 八、同仇特性 (SharedHatred)
+
+位置：`battlefield_.cs` `TriggerSharedHatred()` (line 3092)
+
+触发时机：BePicked 时点（被攻击选中 / 被友方指令选中）
+
+效果：被指向的单位若具有 SharedHatred 特性，所有与该单位同阵营的同仇单位获得 +1 攻击 +1 防御（被指向的单位自身除外）。

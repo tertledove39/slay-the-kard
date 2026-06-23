@@ -933,6 +933,7 @@ InputState currentInputState = InputState.nil;
         "foreach", "End&", "Develop", "Choose()", "Play",
         "AddTrait()", "RemoveTrait()", "DrawACard()", "GetCardsBeingTreated",
         "getCount()", "setTargets()", "DiscardRandomly()", "DiscardWithName()",
+        "addANewUnitToBattlefieldWithCostAndType()", "GetHighestAttackFriendUnit()", "FightRandomEnemy()",
     };
 
     private void ToggleConsole()
@@ -1495,6 +1496,18 @@ InputState currentInputState = InputState.nil;
                             sb.Append(sourceCard.ReadLifeTime());
                         else
                             sb.Append(0);
+                        break;
+                    case "targetAttack":
+                    case "target.attack":
+                        sb.Append((targets != null && targets.Count > 0) ? targets[0].ReadAttack() : 0);
+                        break;
+                    case "targetDefence":
+                    case "target.defence":
+                        sb.Append((targets != null && targets.Count > 0) ? targets[0].ReadDefence() : 0);
+                        break;
+                    case "targetCost":
+                    case "target.cost":
+                        sb.Append((targets != null && targets.Count > 0) ? targets[0].ReadCost() : 0);
                         break;
                     default:
                         sb.Append(ReadMemory(varName));
@@ -2874,9 +2887,14 @@ InputState currentInputState = InputState.nil;
             {
                 lastDeadFriendlyLandUnitId = deadUnit.id ?? "";
             }
-            await TriggerUnitEffects("Dead", deadUnit, checkOnlySourceCard:true);
+            TriggerUnitEffects("Dead", deadUnit, checkOnlySourceCard:true);
             RemoveCard(deadUnit);
             PlayDeadSound(1);
+            
+            if (deadUnit.GetIsFriend() == IsFriend.friend)
+                await TriggerUnitEffects("FriendlyUnitDead", deadUnit);
+            else if (deadUnit.GetIsFriend() == IsFriend.enemy)
+                await TriggerUnitEffects("EnemyUnitDead", deadUnit);
         }
 
         foreach (var c in allCards.Where(x=>x.shouldBeRemoved == 1).ToList())
@@ -3956,6 +3974,38 @@ InputState currentInputState = InputState.nil;
                     }
                 }
 
+                // addANewUnitToBattlefieldWithCostAndType(type, cost) - 从非Unobtainable卡中按类型和费用选卡加入战场
+                if (instruction.StartsWith("addANewUnitToBattlefieldWithCostAndType", StringComparison.OrdinalIgnoreCase))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^,]+),\s*(\d+)\)");
+                    if (match.Success)
+                    {
+                        string typeStr = match.Groups[1].Value.Trim();
+                        int targetCost = int.Parse(match.Groups[2].Value.Trim());
+                        var cardType = GetTypes(typeStr);
+                        var allCards = GetCardMaganer().GetAllCards()
+                            .Where(c => c.Rarity != Rarity.Unobtainable && c.CardType == cardType && c.IsHq != HQ.hq)
+                            .ToList();
+                        if (allCards.Count > 0)
+                        {
+                            var sorted = allCards.OrderBy(c => Math.Abs(c.Cost - targetCost)).ToList();
+                            int minDiff = Math.Abs(sorted[0].Cost - targetCost);
+                            var candidates = sorted.Where(c => Math.Abs(c.Cost - targetCost) == minDiff).ToList();
+                            var chosen = candidates[new Random().Next(candidates.Count)];
+                            bool isFriend = sourceCard?.GetIsFriend() == IsFriend.friend;
+                            var place = isFriend ? GetTheFirstValidFriendlyPlace() : GetTheFirstValidEnemySupportPlace();
+                            if (place != null)
+                            {
+                                var newCard = cardRes.Instantiate() as cardBase_;
+                                newCard.SetCardInformation(chosen);
+                                newCard.SetIsFriend(isFriend ? IsFriend.friend : IsFriend.enemy);
+                                await AddCardToPlace(newCard, place);
+                                lastCardAddedToSupportLine = newCard;
+                            }
+                        }
+                    }
+                }
+
                 // GetPoint() - 获得指挥点
                 if (ins == "getpoint")
                 {
@@ -4030,6 +4080,33 @@ InputState currentInputState = InputState.nil;
                     else
                     {
                         targets = [];
+                    }
+                }
+
+                // GetHighestAttackFriendUnit(type1,type2,...) - 从友方指定类型单位中取攻击最高者随机选一
+                if (instruction.StartsWith("GetHighestAttackFriendUnit", StringComparison.OrdinalIgnoreCase))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
+                    if (match.Success)
+                    {
+                        var typeNames = match.Groups[1].Value.Split(',').Select(t => t.Trim()).ToList();
+                        var candidates = ReadCardInPlaces()
+                            .Where(x => x.getState() == CardState.placed
+                                     && x.GetIsFriend() == IsFriend.friend
+                                     && x.isHq != HQ.hq
+                                     && typeNames.Any(tn => GetTypes(tn) == x.cardType))
+                            .ToList();
+                        if (candidates.Count > 0)
+                        {
+                            int maxAttack = candidates.Max(c => c.ReadAttack());
+                            var highest = candidates.Where(c => c.ReadAttack() == maxAttack).ToList();
+                            var rnd = new Random();
+                            targets = new List<cardBase_> { highest[rnd.Next(highest.Count)] };
+                        }
+                        else
+                        {
+                            targets = [];
+                        }
                     }
                 }
 
@@ -4118,6 +4195,32 @@ InputState currentInputState = InputState.nil;
                         if (target != null && target.getState() == CardState.placed)
                         {
                             target.LoseDefence(target.ReadDefence());
+                        }
+                    }
+                }
+
+                // FightRandomEnemy() - 使targets各自随机攻击一个敌方非总部单位，不计入攻击次数
+                if (instruction.StartsWith("FightRandomEnemy", StringComparison.OrdinalIgnoreCase))
+                {
+                    await ExecuteChangeLists();
+                    var targetsSnapshot = targets.ToList();
+                    foreach (var t in targetsSnapshot)
+                    {
+                        if (t == null || t.getState() != CardState.placed) continue;
+                        var allTargets = GetAllowedTargets(t);
+                        var validTargets = allTargets.Where(v => v.isHq != HQ.hq).ToList();
+                        if (validTargets.Count > 0)
+                        {
+                            int savedMoveAble = t.moveAble;
+                            int savedAttackAble = t.attackAble;
+                            int savedAttackCount = t.attackCountThisTurn;
+                            if (t.attackAble < 1) t.attackAble = 1;
+                            var rnd = new Random();
+                            await Attack(t, validTargets[rnd.Next(validTargets.Count)]);
+                            t.moveAble = savedMoveAble;
+                            t.attackAble = savedAttackAble;
+                            t.attackCountThisTurn = savedAttackCount;
+                            t.UpdateMoveableLight();
                         }
                     }
                 }
