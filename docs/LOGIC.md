@@ -16,6 +16,7 @@
 | `&lifeTime` | 目标单位存活回合数（优先targets[0]，否则sourceCard） |
 | `&attackCountThisTurn` | 本回合该卡作为攻击方的战斗次数 |
 | `&overflow` | 上次攻击溢出的伤害值 (lastOverflowDamage) |
+| `&lastDamage` | 上次战斗攻击方造成的伤害值 |
 | `&LastdeadFriendlyLandUnit` | 上一个死亡的友方陆军单位ID |
 | `&fieldFriendUnitCount` / `&field.friend.unit.count` | 友方场上非HQ单位数量 |
 | `&fieldEnemyUnitCount` / `&field.enemy.unit.count` | 敌方场上非HQ单位数量 |

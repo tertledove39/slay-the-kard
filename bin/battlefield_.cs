@@ -128,6 +128,7 @@ public partial class battlefield_ : Control
     /// 上次攻击溢出的伤害
     /// </summary>
     private int lastOverflowDamage = 0;
+    private int lastDamage = 0;
     /// <summary>
     /// 上一个死亡的友方陆军单位的id
     /// </summary>
@@ -1448,6 +1449,9 @@ InputState currentInputState = InputState.nil;
                     case "overflow":
                         sb.Append(lastOverflowDamage);
                         break;
+                    case "lastDamage":
+                        sb.Append(lastDamage);
+                        break;
                     case "LastdeadFriendlyLandUnit":
                         sb.Append(lastDeadFriendlyLandUnitId ?? "");
                         break;
@@ -1806,6 +1810,7 @@ InputState currentInputState = InputState.nil;
     public async Task Attack(cardBase_ from,cardBase_ to)
     {
         lastOverflowDamage = 0;
+        lastDamage = 0;
         ForbidControl();
         PauseDeathCheck(); // 暂停死亡检查
         if (!from.CheckIfCanAttack())
@@ -1885,6 +1890,7 @@ InputState currentInputState = InputState.nil;
         int attackDamage = from.ReadAttack();
         if (to.HasTrait(UnitTraits.HeavyArmor)) attackDamage = Math.Max(0, attackDamage - 1);
         if (to.HasTrait(UnitTraits.Immunity)) attackDamage = 0;
+        lastDamage = attackDamage;
         lastOverflowDamage = Math.Max(0, attackDamage - to.ReadDefence());
 
         // 触发攻击者的 Attacking 效果
