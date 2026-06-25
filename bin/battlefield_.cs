@@ -932,7 +932,7 @@ InputState currentInputState = InputState.nil;
         "displayAllCardState", "GetAllFriendUnits", "GetAllEnemyUnits", "GetAllFriendTargets", "GetAllEnemyTargets",
         "GetRandomFriendUnit", "GetRandomEnemyUnit",
         "GetRandomFriendTarget", "GetRandomEnemyTarget", "GetRandomNumber()",
-        "KillAllTargets", "HealAllTargets", "Refresh", "Retreat", "Discard",
+        "KillAllTargets", "HealAllTargets", "Refresh", "Retreat", "Discard", "DiscardWithTarget",
         "foreach", "End&", "Develop", "Choose()", "Play",
         "AddTrait()", "RemoveTrait()", "DrawACard()", "GetCardsBeingTreated",
         "getCount()", "setTargets()", "DiscardRandomly()", "DiscardWithName()",
@@ -3903,6 +3903,28 @@ InputState currentInputState = InputState.nil;
                     }
                 }
 
+                // DiscardWithTarget - 弃置当前targets（支持手牌）
+                if (instruction.StartsWith("DiscardWithTarget", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var target in targets.ToList())
+                    {
+                        if (target == null) continue;
+                        if (target.getState() == CardState.inHand)
+                        {
+                            if (target.GetIsFriend() == IsFriend.friend)
+                                player1.RemoveFromHand(target);
+                            else
+                                player2.RemoveFromHand(target);
+                            _ = CardDiscardAndRemove(target);
+                        }
+                        else
+                        {
+                            target.AddPendingDiscard();
+                        }
+                    }
+                    continue;
+                }
+
                 // Discard(list) - 挂起弃置操作
                 if (instruction.StartsWith("Discard", StringComparison.OrdinalIgnoreCase))
                 {
@@ -4816,29 +4838,29 @@ InputState currentInputState = InputState.nil;
     /// </summary>
     private List<cardBase_> GetTargetsFromSelector(string selector)
     {
-        // 获取所有在战场上的单位，包括总部
         List<cardBase_> results = new List<cardBase_>();
-        
-        // 添加所有在cardInPlaces中的单位
-        results.AddRange(cardInPlaces.Where(x => x.getState() == CardState.placed).ToList());
-        
-        // 添加友方总部（如果存在且在战场上）
-        if (myHq != null && myHq.getState() == CardState.placed && !results.Contains(myHq))
-        {
-            results.Add(myHq);
-        }
-        
-        // 添加敌方总部（如果存在且在战场上）
-        if (enemyHq != null && enemyHq.getState() == CardState.placed && !results.Contains(enemyHq))
-        {
-            results.Add(enemyHq);
-        }
-
         var parts = selector.Split(".");
+        int startIdx = 0;
 
-        foreach (var part in parts)
+        if (parts.Length > 0 && parts[0] == "allCardInHand")
         {
-            if (part == "allTargets")
+            results.AddRange(player1.GetCardsInHand());
+            results.AddRange(player2.GetCardsInHand());
+            startIdx = 1;
+        }
+        else
+        {
+            results.AddRange(cardInPlaces.Where(x => x.getState() == CardState.placed).ToList());
+            if (myHq != null && myHq.getState() == CardState.placed && !results.Contains(myHq))
+                results.Add(myHq);
+            if (enemyHq != null && enemyHq.getState() == CardState.placed && !results.Contains(enemyHq))
+                results.Add(enemyHq);
+        }
+
+        for (int i = startIdx; i < parts.Length; i++)
+        {
+            var part = parts[i];
+            if (part == "allTargets" || part == "allCardInHand")
             {
                 // 已经是所有单位
                 continue;
