@@ -924,15 +924,15 @@ InputState currentInputState = InputState.nil;
     private static readonly string[] ConsoleCommands = new[]
     {
         "myHq", "enemyHq", "this", "target", "GetCardBeingAddToSupportLine",
-        "Heal()", "damage()", "GetAttack()", "LoseAttack()", "SetDefence()", "addDefence()",
+        "Heal()", "damage()", "GetAttack()", "SetDefence()", "addDefence()",
         "setResult()", "setTarget", "drawCard", "DrawUnitCards()",
         "GetEffect()", "AddToHand()", "addToSupportLine()", "addToEnemySupportLine()",
         "addToDeck()", "SetMemory()", "AddPoint()", "AddPointMax()", "losePointAtNextTurnBegin()",
         "ShuffleIntoDeck", "GetCardsShuffledIntoDeck",
         "displayAllCardState", "GetAllFriendUnits", "GetAllEnemyUnits", "GetAllFriendTargets", "GetAllEnemyTargets",
-        "GetEnemyHq", "GetFriendHq", "GetRandomFriendUnit", "GetRandomEnemyUnit",
+        "GetRandomFriendUnit", "GetRandomEnemyUnit",
         "GetRandomFriendTarget", "GetRandomEnemyTarget", "GetRandomNumber()",
-        "KillAllTargets", "KillAllTarget", "HealAllTargets", "Refresh", "Retreat", "Discard",
+        "KillAllTargets", "HealAllTargets", "Refresh", "Retreat", "Discard",
         "foreach", "End&", "Develop", "Choose()", "Play",
         "AddTrait()", "RemoveTrait()", "DrawACard()", "GetCardsBeingTreated",
         "getCount()", "setTargets()", "DiscardRandomly()", "DiscardWithName()",
