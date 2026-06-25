@@ -123,6 +123,7 @@ public partial class battlefield_ : Control
     /// 上一个被加入支援阵线的卡牌引用
     /// </summary>
     private cardBase_ lastCardAddedToSupportLine = null;
+    private List<cardBase_> lastCardsShuffledIntoDeck = new();
     /// <summary>
     /// 上次攻击溢出的伤害
     /// </summary>
@@ -926,6 +927,7 @@ InputState currentInputState = InputState.nil;
         "setResult()", "setTarget", "drawCard", "DrawUnitCards()",
         "GetEffect()", "AddToHand()", "addToSupportLine()", "addToEnemySupportLine()",
         "addToDeck()", "SetMemory()", "AddPoint()", "AddPointMax()", "losePointAtNextTurnBegin()",
+        "ShuffleIntoDeck", "GetCardsShuffledIntoDeck",
         "displayAllCardState", "GetAllFriendUnits", "GetAllEnemyUnits", "GetAllFriendTargets", "GetAllEnemyTargets",
         "GetEnemyHq", "GetFriendHq", "GetRandomFriendUnit", "GetRandomEnemyUnit",
         "GetRandomFriendTarget", "GetRandomEnemyTarget", "GetRandomNumber()",
@@ -2941,9 +2943,11 @@ InputState currentInputState = InputState.nil;
         
         // 触发双方回合开始时点
         await TriggerUnitEffects("TurnBegin", null);
+        await EnemyTurnAsync();
         
         // 触发友方回合开始时点
         await TriggerUnitEffects("FriendlyTurnBegin", null);
+        await TriggerUnitEffects("TurnBegin", null);
 
         // 回合开始时trait处理
         ApplyTurnStartTraits();
@@ -2956,7 +2960,7 @@ InputState currentInputState = InputState.nil;
         
         CheckIfAnyUnitDiedAsync(); // 检查死亡
 
-        await EnemyTurnAsync();
+        
         
         _ = player1.DrawCard();
         player1.AddPointMaxNatural();
@@ -2964,7 +2968,7 @@ InputState currentInputState = InputState.nil;
         int pendingLoss = ReadMemory("pendingPointLoss");
         if (pendingLoss > 0)
         {
-            player1.LosePointDirect(pendingLoss);
+            player1.AddPoint(-pendingLoss);
             SetMemory("pendingPointLoss", 0);
         }
         
@@ -3729,6 +3733,12 @@ InputState currentInputState = InputState.nil;
                     }
                 }
 
+                // GetCardsShuffledIntoDeck - 获得刚才洗入卡组的卡
+                if (ins == "getcardsshuffledintodeck")
+                {
+                    targets = new List<cardBase_>(lastCardsShuffledIntoDeck);
+                }
+
                 // AddToHand(string) 或 AddToHand(string,int) - 将名字为s的卡加入手牌，可以指定数量
                 if (instruction.StartsWith("AddToHand", StringComparison.OrdinalIgnoreCase))
                 {
@@ -3982,6 +3992,30 @@ InputState currentInputState = InputState.nil;
                             player2.AddCardToDeck(cardId);
                         }
                     }
+                }
+
+                // ShuffleIntoDeck - 将当前targets洗入卡组
+                if (ins == "shuffleintodeck")
+                {
+                    var shuffled = new List<cardBase_>();
+                    foreach (var target in targets.ToList())
+                    {
+                        if (target == null || target.isHq == HQ.hq) continue;
+                        target.ClearMyPlace();
+                        cardInPlaces.Remove(target);
+                        target.DisableCombatAbility();
+                        if (target.GetIsFriend() == IsFriend.friend)
+                            player1.AddExistingCardToDeck(target);
+                        else if (target.GetIsFriend() == IsFriend.enemy)
+                            player2.AddExistingCardToDeck(target);
+                        shuffled.Add(target);
+                    }
+                    if (shuffled.Any(c => c.GetIsFriend() == IsFriend.friend))
+                        player1.ShuffleDeck();
+                    if (shuffled.Any(c => c.GetIsFriend() == IsFriend.enemy))
+                        player2.ShuffleDeck();
+                    lastCardsShuffledIntoDeck = shuffled;
+                    RefreshAllBeGuardianedStatus();
                 }
 
                 // addANewUnitToBattlefieldWithCostAndType(type, cost) - 从非Unobtainable卡中按类型和费用选卡加入战场
@@ -5067,18 +5101,12 @@ public class Player
     {
         int oldPoint = point;
         if(point + i >= pointMaxMaxMax) {point = pointMaxMaxMax;}
+        else if(point+i<=0) point=0;
         else point += i;
+        
         _ = pointLabel.AnimateTo(point);
     }
 
-    public void LosePointDirect(int x)
-    {
-        if (point >= x)
-            point -= x;
-        else
-            point = 0;
-        _ = pointLabel.AnimateTo(point);
-    }
 
     public void AddPointMax(int i = 1)
     {
@@ -5503,6 +5531,11 @@ public class Player
             lastDrawnCards = [card];
         }
         ShuffleDeck();
+    }
+
+    public void AddExistingCardToDeck(cardBase_ card)
+    {
+        deck.Add(card);
     }
 
     // 存储最近抽到的卡牌引用

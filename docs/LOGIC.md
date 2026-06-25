@@ -73,6 +73,8 @@
 | `addToSupportLine(id)` | 向友方支援阵线添加指定ID的卡 |
 | `addToEnemySupportLine(id)` | 向敌方支援阵线添加指定ID的卡 |
 | `addToDeck(id)` | 向卡组添加指定ID的卡并洗牌 |
+| `ShuffleIntoDeck` | 将targets中的单位洗入卡组 |
+| `GetCardsShuffledIntoDeck` | 获得上次ShuffleIntoDeck洗入的卡列表 |
 | `Play` / `Play(selector)` | 从手牌免费打出一张卡 |
 | `Choose(a, b)` | 显示2选1界面，执行选中卡效果 |
 | `Develop` / `Develop(selector)` | 显示最多3张随机卡选1加入手牌 |
