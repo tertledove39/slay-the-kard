@@ -38,8 +38,8 @@ public partial class cardBase_ : Control
     [Export] public Rarity rarity = Rarity.Common;
     [Export] public string IconPath = "res://cards/轻步兵.png";
     [Export] public HQ isHq = HQ.normalCard;
-    [Export] int moveAble = 0;
-    [Export] int attackAble = 0;
+    [Export] internal int moveAble = 0;
+    [Export] internal int attackAble = 0;
     [Export] public TargetType targetType = TargetType.anyTarget;
     
     // 单位特性
@@ -56,7 +56,7 @@ public partial class cardBase_ : Control
     // 单位存活回合数
     private int lifeTime = 0;
     // 本回合攻击次数（作为攻击方的次数）
-    private int attackCountThisTurn = 0;
+    internal int attackCountThisTurn = 0;
     
     CardState state;
     Node2D cardBase;
@@ -126,7 +126,7 @@ public partial class cardBase_ : Control
     /// 绿灯：可移动且可攻击；黄灯：可移动或可攻击其一；红灯：均不可。
     /// 仅在单位已放置在战场上且非指令卡时显示。
     /// </summary>
-    private void UpdateMoveableLight()
+    internal void UpdateMoveableLight()
     {
         if (moveableLight == null) return;
 
@@ -925,18 +925,16 @@ public partial class cardBase_ : Control
     private EffectAttribute ParseEffectAttribute(string effectStr)
     {
         if (string.IsNullOrEmpty(effectStr))
-            return new EffectAttribute { IconName = "action", Description = "" };
+            return null;
 
-        // 查找最后一个[...]
         int lastBracket = effectStr.LastIndexOf('[');
         if (lastBracket < 0 || !effectStr.EndsWith("]"))
-            return new EffectAttribute { IconName = "action", Description = "" };
+            return null;
 
         string meta = effectStr.Substring(lastBracket + 1, effectStr.Length - lastBracket - 2);
         string iconName = "action";
         string desc = "";
 
-        // 用 icon= 和 ,description= 定位，避免 description 内部的逗号被错误分割
         int iconEq = meta.IndexOf("icon=");
         int descEq = meta.IndexOf(",description=");
         if (descEq < 0) descEq = meta.IndexOf("description=");
@@ -998,7 +996,8 @@ public partial class cardBase_ : Control
                 string clean = seg;
                 int colonIdx = clean.IndexOf(':');
                 if (colonIdx > 0) clean = clean.Substring(colonIdx + 1);
-                list.Add(ParseEffectAttribute(clean));
+                var attr = ParseEffectAttribute(clean);
+                if (attr != null) list.Add(attr);
             }
         }
 
@@ -1299,7 +1298,8 @@ public partial class cardBase_ : Control
 
         int bestSize = FindBestFontSizeForLabel(label, font, text, 6, maxSize, effectiveSize);
 
-        // 直接修改克隆后的LabelSettings字体和字号，避免theme override被LabelSettings覆盖
+        // 确保 Label 有独立 LabelSettings 并正确设置字体（新建，避免共享 sub_resource）
+        label.LabelSettings = new LabelSettings();
         label.LabelSettings.Font = font;
         label.LabelSettings.FontSize = bestSize;
     }
@@ -1310,10 +1310,11 @@ public partial class cardBase_ : Control
         int high = maxSize;
         int best = minSize;
 
-        // 创建临时 Label 用于测量，使用ThemeOverride避免创建LabelSettings
+        // 创建临时 Label 用于测量，避免修改原 Label 的属性
         Label tempLabel = new Label();
         tempLabel.Text = text;
-        tempLabel.AddThemeFontOverride("font", font);
+        tempLabel.LabelSettings = new LabelSettings();
+        tempLabel.LabelSettings.Font = font;
         // 临时添加到场景树以确保正确测量
         AddChild(tempLabel);
 
@@ -1322,7 +1323,7 @@ public partial class cardBase_ : Control
             int mid = (low + high) / 2;
 
             // 设置临时 Label 的字体大小
-            tempLabel.AddThemeFontSizeOverride("font_size", mid);
+            tempLabel.LabelSettings.FontSize = mid;
 
             // 获取实际内容大小
             Vector2 measuredSize = tempLabel.GetMinimumSize();
@@ -1338,7 +1339,7 @@ public partial class cardBase_ : Control
             }
         }
 
-        // 清理临时 Label：先移除再释放
+        // 清理临时 Label
         RemoveChild(tempLabel);
         tempLabel.QueueFree();
 
