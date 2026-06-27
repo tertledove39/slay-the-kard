@@ -4887,8 +4887,21 @@ InputState currentInputState = InputState.nil;
             }
             else if (part == "hq")
             {
-                // 只保留HQ
                 results = results.Where(x => x.isHq == HQ.hq).ToList();
+            }
+            else if (part == "land")
+            {
+                results = results.Where(x => x.cardType == CardTypes.Infantry || x.cardType == CardTypes.Tank || x.cardType == CardTypes.Artillery).ToList();
+            }
+            else if (part == "air")
+            {
+                results = results.Where(x => x.cardType == CardTypes.Plane || x.cardType == CardTypes.Bomber).ToList();
+            }
+            else
+            {
+                var cardType = ParseCardTypeFromName(part);
+                if (cardType.HasValue)
+                    results = results.Where(x => x.cardType == cardType.Value).ToList();
             }
         }
 
