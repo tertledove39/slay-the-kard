@@ -5074,6 +5074,11 @@ InputState currentInputState = InputState.nil;
             return targets[0].GetIsFriend() == IsFriend.enemy;
         }
 
+        if (condition == "target.isHq" && targets != null && targets.Count > 0)
+        {
+            return targets[0].isHq == HQ.hq;
+        }
+
         if (condition == "source.isFriend" && sourceCard != null)
         {
             return sourceCard.GetIsFriend() == IsFriend.friend;
