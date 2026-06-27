@@ -66,6 +66,7 @@
 | `Refresh` | 刷新targets的行动次数 |
 | `Retreat` | 使targets撤退（前线→支援线，支援线→手牌/弃牌） |
 | `Discard` | 标记targets为待弃置 |
+| `DiscardWithTarget` | 弃置targets（支持手牌，直接播放弃牌动画） |
 | `drawCard` | 抽result张卡（最少1张） |
 | `DrawUnitCards(n)` | 抽n张单位卡 |
 | `DrawACard(name, n)` | 抽n张ID含name的卡 |
@@ -114,7 +115,7 @@
 位置：`battlefield_.cs` line 4653
 
 Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
-- 首段：`allTargets` = 所有场上+HQ的卡
+- 首段：`allTargets` = 所有场上+HQ的卡 / `allCardInHand` = 所有手牌
 - 后续段：`unit`=非HQ / `hq`=总部 / `friend`=友方 / `enemy`=敌方 / 类型名=CardTypes过滤
 
 ---
