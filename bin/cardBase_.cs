@@ -1877,6 +1877,7 @@ public static class IconCache
             var tex = ResourceManager.Instance?.GetTexture(path)
                    ?? GD.Load<Texture2D>(path);
             if (tex != null) _cache[name] = tex;
+            else GD.Print($"[IconCache] 加载失败: {path}");
         }
         _initialized = true;
     }
