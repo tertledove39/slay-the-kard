@@ -493,6 +493,15 @@ public partial class cardBase_ : Control
                 case ChangeType.SetDefence:
                     SetDefence(change.Value);
                     break;
+                case ChangeType.SetCost:
+                    SetCostValue(change.Value);
+                    break;
+                case ChangeType.AddCost:
+                    AddCost(change.Value);
+                    break;
+                case ChangeType.ReduceCost:
+                    ReduceCost(change.Value);
+                    break;
                 case ChangeType.DiscardCard:
                     shouldBeRemoved = 1;
                     break;
@@ -634,7 +643,17 @@ public partial class cardBase_ : Control
         int oldCost = cost;
         if (cost - n >= 0) cost -= n;
         else cost = 0;
-        // 更新历史最小值并触发闪烁效果
+        if (cost < minHistoryCost) minHistoryCost = cost;
+        FlashAttributeWithColor("cost", cost, initialCost, minHistoryCost, isInverted: true);
+        RefreshState();
+        _ = AnimateCostRoll(oldCost, cost);
+    }
+
+    public void SetCostValue(int n)
+    {
+        int oldCost = cost;
+        if (n <= 99) cost = n;
+        else cost = 99;
         if (cost < minHistoryCost) minHistoryCost = cost;
         FlashAttributeWithColor("cost", cost, initialCost, minHistoryCost, isInverted: true);
         RefreshState();
@@ -1918,6 +1937,9 @@ public enum ChangeType
     GetDefence,
     LoseDefence,
     SetDefence,
+    SetCost,
+    AddCost,
+    ReduceCost,
     DiscardCard,
 
 }

@@ -925,6 +925,7 @@ InputState currentInputState = InputState.nil;
     {
         "myHq", "enemyHq", "this", "target", "GetCardBeingAddToSupportLine",
         "Heal()", "damage()", "GetAttack()", "SetDefence()", "addDefence()",
+        "setCost()", "addCost()", "subCost()",
         "setResult()", "setTarget", "drawCard", "DrawUnitCards()",
         "GetEffect()", "AddToHand()", "addToSupportLine()", "addToEnemySupportLine()",
         "addToDeck()", "SetMemory()", "AddPoint()", "AddPointMax()", "losePointAtNextTurnBegin()",
@@ -3623,6 +3624,54 @@ InputState currentInputState = InputState.nil;
                             if (target != null)
                             {
                                 target.AddChange(ChangeType.SetDefence, setDefenceAmount);
+                            }
+                        }
+                    }
+                }
+
+                if (instruction.StartsWith("setCost", StringComparison.OrdinalIgnoreCase))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
+                    if (match.Success)
+                    {
+                        int setCostAmount = EvaluateExpression(match.Groups[1].Value, result, targets, sourceCard);
+                        foreach (var target in targets)
+                        {
+                            if (target != null)
+                            {
+                                target.AddChange(ChangeType.SetCost, setCostAmount);
+                            }
+                        }
+                    }
+                }
+
+                if (instruction.StartsWith("addCost", StringComparison.OrdinalIgnoreCase))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
+                    if (match.Success)
+                    {
+                        int addCostAmount = EvaluateExpression(match.Groups[1].Value, result, targets, sourceCard);
+                        foreach (var target in targets)
+                        {
+                            if (target != null)
+                            {
+                                target.AddChange(ChangeType.AddCost, addCostAmount);
+                            }
+                        }
+                    }
+                }
+
+                if (instruction.StartsWith("subCost", StringComparison.OrdinalIgnoreCase))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
+                    if (match.Success)
+                    {
+                        int subCostAmount = EvaluateExpression(match.Groups[1].Value, result, targets, sourceCard);
+                        foreach (var target in targets)
+                        {
+                            if (target != null)
+                            {
+                                target.AddChange(ChangeType.ReduceCost, subCostAmount);
                             }
                         }
                     }
