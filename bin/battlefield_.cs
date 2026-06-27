@@ -3256,6 +3256,26 @@ InputState currentInputState = InputState.nil;
                 return card.GetIsFriend() == IsFriend.friend && card.isHq == HQ.normalCard;
             case TargetType.anEnemyUnit:
                 return card.GetIsFriend() == IsFriend.enemy && card.isHq == HQ.normalCard;
+            case TargetType.aFriendlyTank:
+                return card.GetIsFriend() == IsFriend.friend && card.cardType == CardTypes.Tank;
+            case TargetType.aFriendlyInfantry:
+                return card.GetIsFriend() == IsFriend.friend && card.cardType == CardTypes.Infantry;
+            case TargetType.aFriendlyPlane:
+                return card.GetIsFriend() == IsFriend.friend && card.cardType == CardTypes.Plane;
+            case TargetType.aFriendlyBomber:
+                return card.GetIsFriend() == IsFriend.friend && card.cardType == CardTypes.Bomber;
+            case TargetType.aFriendlyArtillery:
+                return card.GetIsFriend() == IsFriend.friend && card.cardType == CardTypes.Artillery;
+            case TargetType.anEnemyTank:
+                return card.GetIsFriend() == IsFriend.enemy && card.cardType == CardTypes.Tank;
+            case TargetType.anEnemyInfantry:
+                return card.GetIsFriend() == IsFriend.enemy && card.cardType == CardTypes.Infantry;
+            case TargetType.anEnemyPlane:
+                return card.GetIsFriend() == IsFriend.enemy && card.cardType == CardTypes.Plane;
+            case TargetType.anEnemyBomber:
+                return card.GetIsFriend() == IsFriend.enemy && card.cardType == CardTypes.Bomber;
+            case TargetType.anEnemyArtillery:
+                return card.GetIsFriend() == IsFriend.enemy && card.cardType == CardTypes.Artillery;
             case TargetType.myHq:
                 return card.GetIsFriend() == IsFriend.friend && card.isHq == HQ.hq;
             case TargetType.enemyHq:
