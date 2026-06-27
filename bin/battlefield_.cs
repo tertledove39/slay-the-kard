@@ -758,6 +758,7 @@ TextureButton buttonNextTurn;
         {
             return result;
         }
+        GD.Print($"[GetTargetType] 解析失败: '{v}' -> 回退为 anyTarget");
         return TargetType.anyTarget;
     }
 
@@ -1213,14 +1214,14 @@ InputState currentInputState = InputState.nil;
 
                 switch (currentInputState)
                 {
-                    case InputState.P_InHandCommandNeedChooseTarget:
-                    if(result == null || result.GetMyCard() == null ||result.GetMyCard() != null && IsValidTarget(result.GetMyCard(), cardNowChoose.targetType)== false)
-                        {
-                            
-                            cardNowChoose.setState(CardState.inHand);
-                            cardNowChoose = null;
-                            break;
-                        }
+                case InputState.P_InHandCommandNeedChooseTarget:
+                if(result == null || result.GetMyCard() == null ||result.GetMyCard() != null && IsValidTarget(result.GetMyCard(), cardNowChoose.targetType)== false)
+                    {
+                        GD.Print($"[TargetSelect] 校验失败: targetType={cardNowChoose.targetType}, card={result?.GetMyCard()?.id}, isValid={result?.GetMyCard() != null && IsValidTarget(result.GetMyCard(), cardNowChoose.targetType)}");
+                        cardNowChoose.setState(CardState.inHand);
+                        cardNowChoose = null;
+                        break;
+                    }
                     if (player1.UsePoint(cardNowChoose.ReadCost()))
                         {
                             ExecuteCommandAndDiscard(cardNowChoose, new List<cardBase_> { result.GetMyCard() }, needRestoreColor: true);
