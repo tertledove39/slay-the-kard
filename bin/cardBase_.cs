@@ -1850,7 +1850,7 @@ public static class IconCache
         "action", "Determination", "Guardian",
         "greenLight", "yellowLight", "redLight",
         "blitz", "mobilize", "smoke", "impact",
-        "ambush", "heavyArmour", "beGuardianed", "hatred"
+        "ambush", "heavyArmour", "beGuardianed", "hatred", "dead"
     };
 
     // trait -> icon 映射
