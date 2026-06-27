@@ -1870,9 +1870,9 @@ public static class IconCache
 
     public static void Init()
     {
-        if (_initialized) return;
         foreach (var name in KnownIcons)
         {
+            if (_cache.ContainsKey(name)) continue;
             var path = $"res://assest/{name}.png";
             var tex = ResourceManager.Instance?.GetTexture(path)
                    ?? GD.Load<Texture2D>(path);
