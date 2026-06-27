@@ -4870,6 +4870,10 @@ InputState currentInputState = InputState.nil;
                 // 只保留非HQ单位
                 results = results.Where(x => x.isHq == HQ.normalCard).ToList();
             }
+            else if (part == "command")
+            {
+                results = results.Where(x => x.cardType == CardTypes.Command).ToList();
+            }
             else if (part == "friend")
             {
                 // 只保留友方单位
