@@ -963,6 +963,7 @@ public partial class cardBase_ : Control
             int iconValEnd = descEq >= 0 ? descEq : meta.Length;
             if (iconValEnd < 0) iconValEnd = meta.Length;
             iconName = meta.Substring(iconEq + 5, iconValEnd - iconEq - 5).Trim();
+            GD.Print($"[ParseEffectAttr] iconName='{iconName}', meta='{meta}', descEq={descEq}, iconValEnd={iconValEnd}");
         }
         if (descEq >= 0)
         {
@@ -1885,7 +1886,10 @@ public static class IconCache
     public static Texture2D GetIcon(string name)
     {
         Init();
-        return _cache.TryGetValue(name, out var tex) ? tex : null;
+        var tex = _cache.TryGetValue(name, out var t) ? t : null;
+        if (tex == null && name != "action")
+            GD.Print($"[IconCache.GetIcon] 未找到图标: '{name}', 缓存键: {string.Join(",", _cache.Keys)}");
+        return tex;
     }
 
     public static string GetTraitIconName(UnitTraits trait)
