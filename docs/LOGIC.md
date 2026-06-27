@@ -104,7 +104,7 @@
 
 支持格式：
 - 数值比较：`result>n`、`target.attack<=n`、`target.defence==n`、`target.cost>=n`、`targets.count<n`
-- 布尔判断：`target.isFriend`、`target.isEnemy`、`target.isHq`、`source.isFriend`、`source.isEnemy`
+- 布尔判断：`target.isFriend`、`!target.isFriend`、`target.isEnemy`、`target.isHq`、`!target.isHq`、`source.isFriend`、`source.isEnemy`
 - 类型匹配：`target.cardType==Tank`
 - ID匹配：`target.name==cardId`
 - 变量引用：`&variableName`

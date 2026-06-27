@@ -5088,6 +5088,18 @@ InputState currentInputState = InputState.nil;
             return sourceCard.GetIsFriend() == IsFriend.enemy;
         }
 
+        // 否定形式
+        if (condition == "!target.isFriend" && targets != null && targets.Count > 0)
+            return targets[0].GetIsFriend() != IsFriend.friend;
+        if (condition == "!target.isEnemy" && targets != null && targets.Count > 0)
+            return targets[0].GetIsFriend() != IsFriend.enemy;
+        if (condition == "!target.isHq" && targets != null && targets.Count > 0)
+            return targets[0].isHq != HQ.hq;
+        if (condition == "!source.isFriend" && sourceCard != null)
+            return sourceCard.GetIsFriend() != IsFriend.friend;
+        if (condition == "!source.isEnemy" && sourceCard != null)
+            return sourceCard.GetIsFriend() != IsFriend.enemy;
+
         // 处理 target.cardType ==/!= 类型比较（支持 Tank 等枚举）
         if (targets != null && targets.Count > 0)
         {
