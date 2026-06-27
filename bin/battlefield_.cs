@@ -3911,6 +3911,7 @@ InputState currentInputState = InputState.nil;
                         if (target == null) continue;
                         if (target.getState() == CardState.inHand)
                         {
+                            target.ResetVisualsInstant();
                             if (target.GetIsFriend() == IsFriend.friend)
                                 player1.RemoveFromHand(target);
                             else
