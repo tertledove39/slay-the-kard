@@ -978,21 +978,40 @@ public partial class cardBase_ : Control
     }
 
     /// <summary>
-    /// 按逗号分割效果字符串，跳过[]括号内的逗号
+    /// 按逗号分割效果字符串，跳过括号内和引号内的逗号
     /// </summary>
     private static List<string> SplitEffectByComma(string s)
     {
         var result = new List<string>();
         int bracketDepth = 0;
+        int parenDepth = 0;
+        bool inQuotes = false;
+        char quoteChar = '\0';
         int segStart = 0;
         for (int i = 0; i < s.Length; i++)
         {
-            if (s[i] == '[') bracketDepth++;
-            else if (s[i] == ']') bracketDepth--;
-            else if (s[i] == ',' && bracketDepth == 0)
+            char c = s[i];
+            if ((c == '"' || c == '\'') && !inQuotes)
             {
-                result.Add(s.Substring(segStart, i - segStart).Trim());
-                segStart = i + 1;
+                inQuotes = true;
+                quoteChar = c;
+            }
+            else if (c == quoteChar && inQuotes)
+            {
+                inQuotes = false;
+                quoteChar = '\0';
+            }
+            else if (!inQuotes)
+            {
+                if (c == '[') bracketDepth++;
+                else if (c == ']') bracketDepth--;
+                else if (c == '(') parenDepth++;
+                else if (c == ')') parenDepth--;
+                else if (c == ',' && bracketDepth == 0 && parenDepth == 0)
+                {
+                    result.Add(s.Substring(segStart, i - segStart).Trim());
+                    segStart = i + 1;
+                }
             }
         }
         if (segStart < s.Length)
