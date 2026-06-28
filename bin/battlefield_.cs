@@ -1140,7 +1140,14 @@ InputState currentInputState = InputState.nil;
             RefreshAllCardDisplayOrder();
             var validTargets = GetAllowedTargets(card);
             if(currentInputState == InputState.waitingForChoosingTarget) ;//如果是等待 那直接跳过
-            else if (card.cardType == CardTypes.Command && card.getState() == CardState.inHand && card.targetType != TargetType.NOTarget) {currentInputState = InputState.P_InHandCommandNeedChooseTarget;HighlightValidTargets(card.targetType);}
+            else if (card.cardType == CardTypes.Command && card.getState() == CardState.inHand && card.targetType != TargetType.NOTarget)
+            {
+                if (GetHowManyCardIsValid(card.targetType) > 0)
+                {
+                    currentInputState = InputState.P_InHandCommandNeedChooseTarget;
+                    HighlightValidTargets(card.targetType);
+                }
+            }
             else if (card.cardType == CardTypes.Command && card.getState() == CardState.inHand && card.targetType == TargetType.NOTarget) currentInputState = InputState.P_InHandCommand;
             else if (card.cardType != CardTypes.Command && card.getState() == CardState.inHand && card.targetType != TargetType.NOTarget) currentInputState = InputState.P_InHandUnitNeedChooseTarget;
             else if (card.cardType != CardTypes.Command && card.getState() == CardState.inHand && card.targetType == TargetType.NOTarget) currentInputState = InputState.P_InHandUnit;
@@ -1290,7 +1297,14 @@ InputState currentInputState = InputState.nil;
                             cardNowChoose = null;
                             break;
                         }
-                        
+
+                    if (cardNowChoose.targetType != TargetType.NOTarget && GetHowManyCardIsValid(cardNowChoose.targetType) == 0)
+                        {
+                            cardNowChoose.setState(CardState.inHand);
+                            cardNowChoose = null;
+                            break;
+                        }
+
                     if (player1.UsePoint(cardNowChoose.ReadCost()))
                         {
                              _ = Move(cardNowChoose,result);
@@ -1394,6 +1408,20 @@ InputState currentInputState = InputState.nil;
             else
             {
                 player1.UpdateHover(new Vector2(-9999, -9999));
+            }
+
+            // 灰显无合法目标的手牌（跳过正在拖拽的卡）
+            foreach (var handCard in player1.GetCardsInHand())
+            {
+                if (handCard == cardNowChoose) continue;
+                if (handCard.targetType != TargetType.NOTarget && GetHowManyCardIsValid(handCard.targetType) == 0)
+                {
+                    handCard.SetGrayscale();
+                }
+                else
+                {
+                    handCard.RestoreColor();
+                }
             }
         }
 
