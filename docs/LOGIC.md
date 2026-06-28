@@ -266,6 +266,7 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 | FriendlyUnitDead | 友方单位死亡时（所有剩余单位触发） |
 | EnemyUnitDead | 敌方单位死亡时（所有剩余单位触发） |
 | BeingAddedToField | 单位被加入战场时 |
+| FriendlyUnitEnteringField | 友方单位入场时（部署手牌或效果加入支援阵线，target=入场单位自身） |
 | BePicked | 被指向（被选为目标时） |
 
 ---

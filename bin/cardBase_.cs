@@ -1841,7 +1841,8 @@ public enum Times
     fightingInfantry,          // 对战步兵时
     attackingHq,               // 攻击总部时
     takingDamage,              // 本单位收到伤害时
-    bePicked                   // 被指向（成为友方/敌方选择目标时）
+    bePicked,                  // 被指向（成为友方/敌方选择目标时）
+    friendlyUnitEnteringField  // 友方单位入场时(部署或加入支援阵线)
 }
 
 /// <summary>

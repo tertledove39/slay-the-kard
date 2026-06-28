@@ -297,6 +297,13 @@ public partial class battlefield_ : Control
 
                       // 触发被加入战场的效果
         await TriggerUnitEffects("BeingAddedToField", card, new List<cardBase_>(), checkOnlySourceCard: true);
+
+        // 触发友方单位入场效果
+        if (card.GetIsFriend() == IsFriend.friend && card.isHq != HQ.hq)
+        {
+            await TriggerUnitEffects("FriendlyUnitEnteringField", card, new List<cardBase_> { card }, checkOnlySourceCard: true);
+        }
+
         ResumeDeathCheck(); // 恢复死亡检查
         CheckIfAnyUnitDiedAsync(); // 检查死亡
         RefreshAllBeGuardianedStatus(); // 部署后刷新被守护状态
@@ -2144,6 +2151,12 @@ InputState currentInputState = InputState.nil;
                 {
                     await TriggerUnitEffects("FriendlyInfantryDeployed", card, new List<cardBase_> { card });
                 }
+            }
+
+            // 触发友方单位入场效果
+            if (card.GetIsFriend() == IsFriend.friend && card.isHq != HQ.hq)
+            {
+                await TriggerUnitEffects("FriendlyUnitEnteringField", card, new List<cardBase_> { card }, checkOnlySourceCard: true);
             }
         }
         else
