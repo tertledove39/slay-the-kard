@@ -1951,6 +1951,12 @@ InputState currentInputState = InputState.nil;
 
     await to.LoseDefence(attackDamage);
 
+        // 触发受到伤害时点
+        if (attackDamage > 0)
+        {
+            await TriggerUnitEffects("TakingDamage", to, new List<cardBase_> { to }, checkOnlySourceCard: true);
+        }
+
         // 动员特性：受到伤害后消失
         if (to.HasMobilizeActive() && attackDamage > 0)
         {
