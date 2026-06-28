@@ -4996,6 +4996,10 @@ InputState currentInputState = InputState.nil;
             {
                 results = results.Where(x => x.cardType == CardTypes.Plane || x.cardType == CardTypes.Bomber).ToList();
             }
+            else if (part == "damaged")
+            {
+                results = results.Where(x => x.ReadDefence() < x.ReadMaxHistoryDefence()).ToList();
+            }
             else
             {
                 var cardType = ParseCardTypeFromName(part);
