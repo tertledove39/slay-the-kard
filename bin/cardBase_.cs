@@ -1990,7 +1990,11 @@ public enum TargetType
     anyTarget,
     friendlyTarget,
     enemyTarget,
-    NOTarget
+    NOTarget,
+    aFriendlyLandUnit,   // 友方陆军(Infantry/Tank/Artillery)
+    anEnemyLandUnit,     // 敌方陆军
+    aFriendlyAirUnit,    // 友方空军(Plane/Bomber)
+    anEnemyAirUnit       // 敌方空军
 }
 
 struct Change
