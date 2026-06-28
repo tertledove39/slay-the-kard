@@ -1297,14 +1297,7 @@ InputState currentInputState = InputState.nil;
                             cardNowChoose = null;
                             break;
                         }
-
-                    if (cardNowChoose.targetType != TargetType.NOTarget && GetHowManyCardIsValid(cardNowChoose.targetType) == 0)
-                        {
-                            cardNowChoose.setState(CardState.inHand);
-                            cardNowChoose = null;
-                            break;
-                        }
-
+                        
                     if (player1.UsePoint(cardNowChoose.ReadCost()))
                         {
                              _ = Move(cardNowChoose,result);
