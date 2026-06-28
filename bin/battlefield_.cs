@@ -3306,6 +3306,8 @@ InputState currentInputState = InputState.nil;
                 return card.GetIsFriend() == IsFriend.friend && (card.cardType == CardTypes.Plane || card.cardType == CardTypes.Bomber);
             case TargetType.anEnemyAirUnit:
                 return card.GetIsFriend() == IsFriend.enemy && (card.cardType == CardTypes.Plane || card.cardType == CardTypes.Bomber);
+            case TargetType.anEnemyDamagedUnit:
+                return card.GetIsFriend() == IsFriend.enemy && card.isHq == HQ.normalCard && card.ReadDefence() < card.ReadMaxHistoryDefence();
             case TargetType.myHq:
                 return card.GetIsFriend() == IsFriend.friend && card.isHq == HQ.hq;
             case TargetType.enemyHq:

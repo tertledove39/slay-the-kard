@@ -1994,7 +1994,8 @@ public enum TargetType
     aFriendlyLandUnit,   // 友方陆军(Infantry/Tank/Artillery)
     anEnemyLandUnit,     // 敌方陆军
     aFriendlyAirUnit,    // 友方空军(Plane/Bomber)
-    anEnemyAirUnit       // 敌方空军
+    anEnemyAirUnit,      // 敌方空军
+    anEnemyDamagedUnit   // 敌方受伤单位
 }
 
 struct Change
