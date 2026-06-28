@@ -113,15 +113,12 @@ public partial class WorldMap : Control
         _ => CardTypes.Infantry
     };
 
-    private static TargetType GetTargetType(string s) => s.ToLowerInvariant() switch
+    private static TargetType GetTargetType(string s)
     {
-        "enemytarget" => TargetType.enemyTarget,
-        "anenemyunit" => TargetType.anEnemyUnit,
-        "afriendlyunit" => TargetType.aFriendlyUnit,
-        "friendlytarget" => TargetType.friendlyTarget,
-        "anytarget" => TargetType.anyTarget,
-        _ => TargetType.NOTarget
-    };
+        if (System.Enum.TryParse<TargetType>(s, ignoreCase: true, out var result))
+            return result;
+        return TargetType.anyTarget;
+    }
 
     /// <summary>从逗号分隔字符串解析特性位掩码</summary>
     private static UnitTraits GetTraitList(string s)
