@@ -40,7 +40,7 @@ public partial class cardBase_ : Control
     [Export] public HQ isHq = HQ.normalCard;
     [Export] internal int moveAble = 0;
     [Export] internal int attackAble = 0;
-    [Export] public TargetType targetType = TargetType.anyTarget;
+    public TargetType targetType = TargetType.anyTarget;
     
     // 单位特性
     [Export] public UnitTraits traits = UnitTraits.None;
