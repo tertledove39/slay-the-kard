@@ -123,6 +123,7 @@ public partial class battlefield_ : Control
     /// 上一个被加入支援阵线的卡牌引用
     /// </summary>
     private cardBase_ lastCardAddedToSupportLine = null;
+    private cardBase_ lastCardAddedToHand = null;
     private List<cardBase_> lastCardsShuffledIntoDeck = new();
     /// <summary>
     /// 上次攻击溢出的伤害
@@ -931,7 +932,7 @@ InputState currentInputState = InputState.nil;
     private string _cmdBeforeHistoryScroll = null;
     private static readonly string[] ConsoleCommands = new[]
     {
-        "myHq", "enemyHq", "this", "target", "GetCardBeingAddToSupportLine",
+        "myHq", "enemyHq", "this", "target", "GetCardBeingAddToSupportLine", "GetCardBeingAddToHand",
         "Heal()", "damage()", "GetAttack()", "SetDefence()", "addDefence()",
         "setCost()", "addCost()", "subCost()",
         "setResult()", "setTarget", "drawCard", "DrawUnitCards()",
@@ -3578,6 +3579,14 @@ InputState currentInputState = InputState.nil;
                         targets = new List<cardBase_> { card };
                     }
                 }
+                // GetCardBeingAddToHand - 获取上一张被加入手中的卡
+                else if (ins == "getcardbeingaddtohand")
+                {
+                    if (lastCardAddedToHand != null)
+                    {
+                        targets = new List<cardBase_> { lastCardAddedToHand };
+                    }
+                }
                 else if (instruction.StartsWith("GetTargetByIndex", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
@@ -3864,6 +3873,7 @@ InputState currentInputState = InputState.nil;
                                 card.SetCardInformation(cardData);
                                 card.SetIsFriend(sourceCard?.GetIsFriend() ?? IsFriend.friend);
                                 addedCards.Add(card);
+                                lastCardAddedToHand = card;
                                 
                                 if (sourceCard?.GetIsFriend() == IsFriend.friend)
                                 {
