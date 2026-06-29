@@ -1814,7 +1814,7 @@ InputState currentInputState = InputState.nil;
 
     public void TriggerFriendlyCardDrawn(cardBase_ card)
     {
-        _ = TriggerUnitEffects("FriendlyCardDrawn", card, new List<cardBase_> { card }, checkOnlySourceCard: true);
+        _ = TriggerUnitEffects("FriendlyCardDrawn", card, new List<cardBase_> { card });
     }
 
     /// <summary>
