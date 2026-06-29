@@ -946,7 +946,7 @@ InputState currentInputState = InputState.nil;
         "foreach", "End&", "Develop", "Choose()", "Play",
         "AddTrait()", "RemoveTrait()", "DrawACard()", "GetCardsBeingTreated",
         "getCount()", "setTargets()", "DiscardRandomly()", "DiscardWithName()",
-        "addANewUnitToBattlefieldWithCostAndType()", "GetHighestAttackFriendUnit()", "FightRandomEnemy()",
+        "addANewUnitToBattlefieldWithCostAndType()", "GetHighestAttackFriendUnit()", "FightRandomEnemy()", "Fight", "GetLeftTarget", "GetRightTarget",
     };
 
     private void ToggleConsole()
@@ -1810,6 +1810,11 @@ InputState currentInputState = InputState.nil;
             }
         }
 
+    }
+
+    public void TriggerFriendlyCardDrawn(cardBase_ card)
+    {
+        _ = TriggerUnitEffects("FriendlyCardDrawn", card, new List<cardBase_> { card }, checkOnlySourceCard: true);
     }
 
     /// <summary>
@@ -3595,6 +3600,63 @@ InputState currentInputState = InputState.nil;
                     if (lastCardAddedToHand != null)
                     {
                         targets = new List<cardBase_> { lastCardAddedToHand };
+                    }
+                }
+                // GetLeftTarget - 获取当前目标的左侧相邻单位
+                else if (ins == "getlefttarget")
+                {
+                    if (targets.Count > 0 && targets[0] != null)
+                    {
+                        var myPlace = targets[0].GetMyPlace();
+                        if (myPlace != null)
+                        {
+                            var leftPlace = GetLeftPlace(myPlace);
+                            if (leftPlace != null && leftPlace.GetMyCard() != null && leftPlace.GetMyCard().getState() == CardState.placed)
+                            {
+                                targets = new List<cardBase_> { leftPlace.GetMyCard() };
+                            }
+                        }
+                    }
+                }
+                // GetRightTarget - 获取当前目标的右侧相邻单位
+                else if (ins == "getrighttarget")
+                {
+                    if (targets.Count > 0 && targets[0] != null)
+                    {
+                        var myPlace = targets[0].GetMyPlace();
+                        if (myPlace != null)
+                        {
+                            var rightPlace = GetRightPlace(myPlace);
+                            if (rightPlace != null && rightPlace.GetMyCard() != null && rightPlace.GetMyCard().getState() == CardState.placed)
+                            {
+                                targets = new List<cardBase_> { rightPlace.GetMyCard() };
+                            }
+                        }
+                    }
+                }
+                // Fight - 使当前targets与原始选择目标(命令卡点击目标)战斗
+                else if (ins == "fight")
+                {
+                    await ExecuteChangeLists();
+                    var attackers = targets.ToList();
+                    var defenders = targetCards;
+                    if (defenders != null && defenders.Count > 0)
+                    {
+                        foreach (var attacker in attackers)
+                        {
+                            if (attacker != null && attacker.getState() == CardState.placed)
+                            {
+                                int savedMoveAble = attacker.moveAble;
+                                int savedAttackAble = attacker.attackAble;
+                                int savedAttackCount = attacker.attackCountThisTurn;
+                                if (attacker.attackAble < 1) attacker.attackAble = 1;
+                                await Attack(attacker, defenders[0]);
+                                attacker.moveAble = savedMoveAble;
+                                attacker.attackAble = savedAttackAble;
+                                attacker.attackCountThisTurn = savedAttackCount;
+                                attacker.UpdateMoveableLight();
+                            }
+                        }
                     }
                 }
                 else if (instruction.StartsWith("GetTargetByIndex", StringComparison.OrdinalIgnoreCase))
@@ -5672,7 +5734,8 @@ public class Player
             }
             card.SetPosition(new Godot.Vector2(-2000, 800));
             await AddCardToHand(card);
-            await battlefield.TriggerUnitEffects("FriendlyCardDrawn", card, new List<cardBase_> { card }, checkOnlySourceCard: true);
+            SetLastDrawnCards(new List<cardBase_> { card });
+            battlefield.TriggerFriendlyCardDrawn(card);
         }
         
     }
