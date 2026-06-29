@@ -103,11 +103,12 @@ public partial class ChooseMission : Control
 
     private async void StartEvent(string eventId)
     {
-        // 加载事件数据
         var eventData = BattleStateManager.GetEvent(eventId);
         if (eventData == null) return;
 
-        // 打开事件界面（CanvasLayer叠加在当前场景上）
         await EventScene.Show(this, eventData, _areaName);
+
+        if (GetParent() is WorldMap wm)
+            wm.DismissChooseMission();
     }
 }

@@ -2389,7 +2389,7 @@ InputState currentInputState = InputState.nil;
     void CreateEnemyIntentPanel()
     {
         var panel = new Control();
-        panel.SetAnchorsPreset(Control.LayoutPreset.Left);
+        panel.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
         panel.Position = new Vector2(10, 200);
         panel.Size = new Vector2(300, 400);
         panel.ZIndex = 50;
