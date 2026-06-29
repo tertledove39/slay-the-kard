@@ -1761,7 +1761,7 @@ InputState currentInputState = InputState.nil;
     /// <param name="sourceCard">触发效果的单位（self指向此单位）</param>
     /// <param name="targetCards">效果的目标单位列表（target指向这些单位）</param>
     /// <param name="checkOnlySourceCard">是否只检查sourceCard的效果，true=只检查源卡，false=检查所有单位</param>
-    private async Task TriggerUnitEffects(string triggerPoint, cardBase_ sourceCard, List<cardBase_> targetCards = null, bool checkOnlySourceCard = false)
+    public async Task TriggerUnitEffects(string triggerPoint, cardBase_ sourceCard, List<cardBase_> targetCards = null, bool checkOnlySourceCard = false)
     {
         if (targetCards == null) targetCards = new List<cardBase_>();
 
@@ -5228,16 +5228,11 @@ InputState currentInputState = InputState.nil;
             }
         }
         return foreachIndex; // 未找到匹配的End&
-        }
-
     }
 
-    public void TriggerFriendlyCardDrawn(cardBase_ card)
-    {
-        _ = TriggerUnitEffects("FriendlyCardDrawn", card, new List<cardBase_> { card }, checkOnlySourceCard: true);
-    }
+}
 
-    /// <summary>
+/// <summary>
 /// 玩家 手牌和状态记录在这里
 /// </summary>
 public class Player
@@ -5677,7 +5672,7 @@ public class Player
             }
             card.SetPosition(new Godot.Vector2(-2000, 800));
             await AddCardToHand(card);
-            battlefield.TriggerFriendlyCardDrawn(card);
+            await battlefield.TriggerUnitEffects("FriendlyCardDrawn", card, new List<cardBase_> { card }, checkOnlySourceCard: true);
         }
         
     }
