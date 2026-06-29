@@ -30,6 +30,7 @@ public partial class cardBase_ : Control
 
     // 悬停高亮和缩放效果
     private Tween hoverTween;
+    private Tween moveTween;
     private Panel hoverHighlight;
     private bool isHovering = false;
     private Vector2 originalScale = Vector2.One;
@@ -406,7 +407,7 @@ public partial class cardBase_ : Control
 
     public Boolean CheckIfCanAttack()
     {
-        GD.Print($"CheckIfCanAttack: {this}, Type={cardType}, attackAble={attackAble}, moveAble={moveAble}");
+        
 
         // 移除了将moveAble设置为0的逻辑，因为步兵移动后应该能够攻击
         
@@ -419,7 +420,7 @@ public partial class cardBase_ : Control
         // 检查奋战特性提供的额外攻击次数
 
         
-        GD.Print($"  attackAble < 1, returning false");
+        
         return false;
     }
 
@@ -967,7 +968,7 @@ public partial class cardBase_ : Control
             int iconValEnd = descEq >= 0 ? descEq : meta.Length;
             if (iconValEnd < 0) iconValEnd = meta.Length;
             iconName = meta.Substring(iconEq + 5, iconValEnd - iconEq - 5).Trim();
-            GD.Print($"[ParseEffectAttr] iconName='{iconName}', meta='{meta}', descEq={descEq}, iconValEnd={iconValEnd}");
+            
         }
         if (descEq >= 0)
         {
@@ -1129,21 +1130,20 @@ public partial class cardBase_ : Control
 
     public void RefreshState()
     {
-        // 指令卡使用特殊的背景图
         if (cardType == CardTypes.Command)
         {
-            if (FileAccess.FileExists(IconPath))
+            if (!string.IsNullOrEmpty(IconPath))
                 GetNode<Sprite2D>("icon").Texture = ResourceManager.Instance?.GetTexture(IconPath) ?? GD.Load<Texture2D>(IconPath);
             GetNode<Sprite2D>("cardbase").Texture = ResourceManager.Instance?.GetTexture("res://cards/卡背_command.png") ?? GD.Load<Texture2D>("res://cards/卡背_command.png");
         }
         else if(isHq != HQ.hq)
         {
-            if (FileAccess.FileExists(IconPath))
+            if (!string.IsNullOrEmpty(IconPath))
                 GetNode<Sprite2D>("icon").Texture = ResourceManager.Instance?.GetTexture(IconPath) ?? GD.Load<Texture2D>(IconPath);
         }
         else
         {
-            if (FileAccess.FileExists(IconPath))
+            if (!string.IsNullOrEmpty(IconPath))
                 GetNode<Sprite2D>("cardbase").Texture = ResourceManager.Instance?.GetTexture(IconPath) ?? GD.Load<Texture2D>(IconPath);
         }
         if (name != null)
@@ -1233,22 +1233,21 @@ public partial class cardBase_ : Control
         _attrIconDescs.Clear();
         _attrIconWidgets.Clear();
 
-        var attrs = GetAllAttributes();
-        if (attrs.Count == 0) return;
+        if (newAttrs.Count == 0) return;
 
         _attrPanel = new Control();
         _attrPanel.MouseFilter = MouseFilterEnum.Ignore;
         _attrPanel.Position = new Vector2(155, 30);
         AddChild(_attrPanel);
 
-        int visibleCount = Math.Min(attrs.Count, AttrMaxVisible);
+        int visibleCount = Math.Min(newAttrs.Count, AttrMaxVisible);
         int y = 0;
         int bgMargin = 2;
         int itemH = AttrIconSize + bgMargin * 2;
 
         for (int i = 0; i < visibleCount; i++)
         {
-            var attr = attrs[i];
+            var attr = newAttrs[i];
 
             // 半透明黑色背景
             var bg = new ColorRect();
@@ -1281,10 +1280,10 @@ public partial class cardBase_ : Control
         }
 
         // 折叠提示
-        if (attrs.Count > AttrMaxVisible)
+        if (newAttrs.Count > AttrMaxVisible)
         {
             var moreLabel = new Label();
-            moreLabel.Text = $"+{attrs.Count - AttrMaxVisible}";
+            moreLabel.Text = $"+{newAttrs.Count - AttrMaxVisible}";
             moreLabel.Position = new Vector2(2, y);
             moreLabel.AddThemeColorOverride("font_color", new Color(0.8f, 0.8f, 0.8f));
             moreLabel.AddThemeFontSizeOverride("font_size", 10);
@@ -1589,13 +1588,14 @@ public partial class cardBase_ : Control
     /// <returns></returns>
     async public Task MoveToPosition(Vector2 destination, float duration = 0.5f)
     {
-        var tween = CreateTween();
-        tween.SetTrans(Tween.TransitionType.Sine);
-        tween.SetEase(Tween.EaseType.InOut);
-        tween.TweenProperty(this, "position", destination, duration);
+        if (moveTween != null && moveTween.IsValid())
+            moveTween.Kill();
+        moveTween = CreateTween();
+        moveTween.SetTrans(Tween.TransitionType.Sine);
+        moveTween.SetEase(Tween.EaseType.InOut);
+        moveTween.TweenProperty(this, "position", destination, duration);
 
-        // 等待 Tween 完成
-        await ToSignal(tween, Tween.SignalName.Finished);
+        await ToSignal(moveTween, Tween.SignalName.Finished);
     }
 
     /// <summary>
@@ -1687,7 +1687,7 @@ public partial class cardBase_ : Control
                 targetColor = Colors.Red;  // > 极值 - 红色
         }
 
-        GD.Print($"闪烁 {attributeName}: 目标颜色 = {targetColor}, 当前值 = {currentValue}");
+        
 
         for(int i = 0; i < 3; i++)
         {
@@ -1907,7 +1907,7 @@ public static class IconCache
             var tex = ResourceManager.Instance?.GetTexture(path)
                    ?? GD.Load<Texture2D>(path);
             if (tex != null) _cache[name] = tex;
-            else GD.Print($"[IconCache] 加载失败: {path}");
+            else { }
         }
         _initialized = true;
     }
@@ -1916,8 +1916,6 @@ public static class IconCache
     {
         Init();
         var tex = _cache.TryGetValue(name, out var t) ? t : null;
-        if (tex == null && name != "action")
-            GD.Print($"[IconCache.GetIcon] 未找到图标: '{name}', 缓存键: {string.Join(",", _cache.Keys)}");
         return tex;
     }
 

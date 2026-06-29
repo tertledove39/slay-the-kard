@@ -74,61 +74,126 @@ public partial class PostBattleReward : CanvasLayer
     // ============================ 卡牌生成 ============================
 
     /// <summary>
-    /// 从卡池中随机生成3组各5张不重复的非总部/非不可获得卡牌。
-    /// 按稀有度过滤：若牌组中某卡已达到稀有度上限，则该卡不会出现在奖励中。
+    /// 稀有度概率权重：Common 50%, Rare 30%, Epic 15%, Legendary 5%
+    /// </summary>
+    private static readonly (Rarity rarity, double weight)[] RarityWeights = new[]
+    {
+        (Rarity.Common, 0.50),
+        (Rarity.Rare, 0.30),
+        (Rarity.Epic, 0.15),
+        (Rarity.Legendary, 0.05),
+    };
+
+    /// <summary>
+    /// 稀有度回退顺序：优先常见卡
+    /// </summary>
+    private static readonly Rarity[] RarityFallbackOrder = { Rarity.Common, Rarity.Rare, Rarity.Epic, Rarity.Legendary };
+
+    /// <summary>
+    /// 生成3组各5张的奖励卡牌。逐槽位按稀有度加权概率抽取，
+    /// 实时检查每种卡在(牌组+当前奖励组)内的总数不超过该稀有度上限。
     /// </summary>
     private List<List<CardData>> GenerateRewardGroups()
     {
         var rnd = new Random();
-        var allCards = _bf.GetCardMaganer().GetAllCards();
+        var allCards = _bf.GetCardMaganer().GetAllCards()
+            .Where(c => c.IsHq == HQ.normalCard && c.Rarity != Rarity.Unobtainable)
+            .ToList();
 
-        // 统计当前牌组中各卡牌ID的数量
+        if (allCards.Count == 0)
+            return new List<List<CardData>>();
+
+        var cardsByRarity = allCards.GroupBy(c => c.Rarity)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
         var deckCounts = new Dictionary<string, int>();
         foreach (var c in _player.ReadMyDeck())
         {
             if (!string.IsNullOrEmpty(c.id))
             {
-                deckCounts.TryGetValue(c.id, out int count);
-                deckCounts[c.id] = count + 1;
+                deckCounts.TryGetValue(c.id, out int cnt);
+                deckCounts[c.id] = cnt + 1;
             }
         }
 
-        // 过滤：非HQ、非不可获得，且加入后不超过稀有度上限
-        var validCards = allCards
-            .Where(c => c.IsHq == HQ.normalCard && c.Rarity != Rarity.Unobtainable)
-            .Where(c =>
-            {
-                if (!RarityMaxCopies.TryGetValue(c.Rarity, out int maxCopies))
-                    return true; // 未配置稀有度限制的默认允许
-                deckCounts.TryGetValue(c.Id, out int currentCount);
-                return currentCount < maxCopies;
-            })
-            .ToList();
-
-        // 如果过滤后卡牌不足，回退为不限稀有度（保障始终能生成奖励）
-        if (validCards.Count < CardsPerGroup)
-        {
-            GD.Print($"[PostBattleReward] 稀有度过滤后仅{validCards.Count}张可用卡，回退为不限稀有度");
-            validCards = allCards
-                .Where(c => c.IsHq == HQ.normalCard && c.Rarity != Rarity.Unobtainable)
-                .ToList();
-        }
-
-        // 允许重复以满足数量要求
-        while (validCards.Count < GroupsCount * CardsPerGroup)
-            validCards.Add(validCards[rnd.Next(validCards.Count)]);
-
-        var shuffled = validCards.OrderBy(_ => rnd.Next()).ToList();
         var groups = new List<List<CardData>>();
-        int idx = 0;
+
         for (int g = 0; g < GroupsCount; g++)
         {
             var group = new List<CardData>();
-            for (int c = 0; c < CardsPerGroup && idx < shuffled.Count; c++, idx++)
-                group.Add(shuffled[idx]);
+            var groupCounts = new Dictionary<string, int>();
+
+            for (int s = 0; s < CardsPerGroup; s++)
+            {
+                Rarity targetRarity = PickRarityByWeight(rnd);
+                CardData chosen = TryPickCard(cardsByRarity, targetRarity, deckCounts, groupCounts, rnd);
+
+                if (chosen == null)
+                {
+                    foreach (var fb in RarityFallbackOrder)
+                    {
+                        if (fb == targetRarity) continue;
+                        chosen = TryPickCard(cardsByRarity, fb, deckCounts, groupCounts, rnd);
+                        if (chosen != null) break;
+                    }
+                }
+
+                if (chosen == null)
+                {
+                    var allValid = allCards.Where(card =>
+                    {
+                        int max = RarityMaxCopies.GetValueOrDefault(card.Rarity, int.MaxValue);
+                        int dCnt = deckCounts.GetValueOrDefault(card.Id, 0);
+                        int gCnt = groupCounts.GetValueOrDefault(card.Id, 0);
+                        return dCnt + gCnt < max;
+                    }).ToList();
+                    chosen = allValid.Count > 0 ? allValid[rnd.Next(allValid.Count)] : allCards[rnd.Next(allCards.Count)];
+                }
+
+                group.Add(chosen);
+                groupCounts.TryGetValue(chosen.Id, out int gc);
+                groupCounts[chosen.Id] = gc + 1;
+            }
+
             groups.Add(group);
         }
+
         return groups;
+    }
+
+    private static Rarity PickRarityByWeight(Random rnd)
+    {
+        double totalWeight = RarityWeights.Sum(w => w.weight);
+        double roll = rnd.NextDouble() * totalWeight;
+        double cumulative = 0;
+        foreach (var (rarity, weight) in RarityWeights)
+        {
+            cumulative += weight;
+            if (roll <= cumulative)
+                return rarity;
+        }
+        return RarityWeights.Last().rarity;
+    }
+
+    private static CardData TryPickCard(
+        Dictionary<Rarity, List<CardData>> cardsByRarity,
+        Rarity rarity,
+        Dictionary<string, int> deckCounts,
+        Dictionary<string, int> groupCounts,
+        Random rnd)
+    {
+        if (!cardsByRarity.TryGetValue(rarity, out var pool) || pool.Count == 0)
+            return null;
+
+        int max = RarityMaxCopies.GetValueOrDefault(rarity, int.MaxValue);
+        var valid = pool.Where(card =>
+        {
+            int dCnt = deckCounts.GetValueOrDefault(card.Id, 0);
+            int gCnt = groupCounts.GetValueOrDefault(card.Id, 0);
+            return dCnt + gCnt < max;
+        }).ToList();
+
+        return valid.Count == 0 ? null : valid[rnd.Next(valid.Count)];
     }
 
     // ============================ 组选择界面 ============================
@@ -145,7 +210,7 @@ public partial class PostBattleReward : CanvasLayer
 
         // 标题
         var viewSize = GetViewport().GetVisibleRect().Size;
-        var title = MakeLabel("[center]选择一组卡牌奖励[/center]", 30, Colors.Gold);
+        var title = MakeLabel("选择一组卡牌奖励", 30, Colors.Gold);
         title.Position = new Vector2(viewSize.X / 2 - 250, 30);
         title.Size = new Vector2(500, 50);
         AddChild(title);
@@ -242,12 +307,12 @@ public partial class PostBattleReward : CanvasLayer
 
         // 标题与计数
         var viewSize = GetViewport().GetVisibleRect().Size;
-        var title = MakeLabel($"[center]选择{MaxSwapCards}张要替换的卡牌[/center]", 26, Colors.Gold);
+        var title = MakeLabel($"选择{MaxSwapCards}张要替换的卡牌", 26, Colors.Gold);
         title.Position = new Vector2(viewSize.X / 2 - 250, 20);
         title.Size = new Vector2(500, 40);
         AddChild(title);
 
-        var countLabel = MakeLabel($"[center]已选: 0/{MaxSwapCards}[/center]", 20, Colors.White);
+        var countLabel = MakeLabel($"已选: 0/{MaxSwapCards}", 20, Colors.White);
         countLabel.Position = new Vector2(viewSize.X / 2 - 100, 58);
         countLabel.Size = new Vector2(200, 30);
         AddChild(countLabel);
@@ -395,7 +460,7 @@ public partial class PostBattleReward : CanvasLayer
             _selectedToRemove.Add(card);
             highlight.Color = new Color(1f, 0.84f, 0, 0.4f);
         }
-        countLabel.Text = $"[center]已选: {_selectedToRemove.Count}/{MaxSwapCards}[/center]";
+        countLabel.Text = $"已选: {_selectedToRemove.Count}/{MaxSwapCards}";
     }
 
     // ============================ 卡组替换执行 ============================

@@ -99,3 +99,39 @@ async public Task AttackInf(cardBase_ target) { }
 `SplitEffectByComma` 只追踪 `[]` 括号深度，不追踪 `()` 括号，导致 `DrawACard(t34,1)` 等指令中括号内的逗号被错误当作段分割符。使 `[icon=dead,...]` 等元数据在分割后被丢弃，attribute 图标无法显示。
 
 **修复**: 增加 `()` 括号深度追踪和引号追踪，只有 `bracketDepth==0 && parenDepth==0 && !inQuotes` 时才将逗号视为分割符。
+
+### 18. 性能优化：每帧刷新显示顺序 (battlefield_.cs)
+
+`RefreshAllCardDisplayOrder()` 在 `_Process()` 中每帧无条件调用，每帧分配3个List + 对每张卡调`MoveChild` + O(n²)的`IndexOf`。
+
+**修复**: 加脏标记`_displayOrderDirty`，只在卡牌增删/手牌变化时设true，`_Process`检测到才刷新。手牌遍历从`foreach+IndexOf`改为`for(int i...)`。
+
+### 19. 性能优化：箭头渲染器每帧QueueRedraw (Cardbase.cs)
+
+`Cardbase._Process` 每帧无条件`QueueRedraw`+鼠标坐标转换，即使箭头不可见。
+
+**修复**: 开头加`if (!Visible) return;`。
+
+### 20. 性能优化：RefreshState磁盘IO (cardBase_.cs)
+
+`RefreshState()` 每次属性变更都调`FileAccess.FileExists(IconPath)`做磁盘IO。
+
+**修复**: 改为`!string.IsNullOrEmpty(IconPath)`内存检查。
+
+### 21. 性能优化：BuildAttributePanel重复调用 (cardBase_.cs)
+
+`BuildAttributePanel()` 调`GetAllAttributes()`两次，第二次完全多余。
+
+**修复**: 删除第二次调用，复用`newAttrs`。
+
+### 22. 性能优化：MoveToPosition不杀旧Tween (cardBase_.cs)
+
+`MoveToPosition()` 每次创建新Tween不Kill旧的，导致悬停切换时Tween竞争+泄漏。
+
+**修复**: 加`moveTween`字段，创建前先Kill旧的。
+
+### 23. 性能优化：热路径GD.Print (cardBase_.cs)
+
+`CheckIfCanAttack`、`FlashAttributeWithColor`、`ParseEffectAttribute`、`IconCache.GetIcon`中的`GD.Print`在频繁调用路径中产生字符串拼接开销。
+
+**修复**: 删除这些调试日志。

@@ -79,6 +79,7 @@ public partial class battlefield_ : Control
     /// 全局 储存所有场上的卡
     /// </summary>
     private List<cardBase_> cardInPlaces = new List<cardBase_>();
+    public bool _displayOrderDirty = true;
 
     private CanvasLayer choiceLayer;
     private ColorRect choiceDim;
@@ -240,11 +241,12 @@ public partial class battlefield_ : Control
             }
         }
 
-        foreach (var card in player1.GetCardsInHand())
+        var handCards = player1.GetCardsInHand();
+        int hoveredIdx = player1.GetHoveredHandIndex();
+        for (int i = 0; i < handCards.Count; i++)
         {
-            MoveChild(card,1);
-            int cardIndex = player1.GetCardsInHand().IndexOf(card);
-            card.ZIndex = (cardIndex == player1.GetHoveredHandIndex()) ? 30 : 20;
+            MoveChild(handCards[i], 1);
+            handCards[i].ZIndex = (i == hoveredIdx) ? 30 : 20;
         }
     }
 
@@ -338,6 +340,7 @@ public partial class battlefield_ : Control
     {
         AddChild(card);
         cardInPlaces.Add(card);
+        _displayOrderDirty = true;
     }
 
 /// <summary>
@@ -1138,7 +1141,7 @@ InputState currentInputState = InputState.nil;
             if(currentInputState != InputState.waitingForChoosingTarget) cardNowChoose = card;
             if (card == null) return; // 没有点击到卡牌，不处理
             // 点击时立即将卡牌提升到最上层
-            RefreshAllCardDisplayOrder();
+            _displayOrderDirty = true;
             var validTargets = GetAllowedTargets(card);
             if(currentInputState == InputState.waitingForChoosingTarget) ;//如果是等待 那直接跳过
             else if (card.cardType == CardTypes.Command && card.getState() == CardState.inHand && card.targetType != TargetType.NOTarget) {currentInputState = InputState.P_InHandCommandNeedChooseTarget;HighlightValidTargets(card.targetType);}
@@ -1372,8 +1375,8 @@ InputState currentInputState = InputState.nil;
 
         //不管怎么说 先把箭头隐藏了
         
-        RefreshAllCardDisplayOrder();
-        
+        _displayOrderDirty = true;
+
         CheckIfAnyUnitDiedAsync();
 
             
@@ -1382,7 +1385,11 @@ InputState currentInputState = InputState.nil;
 
     public override void _Process(double delta)
     {
-        RefreshAllCardDisplayOrder();
+        if (_displayOrderDirty)
+        {
+            RefreshAllCardDisplayOrder();
+            _displayOrderDirty = false;
+        }
 
         // 悬停时手牌浮起并让开（仅对友方手牌生效）
         if (player1 != null)
@@ -3146,7 +3153,8 @@ InputState currentInputState = InputState.nil;
         }
         cardInPlaces.Remove(card);
         card.Dead();
-        RefreshAllBeGuardianedStatus(); // 单位离场后刷新被守护状态
+        RefreshAllBeGuardianedStatus();
+        _displayOrderDirty = true;
     }
 
     /// <summary>
@@ -3485,7 +3493,8 @@ InputState currentInputState = InputState.nil;
                 string ins = instruction.ToLowerInvariant(); // 大小写不敏感
 
                 // 跳过标签定义（End& 需要被处理以支持 foreach 结构）
-                if (instruction.EndsWith("&") && ins != "end&")
+                // if(condition)label& 不是标签定义，是条件跳转指令
+                if (instruction.EndsWith("&") && ins != "end&" && !instruction.StartsWith("if(", StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
@@ -3665,7 +3674,10 @@ InputState currentInputState = InputState.nil;
                                 int savedAttackAble = attacker.attackAble;
                                 int savedAttackCount = attacker.attackCountThisTurn;
                                 if (attacker.attackAble < 1) attacker.attackAble = 1;
+                                var savedCardType = attacker.cardType;
+                                attacker.cardType = CardTypes.Command;
                                 await Attack(attacker, defenders[0]);
+                                attacker.cardType = savedCardType;
                                 attacker.moveAble = savedMoveAble;
                                 attacker.attackAble = savedAttackAble;
                                 attacker.attackCountThisTurn = savedAttackCount;
@@ -3787,7 +3799,24 @@ InputState currentInputState = InputState.nil;
                         {
                             if (target != null)
                             {
-                                target.AddChange(ChangeType.ReduceCost, subCostAmount);
+                                target.ReduceCost(subCostAmount);
+                            }
+                        }
+                    }
+                }
+
+                // LoseAttack(n) - 减少目标攻击力
+                if (instruction.StartsWith("LoseAttack", StringComparison.OrdinalIgnoreCase))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
+                    if (match.Success)
+                    {
+                        int loseAmount = EvaluateExpression(match.Groups[1].Value, result, targets, sourceCard);
+                        foreach (var target in targets)
+                        {
+                            if (target != null)
+                            {
+                                target.LoseAttack(loseAmount);
                             }
                         }
                     }
@@ -4155,6 +4184,7 @@ InputState currentInputState = InputState.nil;
                         var newCardData = GetCardMaganer().GetCard(cardId);
                         if (newCardData != null)
                         {
+                            lastCardAddedToSupportLine = null;
                             var place = GetTheFirstValidFriendlyPlace();
                             if (place != null)
                             {
@@ -4429,7 +4459,7 @@ InputState currentInputState = InputState.nil;
                 if (ins == "getrandomenemytarget")
                 {
                     var enemyTargets = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy).ToList();
-                    if (enemyHq != null && enemyHq.getState() == CardState.placed)
+                    if (enemyHq != null && enemyHq.getState() == CardState.placed && !enemyTargets.Contains(enemyHq))
                     {
                         enemyTargets.Add(enemyHq);
                     }
@@ -4737,7 +4767,7 @@ InputState currentInputState = InputState.nil;
                 if (ins == "getallenemytargets")
                 {
                     var enemyTargets = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy).ToList();
-                    if (enemyHq != null && enemyHq.getState() == CardState.placed)
+                    if (enemyHq != null && enemyHq.getState() == CardState.placed && !enemyTargets.Contains(enemyHq))
                     {
                         enemyTargets.Add(enemyHq);
                     }
@@ -4748,7 +4778,7 @@ InputState currentInputState = InputState.nil;
                 if (ins == "getallfriendtargets")
                 {
                     var friendTargets = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.friend).ToList();
-                    if (myHq != null && myHq.getState() == CardState.placed)
+                    if (myHq != null && myHq.getState() == CardState.placed && !friendTargets.Contains(myHq))
                     {
                         friendTargets.Add(myHq);
                     }
@@ -5638,6 +5668,7 @@ public class Player
         {
             hoveredHandIndex = -1;
         }
+        battlefield._displayOrderDirty = true;
 
         if (cardsInHand.Count == 0)
             return;
@@ -5711,6 +5742,20 @@ public class Player
     {
         if (isFriend != IsFriend.friend)
             return;
+
+        if (cardsInHand.Count == 0)
+            return;
+
+        float handTopY = initPos.Y - 100;
+        if (mousePosition.Y < handTopY)
+        {
+            if (hoveredHandIndex != -1)
+            {
+                hoveredHandIndex = -1;
+                RefreshMyHand();
+            }
+            return;
+        }
 
         int newHover = -1;
         for (int i = 0; i < cardsInHand.Count; i++)

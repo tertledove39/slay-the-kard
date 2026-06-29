@@ -248,6 +248,7 @@ public partial class Cardbase : Node2D
 
     public override void _Process(double delta)
     {
+        if (!Visible) return;
         p1 = marker.Position;
         p2 = ToLocal(GetGlobalMousePosition());
         var ang = (p2 - p1).Angle();

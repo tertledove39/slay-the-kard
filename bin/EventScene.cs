@@ -42,6 +42,8 @@ public partial class EventScene : CanvasLayer
         parent.AddChild(scene);
         await scene.Run(eventData, areaName);
         scene.QueueFree();
+        if (parent is WorldMap wm)
+            wm.DismissChooseMission();
     }
 
     /// <summary>
@@ -138,10 +140,9 @@ public partial class EventScene : CanvasLayer
         // --- 执行效果 ---
         await ExecuteEffect(effect);
 
-        // 标记区域已完成，返回WorldMap
+        // 标记区域已完成
         BattleStateManager.MarkAreaCompleted(_areaName);
         GD.Print($"[EventScene] 事件完成，区域 {_areaName} 已标记");
-        await SceneLoader.ChangeSceneAsync(this, "res://bin/worldMap.tscn");
     }
 
     // ============================ 效果执行 ============================

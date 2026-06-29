@@ -16,6 +16,7 @@ public partial class MeterLabel : Control
     private int _currentValue;
     private int _digitCount;
     private bool _isAnimating;
+    private int _animationGen;
     private float _digitH;
     private float _digitW;
     private readonly List<Tween> _activeTweens = new();
@@ -137,6 +138,7 @@ public partial class MeterLabel : Control
         }
 
         _isAnimating = true;
+        int myGen = ++_animationGen;
 
         try
         {
@@ -190,8 +192,11 @@ public partial class MeterLabel : Control
         }
         finally
         {
-            _isAnimating = false;
-            _activeTweens.Clear();
+            if (_animationGen == myGen)
+            {
+                _isAnimating = false;
+                _activeTweens.Clear();
+            }
         }
     }
 

@@ -113,12 +113,15 @@ public partial class WorldMap : Control
         _ => CardTypes.Infantry
     };
 
-    private static TargetType GetTargetType(string s)
+    private static TargetType GetTargetType(string s) => s.ToLowerInvariant() switch
     {
-        if (System.Enum.TryParse<TargetType>(s, ignoreCase: true, out var result))
-            return result;
-        return TargetType.anyTarget;
-    }
+        "enemytarget" => TargetType.enemyTarget,
+        "anenemyunit" => TargetType.anEnemyUnit,
+        "afriendlyunit" => TargetType.aFriendlyUnit,
+        "friendlytarget" => TargetType.friendlyTarget,
+        "anytarget" => TargetType.anyTarget,
+        _ => TargetType.NOTarget
+    };
 
     /// <summary>从逗号分隔字符串解析特性位掩码</summary>
     private static UnitTraits GetTraitList(string s)
@@ -342,6 +345,19 @@ public partial class WorldMap : Control
             _chooseMissionPanel.AddChild(bg);
             _chooseMissionPanel.MoveChild(bg, 0);
         }
+    }
+
+    /// <summary>
+    /// 事件完成后关闭三选一面板并刷新区域状态
+    /// </summary>
+    public void DismissChooseMission()
+    {
+        if (_chooseMissionPanel != null)
+        {
+            _chooseMissionPanel.QueueFree();
+            _chooseMissionPanel = null;
+        }
+        RefreshAreaStates();
     }
 
     /// <summary>将池中的ID字符串解析为MissionEntry（"event:xxx"为事件，其余为敌人）</summary>
