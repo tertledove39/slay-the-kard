@@ -5671,7 +5671,8 @@ public class Player
                 return;
             }
             card.SetPosition(new Godot.Vector2(-2000, 800));
-            await AddCardToHand(card); 
+            await AddCardToHand(card);
+            await battlefield.TriggerUnitEffects("FriendlyCardDrawn", card, new List<cardBase_> { card }, checkOnlySourceCard: true);
         }
         
     }
