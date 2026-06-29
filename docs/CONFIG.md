@@ -30,6 +30,14 @@
 - `ADD:行动` - 添加行动到永久队列（每回合执行）
 - `default=行动` - 无特定行动时的默认行动
 
+**行动字符串末尾可附加属性元数据（与card.ini的effect相同格式）：**
+```
+t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
+```
+- `icon=` - 意图面板中显示的图标名（对应 `res://assest/{icon}.png`）
+- `description=` - 意图面板中显示的人话描述
+- 元数据由 `StripBracketsOutsideQuotes` 自动剥离，不影响执行
+
 ### bin/AreaPool.ini
 定义区域任务池。每个区域包含敌人预设和事件条目。
 

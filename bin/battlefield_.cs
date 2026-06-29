@@ -80,6 +80,7 @@ public partial class battlefield_ : Control
     /// </summary>
     private List<cardBase_> cardInPlaces = new List<cardBase_>();
     public bool _displayOrderDirty = true;
+    private VBoxContainer _enemyIntentContainer;
 
     private CanvasLayer choiceLayer;
     private ColorRect choiceDim;
@@ -500,6 +501,8 @@ TextureButton buttonNextTurn;
             : "berlin";
         LoadEnemyActionQueue(enemyPreset);
         GD.Print($"Loaded enemy preset: {enemyPreset}");
+        CreateEnemyIntentPanel();
+        RefreshEnemyIntentPanel();
 
         //初始化敌人
         EnemyInit();
@@ -2383,6 +2386,109 @@ InputState currentInputState = InputState.nil;
         GD.Print($"Loaded enemy action queue for {enemyHqName}: {enemyActionQueue.Count} entries");
     }
 
+    void CreateEnemyIntentPanel()
+    {
+        var panel = new Control();
+        panel.SetAnchorsPreset(Control.LayoutPreset.Left);
+        panel.Position = new Vector2(10, 200);
+        panel.Size = new Vector2(300, 400);
+        panel.ZIndex = 50;
+
+        var bg = new ColorRect();
+        bg.Color = new Color(0, 0, 0, 0.55f);
+        bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        bg.MouseFilter = Control.MouseFilterEnum.Ignore;
+        panel.AddChild(bg);
+
+        _enemyIntentContainer = new VBoxContainer();
+        _enemyIntentContainer.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        _enemyIntentContainer.Position = new Vector2(6, 6);
+        _enemyIntentContainer.AddThemeConstantOverride("separation", 6);
+        _enemyIntentContainer.MouseFilter = Control.MouseFilterEnum.Ignore;
+        panel.AddChild(_enemyIntentContainer);
+
+        AddChild(panel);
+    }
+
+    void RefreshEnemyIntentPanel()
+    {
+        if (_enemyIntentContainer == null) return;
+
+        foreach (var child in _enemyIntentContainer.GetChildren())
+            child.QueueFree();
+
+        int nextTurn = turn + 1;
+        var actions = GetNextTurnActions(nextTurn);
+        var iconTexture = ResourceLoader.Load<Texture2D>("res://assest/boss.png");
+
+        foreach (var action in actions)
+        {
+            string desc = ParseActionDescription(action);
+            if (string.IsNullOrEmpty(desc)) continue;
+
+            var row = new HBoxContainer();
+            row.MouseFilter = Control.MouseFilterEnum.Ignore;
+
+            var icon = new TextureRect();
+            icon.Texture = iconTexture;
+            icon.CustomMinimumSize = new Vector2(64, 64);
+            icon.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
+            icon.StretchMode = TextureRect.StretchModeEnum.KeepAspect;
+            icon.MouseFilter = Control.MouseFilterEnum.Ignore;
+            row.AddChild(icon);
+
+            var label = new Label();
+            label.Text = desc;
+            label.AddThemeFontSizeOverride("font_size", 14);
+            label.AddThemeColorOverride("font_color", Colors.White);
+            label.VerticalAlignment = VerticalAlignment.Center;
+            label.CustomMinimumSize = new Vector2(220, 64);
+            label.MouseFilter = Control.MouseFilterEnum.Ignore;
+            row.AddChild(label);
+
+            _enemyIntentContainer.AddChild(row);
+        }
+    }
+
+    List<string> GetNextTurnActions(int nextTurn)
+    {
+        var actions = new List<string>();
+
+        string key = $"t{nextTurn}";
+        if (enemyActionQueue.ContainsKey(key))
+            actions.AddRange(enemyActionQueue[key]);
+
+        if (actions.Count == 0 && enemyActionQueue.ContainsKey("default"))
+            actions.AddRange(enemyActionQueue["default"]);
+
+        foreach (var k in enemyActionQueue.Keys)
+        {
+            if (k.StartsWith("every") && k.EndsWith("t"))
+            {
+                string numStr = k.Substring(5, k.Length - 6);
+                if (int.TryParse(numStr, out int interval) && interval > 0 && nextTurn % interval == 0)
+                    actions.AddRange(enemyActionQueue[k]);
+            }
+        }
+
+        if (enemyActionQueue.ContainsKey("ADD"))
+            actions.AddRange(enemyActionQueue["ADD"]);
+
+        return actions;
+    }
+
+    string ParseActionDescription(string action)
+    {
+        int bracketIdx = action.LastIndexOf('[');
+        if (bracketIdx == -1) return "";
+        int endIdx = action.LastIndexOf(']');
+        if (endIdx <= bracketIdx) return "";
+        string meta = action.Substring(bracketIdx + 1, endIdx - bracketIdx - 1);
+        int descIdx = meta.IndexOf("description=");
+        if (descIdx == -1) return "";
+        return meta.Substring(descIdx + "description=".Length);
+    }
+
     /// <summary>
     /// 执行敌方行动队列中的行动
     /// </summary>
@@ -3025,7 +3131,8 @@ InputState currentInputState = InputState.nil;
             player1.AddPoint(-pendingLoss);
             SetMemory("pendingPointLoss", 0);
         }
-        
+
+        RefreshEnemyIntentPanel();
     }
 
     void RefreshAllCardInField()
