@@ -1761,7 +1761,7 @@ InputState currentInputState = InputState.nil;
     /// <param name="sourceCard">触发效果的单位（self指向此单位）</param>
     /// <param name="targetCards">效果的目标单位列表（target指向这些单位）</param>
     /// <param name="checkOnlySourceCard">是否只检查sourceCard的效果，true=只检查源卡，false=检查所有单位</param>
-    private async Task TriggerUnitEffects(string triggerPoint, cardBase_ sourceCard, List<cardBase_> targetCards = null, bool checkOnlySourceCard = false)
+    public async Task TriggerUnitEffects(string triggerPoint, cardBase_ sourceCard, List<cardBase_> targetCards = null, bool checkOnlySourceCard = false)
     {
         if (targetCards == null) targetCards = new List<cardBase_>();
 
