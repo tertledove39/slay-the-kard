@@ -3567,6 +3567,7 @@ InputState currentInputState = InputState.nil;
                     int closeParenIndex = instruction.IndexOf(")");
                     string condition = instruction.Substring(3, closeParenIndex - 3);
                     string label = instruction.Substring(closeParenIndex + 1).Trim();
+                    if (label.EndsWith("&")) label = label.Substring(0, label.Length - 1);
                     
                     // 评估条件
                     bool conditionResult = EvaluateCondition(condition, result, targets, sourceCard);
