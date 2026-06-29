@@ -181,6 +181,7 @@ public partial class cardBase_ : Control
         if ((trait & UnitTraits.Shock) != 0) hasShock = true;
         if ((trait & UnitTraits.Mobilize) != 0) hasMobilize = true;
         if ((trait & UnitTraits.Ambush) != 0) hasAmbushActive = true;
+        if ((trait & UnitTraits.Suppressed) != 0) { moveAble = 0; attackAble = 0; }
         // 闪击/奋战需要刷新行动次数
         if ((trait & (UnitTraits.Blitz | UnitTraits.Determination)) != 0)
             RefreshUnit();
@@ -199,6 +200,7 @@ public partial class cardBase_ : Control
         if ((trait & UnitTraits.Shock) != 0) hasShock = false;
         if ((trait & UnitTraits.Mobilize) != 0) hasMobilize = false;
         if ((trait & UnitTraits.Ambush) != 0) hasAmbushActive = false;
+        if ((trait & UnitTraits.Suppressed) != 0) UpdateMoveableLight();
         RefreshDescriptionText();
         BuildAttributePanel();
     }
@@ -931,6 +933,8 @@ public partial class cardBase_ : Control
             names.Append("动员 ");
         if ((traits & UnitTraits.SharedHatred) != 0)
             names.Append("同仇 ");
+        if ((traits & UnitTraits.Suppressed) != 0)
+            names.Append("压制 ");
 
         if (names.Length == 0) return "";
         // 去除末尾空格
@@ -1119,6 +1123,7 @@ public partial class cardBase_ : Control
         UnitTraits.Immunity => "免疫：不受到战斗伤害",
         UnitTraits.Mobilize => "动员：友方回合开始时+1+1，受伤后消失",
         UnitTraits.SharedHatred => "同仇：被指向时，其他友方同仇单位+1+1",
+        UnitTraits.Suppressed => "压制：无法移动或攻击，所属方回合结束时失去",
         _ => ""
     };
 
@@ -1775,7 +1780,9 @@ public enum UnitTraits
     /// <summary>动员：友方回合开始时+1攻击+1防御，受到伤害后消失</summary>
     Mobilize = 1 << 8,
     /// <summary>同仇：被指向时，所有其他友方同仇单位+1攻击+1防御</summary>
-    SharedHatred = 1 << 9
+    SharedHatred = 1 << 9,
+    /// <summary>压制：无法移动或攻击，所属方回合结束时失去</summary>
+    Suppressed = 1 << 10
 }
 
 
@@ -1872,7 +1879,7 @@ public static class IconCache
         "action", "Determination", "Guardian",
         "greenLight", "yellowLight", "redLight",
         "blitz", "mobilize", "smoke", "impact",
-        "ambush", "heavyArmour", "beGuardianed", "hatred", "dead"
+        "ambush", "heavyArmour", "beGuardianed", "hatred", "dead", "suppress"
     };
 
     // trait -> icon 映射
@@ -1888,6 +1895,7 @@ public static class IconCache
         { UnitTraits.Immunity, "Immunity" },
         { UnitTraits.Mobilize, "mobilize" },
         { UnitTraits.SharedHatred, "hatred" },
+        { UnitTraits.Suppressed, "suppress" },
     };
 
     public static void Init()

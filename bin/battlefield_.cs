@@ -2258,6 +2258,13 @@ InputState currentInputState = InputState.nil;
         // 敌人行动 AI：移动并攻击
         await EnemyPerformActionsAsync();
 
+        // 敌方回合结束时，移除敌方单位的压制
+        foreach (var unit in cardInPlaces.Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy))
+        {
+            if (unit.HasTrait(UnitTraits.Suppressed))
+                unit.RemoveTrait(UnitTraits.Suppressed);
+        }
+
         AllowControl();
     }
 
@@ -2959,6 +2966,13 @@ InputState currentInputState = InputState.nil;
     {
         // 触发友方回合结束时点
         await TriggerUnitEffects("FriendlyTurnEnd", null);
+
+        // 友方回合结束时，移除友方单位的压制
+        foreach (var unit in cardInPlaces.Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.friend))
+        {
+            if (unit.HasTrait(UnitTraits.Suppressed))
+                unit.RemoveTrait(UnitTraits.Suppressed);
+        }
 
         // 触发双方回合结束时点
         await TriggerUnitEffects("TurnEnd", null);
