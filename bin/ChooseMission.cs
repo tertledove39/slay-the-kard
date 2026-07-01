@@ -28,18 +28,27 @@ public partial class ChooseMission : Control
 {
     private Label _label1, _label2, _label3;
     private TextureButton _btn1, _btn2, _btn3;
+    private TextureButton[] _buttons;
+    private Label[] _labels;
     private List<MissionEntry> _entries = new();
     private string _areaName;
+    private float _buttonY;
+    private float _labelOffsetY;
 
     public override void _Ready()
     {
         _btn1 = GetNode<TextureButton>("TextureButton");
         _btn2 = GetNode<TextureButton>("TextureButton2");
         _btn3 = GetNode<TextureButton>("TextureButton3");
+        _buttons = new[] { _btn1, _btn2, _btn3 };
 
         _label1 = CreateLabel(_btn1, new Vector2(0, -80));
         _label2 = CreateLabel(_btn2, new Vector2(0, -80));
         _label3 = CreateLabel(_btn3, new Vector2(0, -80));
+        _labels = new[] { _label1, _label2, _label3 };
+
+        _buttonY = _btn1.Position.Y;
+        _labelOffsetY = -80f;
 
         _btn1.Pressed += () => OnChoose(0);
         _btn2.Pressed += () => OnChoose(1);
@@ -58,11 +67,33 @@ public partial class ChooseMission : Control
 
     private void ApplyNames()
     {
-        var labels = new[] { _label1, _label2, _label3 };
-        for (int i = 0; i < labels.Length && i < _entries.Count; i++)
+        int count = _entries.Count;
+        if (count == 0 || _buttons == null) return;
+
+        float screenWidth = GetViewportRect().Size.X;
+        float buttonWidth = _btn1.Size.X;
+        float totalWidth = count * buttonWidth;
+        float spacing = (screenWidth - totalWidth) / (count + 1);
+
+        for (int i = 0; i < _buttons.Length; i++)
         {
-            if (labels[i] != null)
-                labels[i].Text = _entries[i].DisplayName;
+            if (i < count)
+            {
+                float x = spacing + i * (buttonWidth + spacing);
+                _buttons[i].Visible = true;
+                _buttons[i].Position = new Vector2(x, _buttonY);
+                if (_labels[i] != null)
+                {
+                    _labels[i].Text = _entries[i].DisplayName;
+                    _labels[i].Visible = true;
+                    _labels[i].Position = new Vector2(x, _buttonY + _labelOffsetY);
+                }
+            }
+            else
+            {
+                _buttons[i].Visible = false;
+                if (_labels[i] != null) _labels[i].Visible = false;
+            }
         }
     }
 
