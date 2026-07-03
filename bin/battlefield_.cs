@@ -3173,14 +3173,6 @@ InputState currentInputState = InputState.nil;
         {
             CalculateMaterialPoints();
             DarkenScreen();
-            var endNode = GetNodeOrNull<End>("end");
-            if (endNode != null)
-                endNode.ShowSettlement(
-                    BattleStateManager.LastBattleLandKilled,
-                    BattleStateManager.LastBattleAirKilled,
-                    BattleStateManager.LastBattleFriendlyDead,
-                    BattleStateManager.LastBattleHqDefenceLost,
-                    BattleStateManager.LastBattlePointsGained);
             if (BattleStateManager.IsCampaignMode)
             {
                 _ = ReturnToWorldMapAfterVictory();
@@ -3235,10 +3227,17 @@ InputState currentInputState = InputState.nil;
     /// </summary>
     private async System.Threading.Tasks.Task ReturnToWorldMapAfterVictory()
     {
-        // 标记当前区域已完成，解锁下一区域
+        var endNode = GetNodeOrNull<End>("end");
+        if (endNode != null)
+            await endNode.ShowSettlement(
+                BattleStateManager.LastBattleLandKilled,
+                BattleStateManager.LastBattleAirKilled,
+                BattleStateManager.LastBattleFriendlyDead,
+                BattleStateManager.LastBattleHqDefenceLost,
+                BattleStateManager.LastBattlePointsGained);
+
         BattleStateManager.MarkAreaCompleted(BattleStateManager.SelectedArea);
 
-        // 显示战后卡牌奖励选择
         await PostBattleReward.Show(this, player1);
 
         await ToSignal(GetTree().CreateTimer(2.5f), SceneTreeTimer.SignalName.Timeout);

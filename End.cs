@@ -66,14 +66,13 @@ public partial class End : CanvasLayer
         _tween.TweenProperty(_overlay, "color", new Color(0, 0, 0, 0), duration);
     }
 
-    public void ShowSettlement(int landKilled, int airKilled, int friendlyDead, int hqDefenceLost, int pointsGained)
+    public async System.Threading.Tasks.Task ShowSettlement(int landKilled, int airKilled, int friendlyDead, int hqDefenceLost, int pointsGained)
     {
         var viewSize = GetViewport().GetVisibleRect().Size;
 
         var panel = new Control();
-        panel.SetAnchorsPreset(Control.LayoutPreset.Center);
-        panel.Position = new Vector2(viewSize.X / 2 - 200, 120);
-        panel.Size = new Vector2(400, 300);
+        panel.Size = new Vector2(400, 360);
+        panel.Position = new Vector2((viewSize.X - 400) / 2, (viewSize.Y - 360) / 2);
         panel.ZIndex = 200;
         AddChild(panel);
 
@@ -120,5 +119,20 @@ public partial class End : CanvasLayer
         totalLabel.AddThemeFontSizeOverride("font_size", 24);
         totalLabel.AddThemeColorOverride("font_color", Colors.Gold);
         panel.AddChild(totalLabel);
+
+        var confirmBtn = new Button();
+        confirmBtn.Text = "确认";
+        confirmBtn.Position = new Vector2(150, y + 60);
+        confirmBtn.Size = new Vector2(100, 36);
+        confirmBtn.AddThemeFontSizeOverride("font_size", 18);
+        panel.AddChild(confirmBtn);
+
+        var tcs = new System.Threading.Tasks.TaskCompletionSource<bool>();
+        confirmBtn.Pressed += () =>
+        {
+            panel.QueueFree();
+            tcs.TrySetResult(true);
+        };
+        await tcs.Task;
     }
 }

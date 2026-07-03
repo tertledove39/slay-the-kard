@@ -143,3 +143,11 @@ commit `ebc702f`（CardParser 重构）在替换 `GetRarity`/`GetTypes` 等本�
 **影响**: `WorldMap.LoadCardDataCache()` 加载到 `BattleStateManager` 缓存的 `CardData` 均无 `IconPath`（默认空字符串）。战役模式下 `battlefield_._Ready()` 从缓存取卡牌数据，`SetCardInformation` 将空 `IconPath` 传给 `cardBase_`，`RefreshState()` 中 `FileAccess.FileExists("")` 返回 false，不加载任何纹理，卡图为空白。冷启动直接运行战场场景时走 `battlefield_.cs:479` 的备用加载路径（有 `IconPath` 赋值），故该路径不受影响。
 
 **修复**: 在 `WorldMap.cs` `LoadCardDataCache()` 中补回 `cd.IconPath = configFile[section.Key]["icon"].GetString();`。
+
+### 25. ShowSettlement 结算面板位置错误+缺少确认按钮 (End.cs)
+
+`ShowSettlement` 使用了 `SetAnchorsPreset(Control.LayoutPreset.Center)` 后又设置了相对坐标 `Position = (viewSize.X/2 - 200, 120)`，Center 预设将锚固点设为 (0.5,0.5)，最终 X = viewSize.X - 200，面板跑到了屏幕右下角。
+
+此外，原流程在 `RemoveCard` 中同步调用 `ShowSettlement` 后立即 fire-and-forget `ReturnToWorldMapAfterVictory`（直接跳到奖励选择），缺少结算→用户确认→奖励的等待环节。
+
+**修复**: (1) 去掉 `SetAnchorsPreset`，直接用 `(viewSize - panelSize) / 2` 居中定位；(2) 添加确认按钮，`ShowSettlement` 改为 `async Task` 等待按钮按下；(3) 将 `ShowSettlement` 调用移入 `ReturnToWorldMapAfterVictory` 最前面，确保确认后才进入奖励选择。
