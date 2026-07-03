@@ -83,59 +83,13 @@ public partial class WorldMap : Control
             cd.Cost = configFile[section.Key]["price"].ToInt();
             cd.Effect = configFile[section.Key]["effect"].GetString();
             cd.IsHq = (HQ)configFile[section.Key]["isHq"].ToInt();
-            cd.Rarity = GetRarity(configFile[section.Key]["rarity"].GetString());
-            cd.IconPath = configFile[section.Key]["icon"].GetString();
-            cd.CardType = GetTypes(configFile[section.Key]["cardType"].GetString());
-            cd.TargetType = GetTargetType(configFile[section.Key]["targetType"].GetString());
-            cd.Traits = GetTraitList(configFile[section.Key]["traits"].GetString());
+            cd.Rarity = CardParser.GetRarity(configFile[section.Key]["rarity"].GetString());
+            cd.CardType = CardParser.GetTypes(configFile[section.Key]["cardType"].GetString());
+            cd.TargetType = CardParser.GetTargetType(configFile[section.Key]["targetType"].GetString());
+            cd.Traits = CardParser.GetTraitList(configFile[section.Key]["traits"].GetString());
             items[cd.Id] = cd;
         }
         BattleStateManager.CacheAllCards(items);
-    }
-
-    private static Rarity GetRarity(string s) => s.ToLowerInvariant() switch
-    {
-        "common" => Rarity.Common,
-        "rare" => Rarity.Rare,
-        "epic" => Rarity.Epic,
-        "legendary" => Rarity.Legendary,
-        _ => Rarity.Unobtainable
-    };
-
-    private static CardTypes GetTypes(string s) => s.ToLowerInvariant() switch
-    {
-        "plane" => CardTypes.Plane,
-        "bomber" => CardTypes.Bomber,
-        "tank" => CardTypes.Tank,
-        "infantry" => CardTypes.Infantry,
-        "artillery" => CardTypes.Artillery,
-        "command" => CardTypes.Command,
-        _ => CardTypes.Infantry
-    };
-
-    private static TargetType GetTargetType(string s) => s.ToLowerInvariant() switch
-    {
-        "enemytarget" => TargetType.enemyTarget,
-        "anenemyunit" => TargetType.anEnemyUnit,
-        "afriendlyunit" => TargetType.aFriendlyUnit,
-        "friendlytarget" => TargetType.friendlyTarget,
-        "anytarget" => TargetType.anyTarget,
-        _ => TargetType.NOTarget
-    };
-
-    /// <summary>从逗号分隔字符串解析特性位掩码</summary>
-    private static UnitTraits GetTraitList(string s)
-    {
-        if (string.IsNullOrWhiteSpace(s)) return UnitTraits.None;
-        try
-        {
-            var list = s.Split(',').Select(x => (UnitTraits)Enum.Parse(typeof(UnitTraits), x.Trim()));
-            UnitTraits result = UnitTraits.None;
-            foreach (var t in list)
-                result |= t;
-            return result;
-        }
-        catch { return UnitTraits.None; }
     }
 
     public override void _Input(InputEvent @event)

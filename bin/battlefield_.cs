@@ -469,11 +469,11 @@ TextureButton buttonNextTurn;
                 card.Cost        = configFile[section.Key]["price"].ToInt();
                 card.IsHq        = (HQ)configFile[section.Key]["isHq"].ToInt();
                 card.Effect      = configFile[section.Key]["effect"].ToString().Trim();
-                card.CardType    = GetTypes(configFile[section.Key]["cardType"].ToString().Trim());
-                card.Rarity      = GetRarity(configFile[section.Key]["rarity"].ToString().Trim());
+                card.CardType    = CardParser.GetTypes(configFile[section.Key]["cardType"].ToString().Trim());
+                card.Rarity      = CardParser.GetRarity(configFile[section.Key]["rarity"].ToString().Trim());
                 card.IconPath    = configFile[section.Key]["icon"].ToString().Trim();
-                card.TargetType  = GetTargetType(configFile[section.Key]["targetType"].ToString().Trim());
-                card.Traits      = GetTraitList(configFile[section.Key]["traits"].ToString().Trim());
+                card.TargetType  = CardParser.GetTargetType(configFile[section.Key]["targetType"].ToString().Trim());
+                card.Traits      = CardParser.GetTraitList(configFile[section.Key]["traits"].ToString().Trim());
                 _items[card.Id] = card;
             }
             cardMaganer.SetCardDictionary(_items);
@@ -740,44 +740,6 @@ TextureButton buttonNextTurn;
     }
 
 
-    UnitTraits GetTraitList(string s)
-    {
-        try
-        {
-        var        tritList = s.Split(',').Select(x => (UnitTraits)Enum.Parse(typeof(UnitTraits), x.Trim())).ToList();
-        UnitTraits outTrait = UnitTraits.None;
-        foreach(var trait in tritList)
-        {
-            outTrait |= trait;
-        }
-        return outTrait;
-        }
-        catch(Exception e)
-        {
-            
-        }
-        return UnitTraits.None;
-        
-    }
-
-
-    /// <summary>
-    ///  将字符串转换为TargetType枚举值 如果转换失败则默认为anyTarget
-    /// </summary>
-    /// <param name="v"></param>
-    /// <returns></returns>
-    private TargetType GetTargetType(string v)
-    {
-        if (System.Enum.TryParse<TargetType>(v, ignoreCase: true, out var result))
-        {
-            return result;
-        }
-        GD.Print($"[GetTargetType] 解析失败: '{v}' -> 回退为 anyTarget");
-        return TargetType.anyTarget;
-    }
-
-
-
 
     async Task FlyBullets(cardBase_ from, cardBase_ to)
     {
@@ -811,28 +773,6 @@ TextureButton buttonNextTurn;
     }
 
 /// <summary>
-/// 稀有度->string
-/// </summary>
-/// <param name="rare"></param>
-/// <returns></returns>
-    public static Rarity GetRarity(string rare)
-    {
-        switch (rare.ToLower())
-        {
-            case "common":
-                return Rarity.Common;
-            case "rare":
-                return Rarity.Rare;
-            case "epic":
-                return Rarity.Epic;
-            case "unobtainable":
-                return Rarity.Unobtainable;
-            default:
-                return Rarity.Legendary;
-        }
-    }
-
-/// <summary>
 /// 播放战斗音效
 /// </summary>
 /// <param name="id"></param>
@@ -853,30 +793,6 @@ TextureButton buttonNextTurn;
         //if (deadSound.Playing != true)
         {
             deadSound.Play();
-        }
-    }
-
-/// <summary>
-/// 转换卡牌的类型 -> string
-/// </summary>
-/// <param name="type"></param>
-/// <returns></returns>
-    public static CardTypes GetTypes(string type)
-    {
-        switch (type)
-        {
-            case "Tank":
-                return CardTypes.Tank;
-            case "Artillery":
-                return CardTypes.Artillery;
-            case "Plane":
-                return CardTypes.Plane;
-            case "Bomber":
-                return CardTypes.Bomber;
-            case "Command":
-                return CardTypes.Command;
-            default:
-                return CardTypes.Infantry;
         }
     }
 
@@ -4377,7 +4293,7 @@ InputState currentInputState = InputState.nil;
                     {
                         string typeStr = match.Groups[1].Value.Trim();
                         int targetCost = int.Parse(match.Groups[2].Value.Trim());
-                        var cardType = GetTypes(typeStr);
+                        var cardType = CardParser.GetTypes(typeStr);
                         var allCards = GetCardMaganer().GetAllCards()
                             .Where(c => c.Rarity != Rarity.Unobtainable && c.CardType == cardType && c.IsHq != HQ.hq)
                             .ToList();
@@ -4500,7 +4416,7 @@ InputState currentInputState = InputState.nil;
                             .Where(x => x.getState() == CardState.placed
                                      && x.GetIsFriend() == IsFriend.friend
                                      && x.isHq != HQ.hq
-                                     && typeNames.Any(tn => GetTypes(tn) == x.cardType))
+                                     && typeNames.Any(tn => CardParser.GetTypes(tn) == x.cardType))
                             .ToList();
                         if (candidates.Count > 0)
                         {
