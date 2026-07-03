@@ -159,15 +159,20 @@ public partial class EventScene : CanvasLayer
         if (string.IsNullOrEmpty(effect) || effect == "none")
             return;
 
-        if (effect.StartsWith("replaceCard(") && effect.EndsWith(")"))
+        var segments = effect.Split(',');
+        foreach (var seg in segments)
         {
-            string cardId = effect["replaceCard(".Length..^1];
-            await DoReplaceCard(cardId, random: false);
-        }
-        else if (effect.StartsWith("replaceRandomCard(") && effect.EndsWith(")"))
-        {
-            string cardId = effect["replaceRandomCard(".Length..^1];
-            await DoReplaceCard(cardId, random: true);
+            var s = seg.Trim();
+            if (s.StartsWith("replaceCard(") && s.EndsWith(")"))
+            {
+                string cardId = s["replaceCard(".Length..^1];
+                await DoReplaceCard(cardId, random: false);
+            }
+            else if (s.StartsWith("replaceRandomCard(") && s.EndsWith(")"))
+            {
+                string cardId = s["replaceRandomCard(".Length..^1];
+                await DoReplaceCard(cardId, random: true);
+            }
         }
     }
 
