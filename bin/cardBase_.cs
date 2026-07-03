@@ -1132,18 +1132,18 @@ public partial class cardBase_ : Control
     {
         if (cardType == CardTypes.Command)
         {
-            if (!string.IsNullOrEmpty(IconPath))
+            if (FileAccess.FileExists(IconPath))
                 GetNode<Sprite2D>("icon").Texture = ResourceManager.Instance?.GetTexture(IconPath) ?? GD.Load<Texture2D>(IconPath);
             GetNode<Sprite2D>("cardbase").Texture = ResourceManager.Instance?.GetTexture("res://cards/卡背_command.png") ?? GD.Load<Texture2D>("res://cards/卡背_command.png");
         }
         else if(isHq != HQ.hq)
         {
-            if (!string.IsNullOrEmpty(IconPath))
+            if (FileAccess.FileExists(IconPath))
                 GetNode<Sprite2D>("icon").Texture = ResourceManager.Instance?.GetTexture(IconPath) ?? GD.Load<Texture2D>(IconPath);
         }
         else
         {
-            if (!string.IsNullOrEmpty(IconPath))
+            if (FileAccess.FileExists(IconPath))
                 GetNode<Sprite2D>("cardbase").Texture = ResourceManager.Instance?.GetTexture(IconPath) ?? GD.Load<Texture2D>(IconPath);
         }
         if (name != null)
