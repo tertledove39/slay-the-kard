@@ -16,6 +16,12 @@ public static class BattleStateManager
     public static string SelectedArea { get; set; } = "";
     // 是否处于战役模式
     public static bool IsCampaignMode { get; set; } = false;
+    public static int MaterialPoints { get; set; } = 0;
+    public static int LastBattleLandKilled { get; set; } = 0;
+    public static int LastBattleAirKilled { get; set; } = 0;
+    public static int LastBattleFriendlyDead { get; set; } = 0;
+    public static int LastBattleHqDefenceLost { get; set; } = 0;
+    public static int LastBattlePointsGained { get; set; } = 0;
     // 已完成的区域集合（跨场景持久）
     public static HashSet<string> CompletedAreas { get; private set; } = new();
 

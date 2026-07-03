@@ -40,6 +40,10 @@ public partial class WorldMap : Control
         ConnectAreaButtons();
         RefreshAreaStates();
 
+        var pointNum = GetNodeOrNull<Label>("pointNum");
+        if (pointNum != null)
+            pointNum.Text = BattleStateManager.MaterialPoints.ToString();
+
         // 预加载选择任务界面
         _chooseMissionScene = ResourceLoader.Load<PackedScene>("res://bin/chooseMission.tscn");
 

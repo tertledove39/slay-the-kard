@@ -63,8 +63,62 @@ public partial class End : CanvasLayer
         if (_tween != null) _tween.Kill();
 
         _tween = CreateTween();
-        // 目标 Alpha 为 0 (完全透明)
         _tween.TweenProperty(_overlay, "color", new Color(0, 0, 0, 0), duration);
     }
 
+    public void ShowSettlement(int landKilled, int airKilled, int friendlyDead, int hqDefenceLost, int pointsGained)
+    {
+        var viewSize = GetViewport().GetVisibleRect().Size;
+
+        var panel = new Control();
+        panel.SetAnchorsPreset(Control.LayoutPreset.Center);
+        panel.Position = new Vector2(viewSize.X / 2 - 200, 120);
+        panel.Size = new Vector2(400, 300);
+        panel.ZIndex = 200;
+        AddChild(panel);
+
+        var bg = new ColorRect();
+        bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        bg.Color = new Color(0.08f, 0.08f, 0.12f, 0.92f);
+        bg.MouseFilter = Control.MouseFilterEnum.Ignore;
+        panel.AddChild(bg);
+
+        var title = new Label();
+        title.Text = "战斗结算";
+        title.Position = new Vector2(0, 10);
+        title.Size = new Vector2(400, 40);
+        title.HorizontalAlignment = HorizontalAlignment.Center;
+        title.AddThemeFontSizeOverride("font_size", 28);
+        title.AddThemeColorOverride("font_color", Colors.Gold);
+        panel.AddChild(title);
+
+        int y = 60;
+        var lines = new[]
+        {
+            $"消灭敌方陆军 x{landKilled}    +{landKilled * 4}",
+            $"消灭敌方空军 x{airKilled}    +{airKilled * 5}",
+            $"己方单位损失 x{friendlyDead}    -{friendlyDead}",
+            $"总部防御损失 {hqDefenceLost}    -{hqDefenceLost / 3}",
+        };
+        foreach (var line in lines)
+        {
+            var lbl = new Label();
+            lbl.Text = line;
+            lbl.Position = new Vector2(30, y);
+            lbl.Size = new Vector2(340, 30);
+            lbl.AddThemeFontSizeOverride("font_size", 18);
+            lbl.AddThemeColorOverride("font_color", Colors.White);
+            panel.AddChild(lbl);
+            y += 35;
+        }
+
+        var totalLabel = new Label();
+        totalLabel.Text = $"获得物资点: {pointsGained}";
+        totalLabel.Position = new Vector2(30, y + 10);
+        totalLabel.Size = new Vector2(340, 40);
+        totalLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        totalLabel.AddThemeFontSizeOverride("font_size", 24);
+        totalLabel.AddThemeColorOverride("font_color", Colors.Gold);
+        panel.AddChild(totalLabel);
+    }
 }

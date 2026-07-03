@@ -81,6 +81,11 @@ public partial class battlefield_ : Control
     private List<cardBase_> cardInPlaces = new List<cardBase_>();
     public bool _displayOrderDirty = true;
     private VBoxContainer _enemyIntentContainer;
+    private int _battleEnemyLandKilled = 0;
+    private int _battleEnemyAirKilled = 0;
+    private int _battleFriendlyDead = 0;
+    private int _battleHqDefenceLost = 0;
+    private int _battleHqDefenceStart = 0;
 
     private CanvasLayer choiceLayer;
     private ColorRect choiceDim;
@@ -490,7 +495,7 @@ TextureButton buttonNextTurn;
         //初始化hq
         myHq = cardMaganer.LoadHq(1);
         AddCardToPlace(myHq,supportLine[2]);
-
+        _battleHqDefenceStart = myHq.ReadDefence();
 
         enemyHq = cardMaganer.LoadHq(2);
         AddCardToPlace(enemyHq,enemySupprotLine[2]);
@@ -3166,17 +3171,63 @@ InputState currentInputState = InputState.nil;
     {
         if(card.GetIsFriend()== IsFriend.enemy && card.isHq == HQ.hq)
         {
+            CalculateMaterialPoints();
             DarkenScreen();
-            // 战役模式：胜利后返回世界地图
+            var endNode = GetNodeOrNull<End>("end");
+            if (endNode != null)
+                endNode.ShowSettlement(
+                    BattleStateManager.LastBattleLandKilled,
+                    BattleStateManager.LastBattleAirKilled,
+                    BattleStateManager.LastBattleFriendlyDead,
+                    BattleStateManager.LastBattleHqDefenceLost,
+                    BattleStateManager.LastBattlePointsGained);
             if (BattleStateManager.IsCampaignMode)
             {
                 _ = ReturnToWorldMapAfterVictory();
             }
         }
+
+        if (card != null && card.isHq != HQ.hq)
+        {
+            if (card.GetIsFriend() == IsFriend.enemy)
+            {
+                if (card.cardType == CardTypes.Plane || card.cardType == CardTypes.Bomber)
+                    _battleEnemyAirKilled++;
+                else
+                    _battleEnemyLandKilled++;
+            }
+            else if (card.GetIsFriend() == IsFriend.friend)
+            {
+                _battleFriendlyDead++;
+            }
+        }
+
         cardInPlaces.Remove(card);
         card.Dead();
         RefreshAllBeGuardianedStatus();
         _displayOrderDirty = true;
+    }
+
+    private void CalculateMaterialPoints()
+    {
+        int hqCurrentDef = myHq != null ? myHq.ReadDefence() : 0;
+        int hqLost = _battleHqDefenceStart - hqCurrentDef;
+        if (hqLost < 0) hqLost = 0;
+
+        int gained = _battleEnemyLandKilled * 4
+                   + _battleEnemyAirKilled * 5
+                   - _battleFriendlyDead
+                   - hqLost / 3;
+        if (gained < 0) gained = 0;
+
+        BattleStateManager.MaterialPoints += gained;
+        BattleStateManager.LastBattleLandKilled = _battleEnemyLandKilled;
+        BattleStateManager.LastBattleAirKilled = _battleEnemyAirKilled;
+        BattleStateManager.LastBattleFriendlyDead = _battleFriendlyDead;
+        BattleStateManager.LastBattleHqDefenceLost = hqLost;
+        BattleStateManager.LastBattlePointsGained = gained;
+
+        GD.Print($"[MaterialPoints] land={_battleEnemyLandKilled} air={_battleEnemyAirKilled} dead={_battleFriendlyDead} hqLost={hqLost} gained={gained} total={BattleStateManager.MaterialPoints}");
     }
 
     /// <summary>
