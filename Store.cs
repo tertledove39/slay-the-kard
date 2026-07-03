@@ -1,14 +1,13 @@
 using Godot;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 public partial class Store : Control
 {
     private cardBase_[] _cards = new cardBase_[7];
     private Label[] _priceLabels = new Label[7];
     private bool _awaitingDeckSelect;
+    private Control _deckOverlay;
     private static readonly Color ColorCantAfford = new(1.0f, 0.27f, 0.0f);
     private static readonly Color ColorDiscount = new(0.2f, 0.5f, 1.0f);
     private const int RefreshCost = 5;
@@ -115,26 +114,28 @@ public partial class Store : Control
         UpdateMaterialPointsLabel();
         if (_cards[index] != null) _cards[index].Modulate = new Color(0.3f, 0.3f, 0.3f, 0.5f);
         var cardData = BattleStateManager.GetCachedCard(slot.CardId);
-        if (cardData != null) { _awaitingDeckSelect = true; _ = ShowDeckSelection(cardData); }
+        if (cardData != null) { _awaitingDeckSelect = true; ShowDeckSelection(cardData); }
     }
 
-    private async Task ShowDeckSelection(CardData purchasedCard)
+    private void ShowDeckSelection(CardData purchasedCard)
     {
-        var tcs = new TaskCompletionSource<int>();
-        var overlay = BuildDeckOverlay(purchasedCard.Name, tcs);
-        AddChild(overlay);
-        int selected = await tcs.Task;
-        if (selected >= 0 && selected < BattleStateManager.DeckCardIds.Count)
+        _deckOverlay = BuildDeckOverlay(purchasedCard, (selected) =>
         {
-            var oldId = BattleStateManager.DeckCardIds[selected];
-            BattleStateManager.DeckCardIds[selected] = purchasedCard.Id;
-            GD.Print($"[Store] 替换卡组第{selected}张: {oldId} -> {purchasedCard.Id}");
-        }
-        overlay.QueueFree();
-        _awaitingDeckSelect = false;
+            if (selected >= 0 && selected < BattleStateManager.DeckCardIds.Count)
+            {
+                var oldId = BattleStateManager.DeckCardIds[selected];
+                BattleStateManager.DeckCardIds[selected] = purchasedCard.Id;
+                GD.Print($"[Store] 替换卡组第{selected}张: {oldId} -> {purchasedCard.Id}");
+            }
+            if (_deckOverlay != null) _deckOverlay.QueueFree();
+            _deckOverlay = null;
+            _awaitingDeckSelect = false;
+        });
+        AddChild(_deckOverlay);
+        GD.Print($"[Store] 卡组选择界面已显示");
     }
 
-    private Control BuildDeckOverlay(string cardName, TaskCompletionSource<int> tcs)
+    private Control BuildDeckOverlay(CardData purchasedCard, Action<int> onSelect)
     {
         var overlay = new Control();
         overlay.SetAnchorsPreset(Control.LayoutPreset.FullRect);
@@ -146,25 +147,25 @@ public partial class Store : Control
         overlay.AddChild(bg);
         var vs = GetViewport().GetVisibleRect().Size;
         var title = new Label();
-        title.Text = $"选择一张卡替换为 {cardName}";
+        title.Text = $"选择一张卡替换为 {purchasedCard.Name}";
         title.Position = new Vector2(vs.X / 2 - 300, 20);
         title.Size = new Vector2(600, 40);
         title.HorizontalAlignment = HorizontalAlignment.Center;
         title.AddThemeFontSizeOverride("font_size", 24);
         title.AddThemeColorOverride("font_color", Colors.Gold);
         overlay.AddChild(title);
-        BuildDeckGrid(overlay, tcs, vs);
+        BuildDeckGrid(overlay, onSelect, vs);
         var cancelBtn = new Button();
         cancelBtn.Text = "取消";
         cancelBtn.Position = new Vector2(vs.X / 2 - 50, vs.Y - 60);
         cancelBtn.Size = new Vector2(100, 44);
         cancelBtn.ZIndex = 60;
-        cancelBtn.Pressed += () => { if (!tcs.Task.IsCompleted) tcs.SetResult(-1); };
+        cancelBtn.Pressed += () => onSelect(-1);
         overlay.AddChild(cancelBtn);
         return overlay;
     }
 
-    private void BuildDeckGrid(Control parent, TaskCompletionSource<int> tcs, Vector2 vs)
+    private void BuildDeckGrid(Control parent, Action<int> onSelect, Vector2 vs)
     {
         var deckIds = BattleStateManager.DeckCardIds;
         if (deckIds == null || deckIds.Count == 0) return;
@@ -210,7 +211,7 @@ public partial class Store : Control
             click.GuiInput += (e) =>
             {
                 if (e is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
-                    if (!tcs.Task.IsCompleted) tcs.SetResult(idx);
+                    onSelect(idx);
             };
             container.AddChild(click);
         }
