@@ -160,19 +160,48 @@ public partial class EventScene : CanvasLayer
             return;
 
         var segments = effect.Split(',');
+        var replaceCardIds = new List<string>();
+        var randomReplaceCardIds = new List<string>();
+
         foreach (var seg in segments)
         {
             var s = seg.Trim();
             if (s.StartsWith("replaceCard(") && s.EndsWith(")"))
             {
                 string cardId = s["replaceCard(".Length..^1];
-                await DoReplaceCard(cardId, random: false);
+                replaceCardIds.Add(cardId);
             }
             else if (s.StartsWith("replaceRandomCard(") && s.EndsWith(")"))
             {
                 string cardId = s["replaceRandomCard(".Length..^1];
-                await DoReplaceCard(cardId, random: true);
+                randomReplaceCardIds.Add(cardId);
             }
+        }
+
+        if (replaceCardIds.Count > 0)
+        {
+            var chosenOldIds = await ShowDeckPickUI(replaceCardIds.Count);
+            for (int i = 0; i < chosenOldIds.Count && i < replaceCardIds.Count; i++)
+            {
+                if (!string.IsNullOrEmpty(chosenOldIds[i]))
+                    ReplaceCardInDeck(chosenOldIds[i], replaceCardIds[i]);
+            }
+        }
+
+        foreach (var newCardId in randomReplaceCardIds)
+        {
+            await DoReplaceCard(newCardId, random: true);
+        }
+    }
+
+    private void ReplaceCardInDeck(string oldCardId, string newCardId)
+    {
+        var deckIds = BattleStateManager.DeckCardIds;
+        int idx = deckIds.IndexOf(oldCardId);
+        if (idx >= 0)
+        {
+            deckIds[idx] = newCardId;
+            GD.Print($"[EventScene] 卡牌替换: {oldCardId} -> {newCardId}");
         }
     }
 
@@ -194,28 +223,26 @@ public partial class EventScene : CanvasLayer
         }
         else
         {
-            oldCardId = await ShowDeckPickUI();
+            var chosen = await ShowDeckPickUI(1);
+            oldCardId = chosen.Count > 0 ? chosen[0] : null;
             if (string.IsNullOrEmpty(oldCardId)) return;
         }
 
-        int idx = deckIds.IndexOf(oldCardId);
-        if (idx >= 0)
-        {
-            deckIds[idx] = newCardId;
-            GD.Print($"[EventScene] 卡牌替换: {oldCardId} → {newCardId}");
-        }
+        ReplaceCardInDeck(oldCardId, newCardId);
     }
 
     /// <summary>
     /// 显示牌组选择界面，让玩家挑选一张要替换的卡
     /// </summary>
-    private async Task<string> ShowDeckPickUI()
+    private async Task<List<string>> ShowDeckPickUI(int pickCount = 1)
     {
-        // 清除事件UI
         foreach (var child in GetChildren())
             child.QueueFree();
 
-        var tcs = new TaskCompletionSource<string>();
+        var tcs = new TaskCompletionSource<List<string>>();
+        var chosenIds = new List<string>();
+        var selectedIndices = new HashSet<int>();
+
         var bg = new ColorRect();
         bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         bg.Color = new Color(0, 0, 0, 0.75f);
@@ -224,13 +251,22 @@ public partial class EventScene : CanvasLayer
 
         var viewSize = GetViewport().GetVisibleRect().Size;
         var title = new Label();
-        title.Text = "选择一张要替换的卡牌";
+        title.Text = pickCount > 1 ? $"选择{pickCount}张要替换的卡牌" : "选择一张要替换的卡牌";
         title.Position = new Vector2(viewSize.X / 2 - 200, 20);
         title.Size = new Vector2(400, 40);
         title.HorizontalAlignment = HorizontalAlignment.Center;
         title.AddThemeFontSizeOverride("font_size", 24);
         title.AddThemeColorOverride("font_color", Colors.Gold);
         AddChild(title);
+
+        var countLabel = new Label();
+        countLabel.Text = $"已选: 0/{pickCount}";
+        countLabel.Position = new Vector2(viewSize.X / 2 - 100, 55);
+        countLabel.Size = new Vector2(200, 30);
+        countLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        countLabel.AddThemeFontSizeOverride("font_size", 18);
+        countLabel.AddThemeColorOverride("font_color", Colors.White);
+        AddChild(countLabel);
 
         float cardW = CardWidth * DeckReplaceScale;
         float cardH = CardHeight * DeckReplaceScale;
@@ -252,7 +288,7 @@ public partial class EventScene : CanvasLayer
         scrollContainer.AddChild(cardContainer);
 
         var cardScene = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
-        var chosenId = new List<string> { null };
+        var highlights = new ColorRect[deckIds.Count];
 
         for (int i = 0; i < deckIds.Count; i++)
         {
@@ -273,7 +309,6 @@ public partial class EventScene : CanvasLayer
             card.MouseFilter = Control.MouseFilterEnum.Ignore;
             card.ZIndex = 10;
 
-            // 高亮框外扩3px
             float pfX = CardWidth / 2f * (1f - DeckReplaceScale);
             float pfY = CardHeight / 2f * (1f - DeckReplaceScale);
             var hl = new ColorRect();
@@ -283,6 +318,7 @@ public partial class EventScene : CanvasLayer
             hl.MouseFilter = Control.MouseFilterEnum.Ignore;
             hl.ZIndex = 9;
             cardContainer.AddChild(hl);
+            highlights[i] = hl;
 
             var click = new ColorRect();
             click.Position = new Vector2(x + pfX, y + pfY);
@@ -295,20 +331,42 @@ public partial class EventScene : CanvasLayer
             {
                 if (e is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
                 {
-                    chosenId[0] = deckIds[idx];
-                    tcs.TrySetResult(deckIds[idx]);
+                    if (selectedIndices.Contains(idx))
+                    {
+                        selectedIndices.Remove(idx);
+                        highlights[idx].Color = new Color(0, 0, 0, 0);
+                    }
+                    else if (selectedIndices.Count < pickCount)
+                    {
+                        selectedIndices.Add(idx);
+                        highlights[idx].Color = new Color(1, 0.84f, 0, 0.5f);
+                    }
+                    countLabel.Text = $"已选: {selectedIndices.Count}/{pickCount}";
                 }
             };
             cardContainer.AddChild(click);
         }
 
-        // 取消按钮
+        var confirmBtn = new Button();
+        confirmBtn.Text = "确认";
+        confirmBtn.Position = new Vector2(viewSize.X / 2 + 10, viewSize.Y - 50);
+        confirmBtn.Size = new Vector2(100, 36);
+        confirmBtn.ZIndex = 60;
+        confirmBtn.Pressed += () =>
+        {
+            var result = new List<string>();
+            foreach (var idx in selectedIndices)
+                result.Add(deckIds[idx]);
+            tcs.TrySetResult(result);
+        };
+        AddChild(confirmBtn);
+
         var cancelBtn = new Button();
         cancelBtn.Text = "取消";
-        cancelBtn.Position = new Vector2(viewSize.X / 2 - 50, viewSize.Y - 50);
+        cancelBtn.Position = new Vector2(viewSize.X / 2 - 110, viewSize.Y - 50);
         cancelBtn.Size = new Vector2(100, 36);
         cancelBtn.ZIndex = 60;
-        cancelBtn.Pressed += () => tcs.TrySetResult(null);
+        cancelBtn.Pressed += () => tcs.TrySetResult(new List<string>());
         AddChild(cancelBtn);
 
         return await tcs.Task;
