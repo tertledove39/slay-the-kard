@@ -50,6 +50,9 @@ public partial class WorldMap : Control
         // 后台预加载大型场景（非阻塞），让玩家浏览地图时在后台完成加载
         SceneLoader.BeginPreload("res://bin/battleField.tscn");
         SceneLoader.BeginPreload("res://bin/worldMap.tscn");
+        SceneLoader.BeginPreload("res://store.tscn");
+
+        BattleStateManager.EnsureStoreCardQueue(14);
 
         // 右上角"查看卡组"按钮
         var viewSize = GetViewportRect().Size;
@@ -467,5 +470,17 @@ public partial class WorldMap : Control
             _consoleInput.Text = commonPrefix;
         }
         _consoleInput.CaretColumn = _consoleInput.Text.Length;
+    }
+
+    void _on_store_pressed()
+    {
+        var storeScene = ResourceLoader.Load<PackedScene>("res://store.tscn");
+        var store = storeScene.Instantiate() as Store;
+        if (store == null) return;
+
+        var canvasLayer = new CanvasLayer();
+        canvasLayer.Layer = 10;
+        AddChild(canvasLayer);
+        canvasLayer.AddChild(store);
     }
 }

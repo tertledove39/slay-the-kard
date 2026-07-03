@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
@@ -140,6 +141,116 @@ public static class BattleStateManager
     {
         foreach (var area in AreaOrder)
             CompletedAreas.Add(area);
+    }
+
+    // ============================ 商店数据 ============================
+
+    public class StoreSlot
+    {
+        public string CardId;
+        public int OriginalPrice;
+        public bool IsDiscounted;
+        public bool IsSold;
+        public int EffectivePrice => IsDiscounted ? OriginalPrice / 2 : OriginalPrice;
+    }
+
+    public static Queue<string> StoreCardQueue { get; set; } = new();
+    public static List<StoreSlot> StoreCurrentSlots { get; set; }
+
+    private static readonly (Rarity rarity, double weight)[] StoreRarityWeights = new[]
+    {
+        (Rarity.Common, 0.4),
+        (Rarity.Rare, 0.3),
+        (Rarity.Epic, 0.2),
+        (Rarity.Legendary, 0.1),
+    };
+
+    private static readonly Dictionary<Rarity, (int basePrice, int variance)> StorePriceTable = new()
+    {
+        { Rarity.Common, (5, 2) },
+        { Rarity.Rare, (10, 3) },
+        { Rarity.Epic, (20, 4) },
+        { Rarity.Legendary, (30, 5) },
+    };
+
+    public static void GenerateStoreCardBatch(int count)
+    {
+        var rnd = new Random();
+        var allCards = GetAllCachedCards()?.Values
+            .Where(c => c.IsHq == HQ.normalCard && c.Rarity != Rarity.Unobtainable)
+            .ToList();
+        if (allCards == null || allCards.Count == 0) return;
+
+        var byRarity = allCards.GroupBy(c => c.Rarity)
+            .ToDictionary(g => g.Key, g => g.Select(c => c.Id).ToList());
+
+        for (int i = 0; i < count; i++)
+        {
+            var rarity = PickStoreRarity(rnd);
+            if (byRarity.TryGetValue(rarity, out var pool) && pool.Count > 0)
+                StoreCardQueue.Enqueue(pool[rnd.Next(pool.Count)]);
+            else
+                StoreCardQueue.Enqueue(allCards[rnd.Next(allCards.Count)].Id);
+        }
+    }
+
+    private static Rarity PickStoreRarity(Random rnd)
+    {
+        double roll = rnd.NextDouble();
+        double cumulative = 0;
+        foreach (var (rarity, weight) in StoreRarityWeights)
+        {
+            cumulative += weight;
+            if (roll <= cumulative) return rarity;
+        }
+        return Rarity.Common;
+    }
+
+    public static void EnsureStoreCardQueue(int minCount)
+    {
+        while (StoreCardQueue.Count < minCount)
+            GenerateStoreCardBatch(100);
+    }
+
+    public static void InitializeStoreSlots()
+    {
+        EnsureStoreCardQueue(14);
+        var rnd = new Random();
+        var slots = new List<StoreSlot>();
+
+        for (int i = 0; i < 7; i++)
+        {
+            if (StoreCardQueue.Count == 0) break;
+            var cardId = StoreCardQueue.Dequeue();
+            var cardData = GetCachedCard(cardId);
+            if (cardData == null) continue;
+
+            var (basePrice, variance) = StorePriceTable.GetValueOrDefault(cardData.Rarity, (5, 2));
+            int price = basePrice + rnd.Next(-variance, variance + 1);
+            if (price < 1) price = 1;
+
+            slots.Add(new StoreSlot
+            {
+                CardId = cardId,
+                OriginalPrice = price,
+                IsDiscounted = false,
+                IsSold = false,
+            });
+        }
+
+        double discountRoll = rnd.NextDouble();
+        int discountCount = discountRoll < 0.5 ? 1 : (discountRoll < 0.75 ? 2 : 0);
+
+        var indices = Enumerable.Range(0, slots.Count).OrderBy(_ => rnd.Next()).ToList();
+        for (int i = 0; i < discountCount && i < indices.Count; i++)
+            slots[indices[i]].IsDiscounted = true;
+
+        StoreCurrentSlots = slots;
+    }
+
+    public static void RefreshStoreSlots()
+    {
+        InitializeStoreSlots();
     }
 
     // ============================ UI辅助 ============================
