@@ -88,6 +88,7 @@ public partial class WorldMap : Control
             cd.Effect = configFile[section.Key]["effect"].GetString();
             cd.IsHq = (HQ)configFile[section.Key]["isHq"].ToInt();
             cd.Rarity = CardParser.GetRarity(configFile[section.Key]["rarity"].GetString());
+            cd.IconPath = configFile[section.Key]["icon"].GetString();
             cd.CardType = CardParser.GetTypes(configFile[section.Key]["cardType"].GetString());
             cd.TargetType = CardParser.GetTargetType(configFile[section.Key]["targetType"].GetString());
             cd.Traits = CardParser.GetTraitList(configFile[section.Key]["traits"].GetString());
