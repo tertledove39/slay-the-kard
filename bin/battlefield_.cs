@@ -1388,16 +1388,10 @@ InputState currentInputState = InputState.nil;
 
     public override void _Process(double delta)
     {
-        if (_displayOrderDirty)
-        {
-            RefreshAllCardDisplayOrder();
-            _displayOrderDirty = false;
-        }
-
-        // 悬停时手牌浮起并让开（仅对友方手牌生效）
+        // 必须先 UpdateHover 再 RefreshAllCardDisplayOrder
+        // 否则 SetHover(false) 的 ZIndex=10 不会被纠正为 20，导致1帧闪烁
         if (player1 != null)
         {
-            // 拖动时不更新悬停状态，以免与拖动位置冲突
             if (cardNowChoose == null || cardNowChoose.getState() != CardState.caught)
             {
                 player1.UpdateHover(GetGlobalMousePosition());
@@ -1408,7 +1402,12 @@ InputState currentInputState = InputState.nil;
             }
         }
 
-        // 跟踪卡牌拖动
+        if (_displayOrderDirty)
+        {
+            RefreshAllCardDisplayOrder();
+            _displayOrderDirty = false;
+        }
+
         if (Input.IsMouseButtonPressed(MouseButton.Left) && cardNowChoose != null && cardNowChoose.getState() == CardState.caught )
         {
             cardNowChoose.SetGlobalPosition(GetGlobalMousePosition() + offset);
