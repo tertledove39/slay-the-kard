@@ -108,13 +108,32 @@ public partial class Store : Control
     {
         var slot = BattleStateManager.StoreCurrentSlots[index];
         int price = slot.EffectivePrice;
-        if (BattleStateManager.MaterialPoints < price) return;
+        if (BattleStateManager.MaterialPoints < price)
+        {
+            GD.Print($"[Store] 物资点不足: {BattleStateManager.MaterialPoints} < {price} ({slot.CardId})");
+            FlashLabel(index);
+            return;
+        }
         BattleStateManager.MaterialPoints -= price;
         slot.IsSold = true;
         UpdateMaterialPointsLabel();
         if (_cards[index] != null) _cards[index].Modulate = new Color(0.3f, 0.3f, 0.3f, 0.5f);
         var cardData = BattleStateManager.GetCachedCard(slot.CardId);
-        if (cardData != null) { _awaitingDeckSelect = true; ShowDeckSelection(cardData); }
+        if (cardData == null)
+        {
+            GD.PrintErr($"[Store] 卡牌数据未找到: {slot.CardId}");
+            return;
+        }
+        _awaitingDeckSelect = true;
+        ShowDeckSelection(cardData);
+    }
+
+    private void FlashLabel(int index)
+    {
+        if (_priceLabels[index] == null) return;
+        var tween = CreateTween();
+        tween.TweenProperty(_priceLabels[index], "modulate", ColorCantAfford, 0.1);
+        tween.TweenProperty(_priceLabels[index], "modulate", Colors.White, 0.3);
     }
 
     private void ShowDeckSelection(CardData purchasedCard)
