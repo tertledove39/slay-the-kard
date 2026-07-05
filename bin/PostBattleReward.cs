@@ -12,16 +12,13 @@ public partial class PostBattleReward : CanvasLayer
     private battlefield_ _bf;
     private Player _player;
     private List<CardData> _chosenGroup;
-    private readonly HashSet<cardBase_> _selectedToRemove = new();
 
     private const float CardDisplayScale = 0.75f; // 奖励组选择界面卡牌缩放
     private const float CardDisplayWidth = 180f;
     private const float CardDisplayHeight = 240f;
-    private const float DeckReplaceScale = 0.75f;  // 替换界面卡牌缩放（与组选择一致）
     private const int GroupsCount = 3;
     private const int CardsPerGroup = 5;
     private const int MaxSwapCards = 5;
-    private const float HighlightBorderMargin = 3f; // 高亮框比卡牌多出的边框宽度
 
     // 每种稀有度在牌组中的最大拥有数量（按卡牌ID计）
     private static readonly Dictionary<Rarity, int> RarityMaxCopies = new()
@@ -63,12 +60,12 @@ public partial class PostBattleReward : CanvasLayer
             return; // 玩家跳过
 
         // 步骤3: 显示卡组替换界面
-        var cardsToRemove = await ShowDeckReplaceUI();
-        if (cardsToRemove == null || cardsToRemove.Count != MaxSwapCards)
+        var idsToRemove = await ChooseSomeCard.Show(this, MaxSwapCards, $"选择{MaxSwapCards}张要替换的卡牌");
+        if (idsToRemove == null || idsToRemove.Count == 0)
             return; // 取消
 
         // 步骤4: 执行替换
-        PerformDeckSwap(cardsToRemove);
+        PerformDeckSwap(idsToRemove);
     }
 
     // ============================ 卡牌生成 ============================
@@ -286,221 +283,30 @@ public partial class PostBattleReward : CanvasLayer
         return result;
     }
 
-    // ============================ 卡组替换界面 ============================
-
-    /// <summary>
-    /// 显示玩家卡组（可滚动），选择最多5张卡牌替换。
-    /// 卡牌按费用→名称→攻击力排序（与牌库展示一致）。
-    /// 使用透明ColorRect覆盖层处理点击，避免卡牌内部子控件拦截事件。
-    /// </summary>
-    private async Task<List<cardBase_>> ShowDeckReplaceUI()
-    {
-        // 清除旧UI
-        foreach (var child in GetChildren())
-            child.QueueFree();
-        _selectedToRemove.Clear();
-
-        var tcs = new TaskCompletionSource<List<cardBase_>>();
-
-        var bg = DarkBackground();
-        AddChild(bg);
-
-        // 标题与计数
-        var viewSize = GetViewport().GetVisibleRect().Size;
-        var title = MakeLabel($"选择{MaxSwapCards}张要替换的卡牌", 26, Colors.Gold);
-        title.Position = new Vector2(viewSize.X / 2 - 250, 20);
-        title.Size = new Vector2(500, 40);
-        AddChild(title);
-
-        var countLabel = MakeLabel($"已选: 0/{MaxSwapCards}", 20, Colors.White);
-        countLabel.Position = new Vector2(viewSize.X / 2 - 100, 58);
-        countLabel.Size = new Vector2(200, 30);
-        AddChild(countLabel);
-
-        // 排序牌库：费用→名称→攻击力降序（与DisplayCard一致）
-        var deck = _player.ReadMyDeck();
-        var sortedDeck = deck
-            .OrderBy(c => c.ReadCost())
-            .ThenBy(c => c.name)
-            .ThenByDescending(c => c.ReadAttack())
-            .ToList();
-
-        // 网格布局参数
-        float cardW = CardDisplayWidth * DeckReplaceScale;
-        float cardH = CardDisplayHeight * DeckReplaceScale;
-        float cardGapX = 8f;
-        float cardGapY = 4f;
-        const int cols = 7;
-        int rows = (sortedDeck.Count + cols - 1) / cols;
-        float gridContentW = cols * cardW + (cols - 1) * cardGapX; // 网格实际宽度，用于居中
-        float gridStartX = (viewSize.X - gridContentW) / 2;
-        float gridContentH = rows * cardH + (rows - 1) * cardGapY + 20; // 内容总高度（含上下边距）
-
-        // 滚动容器区域：从标题下方到底部按钮上方
-        float scrollTop = 90;
-        float scrollBottomPad = 70;
-        var scrollContainer = new ScrollContainer();
-        scrollContainer.Position = new Vector2(0, scrollTop);
-        scrollContainer.Size = new Vector2(viewSize.X, viewSize.Y - scrollTop - scrollBottomPad);
-        scrollContainer.HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled;
-        scrollContainer.FollowFocus = true;
-        AddChild(scrollContainer);
-
-        // 内容容器
-        var cardContainer = new Control();
-        cardContainer.CustomMinimumSize = new Vector2(viewSize.X, Mathf.Max(gridContentH, scrollContainer.Size.Y));
-        scrollContainer.AddChild(cardContainer);
-
-        // 创建卡牌显示、高亮框和透明点击覆盖层
-        var cardDisplays = new List<cardBase_>();
-        var highlightRects = new List<ColorRect>();
-
-        for (int i = 0; i < sortedDeck.Count; i++)
-        {
-            var deckCard = sortedDeck[i];
-            int col = i % cols;
-            int row = i / cols;
-
-            float x = gridStartX + col * (cardW + cardGapX);
-            float y = 10 + row * (cardH + cardGapY);
-
-            // 先重置模板锚点→入树→再设置信息，确保渲染位置与高亮框对齐
-            var card = _bf.GetCardMaganer().GetCardTemplate().Duplicate() as cardBase_;
-            card.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
-            card.Size = new Vector2(CardDisplayWidth, CardDisplayHeight);
-            cardContainer.AddChild(card); // 先入树，originalScale记录为1.0
-
-            var cd = _bf.GetCardMaganer().GetCard(deckCard.id);
-            if (cd != null)
-                card.SetCardInformation(cd); // SetCardInformation内部已调用RefreshState
-            else
-                card.SetCardInformation(new CardData
-                {
-                    Name = deckCard.name, Id = deckCard.id,
-                    Attack = deckCard.ReadAttack(), Defense = deckCard.ReadDefence(),
-                    Cost = deckCard.ReadCost(), CardType = deckCard.cardType,
-                    Rarity = deckCard.rarity, IconPath = deckCard.IconPath,
-                    Description = deckCard.description, Effect = deckCard.effect,
-                    Traits = deckCard.traits, TargetType = deckCard.targetType,
-                    IsHq = deckCard.isHq
-                });
-            card.SetIsFriend(IsFriend.friend);
-            card.Scale = new Vector2(DeckReplaceScale, DeckReplaceScale);
-            card.Position = new Vector2(x, y);
-            card.MouseFilter = Control.MouseFilterEnum.Ignore;
-            card.ZIndex = 10;
-            cardDisplays.Add(card);
-
-            // 因卡牌pivot在中心(90,120)，缩放后视觉左上角偏移，高亮框/点击覆盖需同步偏移
-            Vector2 cvOff = GetCardPivotOffset(DeckReplaceScale);
-
-            // 高亮框比卡牌大一圈（边框外扩），置于卡牌下方避免遮挡但边缘可见
-            var highlight = new ColorRect();
-            var hlPos = new Vector2(x, y) + cvOff;
-            var hlSize = new Vector2(cardW, cardH) + new Vector2(HighlightBorderMargin * 2, HighlightBorderMargin * 2);
-            highlight.Position = hlPos - new Vector2(HighlightBorderMargin, HighlightBorderMargin);
-            highlight.Size = hlSize;
-            highlight.Color = new Color(0, 0, 0, 0);
-            highlight.MouseFilter = Control.MouseFilterEnum.Ignore;
-            highlight.ZIndex = 9;
-            cardContainer.AddChild(highlight);
-            highlightRects.Add(highlight);
-
-            // 透明点击覆盖层（位置需加上pivot偏移以对齐卡牌视觉位置）
-            var clickArea = new ColorRect();
-            clickArea.Position = new Vector2(x, y) + cvOff;
-            clickArea.Size = new Vector2(cardW, cardH);
-            clickArea.Color = new Color(0, 0, 0, 0);
-            clickArea.MouseFilter = Control.MouseFilterEnum.Stop;
-            clickArea.ZIndex = 20;
-            int idx = i;
-            clickArea.GuiInput += (e) =>
-            {
-                if (e is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
-                    ToggleCardSelection(sortedDeck[idx], highlightRects[idx], countLabel);
-            };
-            cardContainer.AddChild(clickArea);
-        }
-
-        // 确认按钮（固定在PostBattleReward中，不随滚动移动）
-        var confirmBtn = new Button();
-        confirmBtn.Text = $"确认替换（需选{MaxSwapCards}张）";
-        confirmBtn.Position = new Vector2(viewSize.X / 2 - 90, viewSize.Y - 60);
-        confirmBtn.Size = new Vector2(180, 44);
-        confirmBtn.Disabled = true;
-        confirmBtn.ZIndex = 60;
-        AddChild(confirmBtn);
-
-        confirmBtn.Pressed += () =>
-        {
-            if (_selectedToRemove.Count == MaxSwapCards && !tcs.Task.IsCompleted)
-                tcs.SetResult(_selectedToRemove.ToList());
-        };
-
-        // 每帧更新按钮状态
-        while (!tcs.Task.IsCompleted)
-        {
-            confirmBtn.Disabled = _selectedToRemove.Count != MaxSwapCards;
-            confirmBtn.Text = $"确认替换（已选{_selectedToRemove.Count}/{MaxSwapCards}）";
-            await Task.Delay(100);
-        }
-
-        return await tcs.Task;
-    }
-
-    private void ToggleCardSelection(cardBase_ card, ColorRect highlight, Label countLabel)
-    {
-        if (_selectedToRemove.Contains(card))
-        {
-            _selectedToRemove.Remove(card);
-            highlight.Color = new Color(0, 0, 0, 0);
-        }
-        else if (_selectedToRemove.Count < MaxSwapCards)
-        {
-            _selectedToRemove.Add(card);
-            highlight.Color = new Color(1f, 0.84f, 0, 0.4f);
-        }
-        countLabel.Text = $"已选: {_selectedToRemove.Count}/{MaxSwapCards}";
-    }
-
     // ============================ 卡组替换执行 ============================
 
-    private void PerformDeckSwap(List<cardBase_> cardsToRemove)
+    private void PerformDeckSwap(List<string> idsToRemove)
     {
         var deck = _player.ReadMyDeck();
-
-        foreach (var card in cardsToRemove)
+        var toRemove = deck.Where(c => idsToRemove.Contains(c.id)).ToList();
+        foreach (var card in toRemove)
             deck.Remove(card);
 
         foreach (var cardData in _chosenGroup)
         {
             var newCard = _bf.GetCardMaganer().GetCardTemplate().Duplicate() as cardBase_;
-            newCard.SetAnchorsPreset(Control.LayoutPreset.TopLeft); // 重置模板锚点
+            newCard.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
             newCard.Size = new Vector2(CardDisplayWidth, CardDisplayHeight);
             newCard.SetCardInformation(cardData);
             newCard.SetIsFriend(IsFriend.friend);
             deck.Add(newCard);
         }
 
-        // 同步持久化卡组ID列表：移除被替换的卡，加入新卡
-        var toRemoveIds = cardsToRemove.Select(c => c.id).ToList();
-        foreach (var id in toRemoveIds)
+        foreach (var id in idsToRemove)
             BattleStateManager.DeckCardIds.Remove(id);
         foreach (var cardData in _chosenGroup)
             BattleStateManager.DeckCardIds.Add(cardData.Id);
-        GD.Print($"[PostBattleReward] DeckCardIds已更新，当前{ BattleStateManager.DeckCardIds.Count}张卡");
-    }
-
-    /// <summary>
-    /// 卡牌pivot位于中心(90,120)，缩放后视觉左上角偏移 = pivot * (1 - Scale)。
-    /// 高亮框/点击覆盖层需加上此偏移才能与卡牌视觉位置对齐。
-    /// 参考battlefield_中 arrowOffset = Vector2(90, 120) 的偏移设计。
-    /// </summary>
-    private static Vector2 GetCardPivotOffset(float scale)
-    {
-        float pivotX = CardDisplayWidth / 2f;
-        float pivotY = CardDisplayHeight / 2f;
-        return new Vector2(pivotX * (1f - scale), pivotY * (1f - scale));
+        GD.Print($"[PostBattleReward] DeckCardIds已更新，当前{BattleStateManager.DeckCardIds.Count}张卡");
     }
 
     // ============================ UI辅助 ============================

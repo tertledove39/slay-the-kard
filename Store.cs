@@ -1,21 +1,17 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 public partial class Store : Control
 {
     private cardBase_[] _cards = new cardBase_[7];
     private Label[] _priceLabels = new Label[7];
     private bool _awaitingDeckSelect;
-    private Control _deckOverlay;
     private static readonly Color ColorCantAfford = new(1.0f, 0.27f, 0.0f);
     private static readonly Color ColorDiscount = new(0.2f, 0.5f, 1.0f);
     private const int RefreshCost = 5;
     private const int StoreCardCount = 7;
-    private const float CardWidth = 180f;
-    private const float CardHeight = 240f;
-    private const float DeckScale = 0.75f;
-    private const string CardScenePath = "res://bin/cardbase.tscn";
     private static readonly string[] CardNodeNames = { "card1", "card2", "card3", "card4", "card5", "card6", "card7" };
 
     public override void _Ready()
@@ -125,7 +121,25 @@ public partial class Store : Control
             return;
         }
         _awaitingDeckSelect = true;
-        ShowDeckSelection(cardData);
+        _ = DoBuyCard(cardData);
+    }
+
+    private async Task DoBuyCard(CardData purchasedCard)
+    {
+        var selected = await ChooseSomeCard.Show(this, 1,
+            $"选择一张卡替换为 {purchasedCard.Name}");
+
+        if (selected.Count > 0)
+        {
+            var idx = BattleStateManager.DeckCardIds.IndexOf(selected[0]);
+            if (idx >= 0)
+            {
+                GD.Print($"[Store] 替换卡组第{idx}张: {selected[0]} -> {purchasedCard.Id}");
+                BattleStateManager.DeckCardIds[idx] = purchasedCard.Id;
+            }
+        }
+
+        _awaitingDeckSelect = false;
     }
 
     private void FlashLabel(int index)
@@ -134,106 +148,6 @@ public partial class Store : Control
         var tween = CreateTween();
         tween.TweenProperty(_priceLabels[index], "modulate", ColorCantAfford, 0.1);
         tween.TweenProperty(_priceLabels[index], "modulate", Colors.White, 0.3);
-    }
-
-    private void ShowDeckSelection(CardData purchasedCard)
-    {
-        _deckOverlay = BuildDeckOverlay(purchasedCard, (selected) =>
-        {
-            if (selected >= 0 && selected < BattleStateManager.DeckCardIds.Count)
-            {
-                var oldId = BattleStateManager.DeckCardIds[selected];
-                BattleStateManager.DeckCardIds[selected] = purchasedCard.Id;
-                GD.Print($"[Store] 替换卡组第{selected}张: {oldId} -> {purchasedCard.Id}");
-            }
-            if (_deckOverlay != null) _deckOverlay.QueueFree();
-            _deckOverlay = null;
-            _awaitingDeckSelect = false;
-        });
-        AddChild(_deckOverlay);
-        GD.Print($"[Store] 卡组选择界面已显示");
-    }
-
-    private Control BuildDeckOverlay(CardData purchasedCard, Action<int> onSelect)
-    {
-        var overlay = new Control();
-        overlay.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        overlay.ZIndex = 100;
-        var bg = new ColorRect();
-        bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        bg.Color = new Color(0, 0, 0, 0.85f);
-        bg.MouseFilter = Control.MouseFilterEnum.Stop;
-        overlay.AddChild(bg);
-        var vs = GetViewport().GetVisibleRect().Size;
-        var title = new Label();
-        title.Text = $"选择一张卡替换为 {purchasedCard.Name}";
-        title.Position = new Vector2(vs.X / 2 - 300, 20);
-        title.Size = new Vector2(600, 40);
-        title.HorizontalAlignment = HorizontalAlignment.Center;
-        title.AddThemeFontSizeOverride("font_size", 24);
-        title.AddThemeColorOverride("font_color", Colors.Gold);
-        overlay.AddChild(title);
-        BuildDeckGrid(overlay, onSelect, vs);
-        var cancelBtn = new Button();
-        cancelBtn.Text = "取消";
-        cancelBtn.Position = new Vector2(vs.X / 2 - 50, vs.Y - 60);
-        cancelBtn.Size = new Vector2(100, 44);
-        cancelBtn.ZIndex = 60;
-        cancelBtn.Pressed += () => onSelect(-1);
-        overlay.AddChild(cancelBtn);
-        return overlay;
-    }
-
-    private void BuildDeckGrid(Control parent, Action<int> onSelect, Vector2 vs)
-    {
-        var deckIds = BattleStateManager.DeckCardIds;
-        if (deckIds == null || deckIds.Count == 0) return;
-        float cardW = CardWidth * DeckScale, cardH = CardHeight * DeckScale;
-        const int cols = 7;
-        float gapX = 8, gapY = 4;
-        int rows = (deckIds.Count + cols - 1) / cols;
-        float gridW = cols * cardW + (cols - 1) * gapX;
-        float startX = (vs.X - gridW) / 2;
-        var scroll = new ScrollContainer();
-        scroll.Position = new Vector2(0, 70);
-        scroll.Size = new Vector2(vs.X, vs.Y - 140);
-        scroll.HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled;
-        parent.AddChild(scroll);
-        var container = new Control();
-        container.CustomMinimumSize = new Vector2(vs.X, rows * (cardH + gapY) + 20);
-        scroll.AddChild(container);
-        var cardScene = ResourceLoader.Load<PackedScene>(CardScenePath);
-        float pfX = CardWidth / 2f * (1f - DeckScale), pfY = CardHeight / 2f * (1f - DeckScale);
-        for (int i = 0; i < deckIds.Count; i++)
-        {
-            int col = i % cols, row = i / cols;
-            float x = startX + col * (cardW + gapX), y = 10 + row * (cardH + gapY);
-            var cd = BattleStateManager.GetCachedCard(deckIds[i]);
-            if (cd == null) continue;
-            var card = cardScene.Instantiate() as cardBase_;
-            card.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
-            card.Size = new Vector2(CardWidth, CardHeight);
-            container.AddChild(card);
-            card.SetCardInformation(cd);
-            card.SetIsFriend(IsFriend.friend);
-            card.Scale = new Vector2(DeckScale, DeckScale);
-            card.Position = new Vector2(x, y);
-            card.MouseFilter = Control.MouseFilterEnum.Ignore;
-            card.ZIndex = 10;
-            var click = new ColorRect();
-            click.Position = new Vector2(x + pfX, y + pfY);
-            click.Size = new Vector2(cardW, cardH);
-            click.Color = new Color(0, 0, 0, 0);
-            click.MouseFilter = Control.MouseFilterEnum.Stop;
-            click.ZIndex = 20;
-            int idx = i;
-            click.GuiInput += (e) =>
-            {
-                if (e is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
-                    onSelect(idx);
-            };
-            container.AddChild(click);
-        }
     }
 
     private void UpdateMaterialPointsLabel()

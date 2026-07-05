@@ -18,16 +18,7 @@ public partial class EventScene : CanvasLayer
 
     /// <summary>左侧事件配图宽度（像素）</summary>
     private const float ImageWidth = 400f;
-    /// <summary>左侧事件配图高度（像素）</summary>
     private const float ImageHeight = 600f;
-    /// <summary>卡组选择界面中卡牌的缩放比例</summary>
-    private const float DeckReplaceScale = 0.75f;
-    /// <summary>卡牌显示宽度（像素）</summary>
-    private const float CardWidth = 180f;
-    /// <summary>卡牌显示高度（像素）</summary>
-    private const float CardHeight = 240f;
-    /// <summary>替换卡牌时最多允许替换的张数</summary>
-    private const int MaxSwapCards = 1;
 
     /// <summary>
     /// 静态入口：在parent节点上创建EventScene叠加层并运行事件流程。
@@ -180,7 +171,7 @@ public partial class EventScene : CanvasLayer
 
         if (replaceCardIds.Count > 0)
         {
-            var chosenOldIds = await ShowDeckPickUI(replaceCardIds.Count);
+            var chosenOldIds = await ChooseSomeCard.Show(this, replaceCardIds.Count, "选择要替换的卡牌");
             for (int i = 0; i < chosenOldIds.Count && i < replaceCardIds.Count; i++)
             {
                 if (!string.IsNullOrEmpty(chosenOldIds[i]))
@@ -223,7 +214,7 @@ public partial class EventScene : CanvasLayer
         }
         else
         {
-            var chosen = await ShowDeckPickUI(1);
+            var chosen = await ChooseSomeCard.Show(this, 1, "选择一张要替换的卡牌");
             oldCardId = chosen.Count > 0 ? chosen[0] : null;
             if (string.IsNullOrEmpty(oldCardId)) return;
         }
@@ -234,143 +225,6 @@ public partial class EventScene : CanvasLayer
     /// <summary>
     /// 显示牌组选择界面，让玩家挑选一张要替换的卡
     /// </summary>
-    private async Task<List<string>> ShowDeckPickUI(int pickCount = 1)
-    {
-        foreach (var child in GetChildren())
-            child.QueueFree();
-
-        var tcs = new TaskCompletionSource<List<string>>();
-        var chosenIds = new List<string>();
-        var selectedIndices = new HashSet<int>();
-
-        var bg = new ColorRect();
-        bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        bg.Color = new Color(0, 0, 0, 0.75f);
-        bg.MouseFilter = Control.MouseFilterEnum.Stop;
-        AddChild(bg);
-
-        var viewSize = GetViewport().GetVisibleRect().Size;
-        var title = new Label();
-        title.Text = pickCount > 1 ? $"选择{pickCount}张要替换的卡牌" : "选择一张要替换的卡牌";
-        title.Position = new Vector2(viewSize.X / 2 - 200, 20);
-        title.Size = new Vector2(400, 40);
-        title.HorizontalAlignment = HorizontalAlignment.Center;
-        title.AddThemeFontSizeOverride("font_size", 24);
-        title.AddThemeColorOverride("font_color", Colors.Gold);
-        AddChild(title);
-
-        var countLabel = new Label();
-        countLabel.Text = $"已选: 0/{pickCount}";
-        countLabel.Position = new Vector2(viewSize.X / 2 - 100, 55);
-        countLabel.Size = new Vector2(200, 30);
-        countLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        countLabel.AddThemeFontSizeOverride("font_size", 18);
-        countLabel.AddThemeColorOverride("font_color", Colors.White);
-        AddChild(countLabel);
-
-        float cardW = CardWidth * DeckReplaceScale;
-        float cardH = CardHeight * DeckReplaceScale;
-        float gapX = 8f; float gapY = 4f;
-        const int cols = 7;
-        var deckIds = BattleStateManager.DeckCardIds;
-        int rows = (deckIds.Count + cols - 1) / cols;
-        float gridW = cols * cardW + (cols - 1) * gapX;
-        float gridStartX = (viewSize.X - gridW) / 2;
-
-        var scrollContainer = new ScrollContainer();
-        scrollContainer.Position = new Vector2(0, 70);
-        scrollContainer.Size = new Vector2(viewSize.X, viewSize.Y - 130);
-        scrollContainer.HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled;
-        AddChild(scrollContainer);
-
-        var cardContainer = new Control();
-        cardContainer.CustomMinimumSize = new Vector2(viewSize.X, rows * (cardH + gapY) + 20);
-        scrollContainer.AddChild(cardContainer);
-
-        var cardScene = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
-        var highlights = new ColorRect[deckIds.Count];
-
-        for (int i = 0; i < deckIds.Count; i++)
-        {
-            int col = i % cols, row = i / cols;
-            float x = gridStartX + col * (cardW + gapX);
-            float y = 10 + row * (cardH + gapY);
-            string cid = deckIds[i];
-
-            var card = cardScene.Instantiate() as cardBase_;
-            card.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
-            card.Size = new Vector2(CardWidth, CardHeight);
-            cardContainer.AddChild(card);
-            var cd = BattleStateManager.GetCachedCard(cid);
-            if (cd != null) card.SetCardInformation(cd);
-            card.SetIsFriend(IsFriend.friend);
-            card.Scale = new Vector2(DeckReplaceScale, DeckReplaceScale);
-            card.Position = new Vector2(x, y);
-            card.MouseFilter = Control.MouseFilterEnum.Ignore;
-            card.ZIndex = 10;
-
-            float pfX = CardWidth / 2f * (1f - DeckReplaceScale);
-            float pfY = CardHeight / 2f * (1f - DeckReplaceScale);
-            var hl = new ColorRect();
-            hl.Position = new Vector2(x + pfX - 3, y + pfY - 3);
-            hl.Size = new Vector2(cardW + 6, cardH + 6);
-            hl.Color = new Color(0, 0, 0, 0);
-            hl.MouseFilter = Control.MouseFilterEnum.Ignore;
-            hl.ZIndex = 9;
-            cardContainer.AddChild(hl);
-            highlights[i] = hl;
-
-            var click = new ColorRect();
-            click.Position = new Vector2(x + pfX, y + pfY);
-            click.Size = new Vector2(cardW, cardH);
-            click.Color = new Color(0, 0, 0, 0);
-            click.MouseFilter = Control.MouseFilterEnum.Stop;
-            click.ZIndex = 20;
-            int idx = i;
-            click.GuiInput += (e) =>
-            {
-                if (e is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
-                {
-                    if (selectedIndices.Contains(idx))
-                    {
-                        selectedIndices.Remove(idx);
-                        highlights[idx].Color = new Color(0, 0, 0, 0);
-                    }
-                    else if (selectedIndices.Count < pickCount)
-                    {
-                        selectedIndices.Add(idx);
-                        highlights[idx].Color = new Color(1, 0.84f, 0, 0.5f);
-                    }
-                    countLabel.Text = $"已选: {selectedIndices.Count}/{pickCount}";
-                }
-            };
-            cardContainer.AddChild(click);
-        }
-
-        var confirmBtn = new Button();
-        confirmBtn.Text = "确认";
-        confirmBtn.Position = new Vector2(viewSize.X / 2 + 10, viewSize.Y - 50);
-        confirmBtn.Size = new Vector2(100, 36);
-        confirmBtn.ZIndex = 60;
-        confirmBtn.Pressed += () =>
-        {
-            var result = new List<string>();
-            foreach (var idx in selectedIndices)
-                result.Add(deckIds[idx]);
-            tcs.TrySetResult(result);
-        };
-        AddChild(confirmBtn);
-
-        var cancelBtn = new Button();
-        cancelBtn.Text = "取消";
-        cancelBtn.Position = new Vector2(viewSize.X / 2 - 110, viewSize.Y - 50);
-        cancelBtn.Size = new Vector2(100, 36);
-        cancelBtn.ZIndex = 60;
-        cancelBtn.Pressed += () => tcs.TrySetResult(new List<string>());
-        AddChild(cancelBtn);
-
-        return await tcs.Task;
-    }
 }
 
 /// <summary>
