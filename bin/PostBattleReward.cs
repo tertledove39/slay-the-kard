@@ -60,6 +60,8 @@ public partial class PostBattleReward : CanvasLayer
             return; // 玩家跳过
 
         // 步骤3: 显示卡组替换界面
+        foreach (var child in GetChildren())
+            child.QueueFree();
         var idsToRemove = await ChooseSomeCard.Show(this, MaxSwapCards, $"选择{MaxSwapCards}张要替换的卡牌");
         if (idsToRemove == null || idsToRemove.Count == 0)
             return; // 取消
