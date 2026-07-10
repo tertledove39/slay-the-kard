@@ -51,6 +51,7 @@ public static class BattleStateManager
     private static Dictionary<string, CardData> _allCards;
     /// <summary>所有事件数据缓存（event.ini解析结果）</summary>
     private static Dictionary<string, EventData> _allEvents;
+    private static Dictionary<string, List<string>> _areaPools;
 
     /// <summary>缓存所有卡牌数据，供跨场景访问</summary>
     public static void CacheAllCards(Dictionary<string, CardData> cards)
@@ -81,6 +82,19 @@ public static class BattleStateManager
     {
         if (events != null && events.Count > 0)
             _allEvents = events;
+    }
+
+    public static bool IsEventDataCached => _allEvents != null && _allEvents.Count > 0;
+
+    public static void CacheAreaPools(Dictionary<string, List<string>> areaPools)
+    {
+        if (areaPools != null && areaPools.Count > 0)
+            _areaPools = areaPools;
+    }
+
+    public static Dictionary<string, List<string>> GetCachedAreaPools()
+    {
+        return _areaPools;
     }
 
     /// <summary>根据ID获取事件数据</summary>

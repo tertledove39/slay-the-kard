@@ -3223,7 +3223,7 @@ InputState currentInputState = InputState.nil;
     }
 
     /// <summary>
-    /// 战役模式下敌方总部被摧毁后，标记区域已完成，延迟2.5秒返回世界地图
+    /// 战役模式下敌方总部被摧毁后，标记区域已完成并返回世界地图
     /// </summary>
     private async System.Threading.Tasks.Task ReturnToWorldMapAfterVictory()
     {
@@ -3240,7 +3240,6 @@ InputState currentInputState = InputState.nil;
 
         await PostBattleReward.Show(this, player1);
 
-        await ToSignal(GetTree().CreateTimer(2.5f), SceneTreeTimer.SignalName.Timeout);
         BattleStateManager.IsCampaignMode = false;
         await SceneLoader.ChangeSceneAsync(this, "res://bin/worldMap.tscn");
     }

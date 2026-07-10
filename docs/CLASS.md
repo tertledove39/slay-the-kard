@@ -122,7 +122,7 @@
 | 卡组持久化 | `DeckCardIds` 跨战役保留卡组ID列表 |
 | 战役状态 | `SelectedEnemy`/`SelectedArea`/`IsCampaignMode`/`CompletedAreas` |
 | 卡牌缓存 | `CacheAllCards()`/`GetCachedCard()`/`GetAllCachedCards()` |
-| 事件缓存 | `CacheAllEvents()`/`GetEvent()` |
+| 配置缓存 | `CacheAllCards()`/`GetCachedCard()`、`CacheAllEvents()`/`GetEvent()`、`CacheAreaPools()`/`GetCachedAreaPools()`；返回地图时复用缓存，避免重复解析 INI |
 | 区域管理 | `IsAreaUnlocked()`/`MarkAreaCompleted()` |
 | 卡组查看 | `ShowDeckViewer()`/`BuildDisplayDeck()` |
 | 商店数据 | `StoreCardQueue`/`StoreCurrentSlots`/`InitializeStoreSlots()`/`RefreshStoreSlots()` |
@@ -139,7 +139,7 @@
 
 | 类 | 文件 | 说明 |
 |----|------|------|
-| `WorldMap` : Control | bin/WorldMap.cs | 世界地图主界面。10个区域按钮随进度解锁。含调试控制台。 |
+| `WorldMap` : Control | bin/WorldMap.cs | 世界地图主界面。10个区域按钮随进度解锁。含调试控制台；卡牌、事件与区域池配置首次解析后跨场景复用。 |
 | `ChooseMission` : Control | bin/ChooseMission.cs | 任务选择面板。3个任务按钮（战斗或事件）。 |
 | `EventScene` : CanvasLayer | bin/EventScene.cs | 剧情事件界面。配图+描述+选项，支持卡牌替换效果。 |
 | `PostBattleReward` : CanvasLayer | bin/PostBattleReward.cs | 战后奖励系统。3组卡牌选择→卡组替换。稀有度限制。 |

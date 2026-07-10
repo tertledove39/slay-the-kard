@@ -153,6 +153,17 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 
 ---
 
+## 战役胜利返回地图
+
+位置：`battlefield_.cs` `ReturnToWorldMapAfterVictory()`
+
+1. 显示结算并等待确认。
+2. 完成或跳过战后奖励。
+3. 标记区域完成并立即调用 `SceneLoader.ChangeSceneAsync()` 返回地图。
+4. `WorldMap` 复用 `BattleStateManager` 中的卡牌、事件和区域池缓存，不重复解析 INI。
+
+---
+
 ## 三、战斗核心流程 (Attack)
 
 位置：`battlefield_.cs` line 1788

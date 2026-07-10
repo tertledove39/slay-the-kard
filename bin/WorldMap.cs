@@ -72,6 +72,7 @@ public partial class WorldMap : Control
     /// <summary>从card.ini加载所有卡牌数据到BattleStateManager缓存中</summary>
     private static void LoadCardDataCache()
     {
+        if (BattleStateManager.IsCardDataCached) return;
         var iniPath = "res://cards/card.ini";
         if (!Godot.FileAccess.FileExists(iniPath)) return;
         var content = Godot.FileAccess.Open(iniPath, Godot.FileAccess.ModeFlags.Read).GetAsText();
@@ -121,6 +122,13 @@ public partial class WorldMap : Control
     /// </summary>
     private void LoadAreaPools()
     {
+        var cachedPools = BattleStateManager.GetCachedAreaPools();
+        if (cachedPools != null)
+        {
+            _areaPools = cachedPools;
+            return;
+        }
+
         var iniPath = "res://bin/AreaPool.ini";
         if (!Godot.FileAccess.FileExists(iniPath))
         {
@@ -151,6 +159,7 @@ public partial class WorldMap : Control
         }
 
         GD.Print($"Loaded area pools: {_areaPools.Count} areas");
+        BattleStateManager.CacheAreaPools(_areaPools);
     }
 
     /// <summary>首次启动时从deck.ini加载卡组并持久化DeckCardIds</summary>
@@ -195,6 +204,7 @@ public partial class WorldMap : Control
     /// <summary>加载event.ini并缓存到BattleStateManager</summary>
     private static void LoadEvents()
     {
+        if (BattleStateManager.IsEventDataCached) return;
         var iniPath = "res://bin/event.ini";
         if (!Godot.FileAccess.FileExists(iniPath)) return;
         var content = Godot.FileAccess.Open(iniPath, Godot.FileAccess.ModeFlags.Read).GetAsText();

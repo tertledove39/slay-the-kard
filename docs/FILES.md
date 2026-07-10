@@ -62,3 +62,4 @@
 | `tests/verify_choose_some_card_overlay.py` | 统一选卡入口、最高层CanvasLayer、浅黑遮罩顺序与精确选卡数量验证 |
 | `tests/verify_command_point_meter.py` | 指挥点效果互斥解析、当前点数上限及下回合扣点路径验证 |
 | `tests/verify_store_card_feedback.py` | 商店待购卡复用手牌悬浮边框、上移反馈及售罄卡排除验证 |
+| `tests/verify_world_map_return_performance.py` | 返回地图时的配置缓存短路和无固定等待验证 |
