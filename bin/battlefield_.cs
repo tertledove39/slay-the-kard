@@ -4412,7 +4412,8 @@ InputState currentInputState = InputState.nil;
                 }
 
                 // AddPoint() - 增加指挥点
-                if (instruction.StartsWith("AddPoint", StringComparison.OrdinalIgnoreCase))
+                if (instruction.StartsWith("AddPoint", StringComparison.OrdinalIgnoreCase)
+                    && !instruction.StartsWith("AddPointMax", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
                     if (match.Success)
@@ -5455,7 +5456,7 @@ public class Player
     public void AddPoint(int i = 1)
     {
         int oldPoint = point;
-        if(point + i >= pointMaxMaxMax) {point = pointMaxMaxMax;}
+        if(point + i >= pointMax) {point = pointMax;}
         else if(point+i<=0) point=0;
         else point += i;
         

@@ -47,7 +47,21 @@ def main():
                       ("ShowDeckPickUI", "ShowDeckReplaceUI", "ShowDeckSelection")),
               "legacy deck-selection implementations are absent"),
         check("_selected.Count != _pickCount" in chooser,
-              "confirm requires the requested selection count"),
+               "confirm requires the requested selection count"),
+        check("private const int Cols = 5;" in chooser,
+               "card selection grid uses five columns"),
+        check("private const float CardScale = 0.9f;" in chooser,
+               "card selection grid uses enlarged cards"),
+        check("private const float GapX = 32f;" in chooser and
+              "private const float GapY = 28f;" in chooser,
+               "card selection grid uses expanded spacing"),
+        check("click.MouseEntered += () => SetCardHover(card, true);" in chooser and
+              "click.MouseExited += () => SetCardHover(card, false);" in chooser,
+               "cards grow on hover and reset after mouse exit"),
+        check("click.CallDeferred(nameof(Control.Set), \"mouse_filter\", (int)Control.MouseFilterEnum.Stop);" in chooser,
+               "card input activates after the opening click is dispatched"),
+        check("private static readonly Color HlColor = new(1f, 0.72f, 0.08f, 0.85f);" in chooser,
+               "selected cards receive a high-contrast highlight"),
     ]
 
     failed = results.count(False)

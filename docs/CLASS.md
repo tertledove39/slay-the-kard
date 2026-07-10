@@ -75,7 +75,7 @@
 |------|------|
 | 手牌管理 | `GetCardsInHand()`/`AddCardToHand()`/`RemoveFromHand()` |
 | 卡组管理 | `DrawCard()`/`AddCardToDeck()`/`ShuffleDeck()` |
-| 指挥点 | `ReadPoint()`/`UsePoint()`/`AddPointMaxNatural()` |
+| 指挥点 | `ReadPoint()`/`UsePoint()`/`AddPoint()`/`AddPointMax()`/`AddPointMaxNatural()`；当前点数始终不高于当前上限 |
 | 手牌布局 | `RefreshMyHand()` — 弧形排列、悬停浮起推旁、旋转倾斜缩放动画 |
 | 卡组初始化 | `InitializeDeckFromIni()` 从 deck.ini 或持久化ID加载 |
 
@@ -146,7 +146,7 @@
 | `DisplayCard` : Control | bin/DisplayCard.cs | 卡组查看器。滚轮翻页。 |
 | `End` : CanvasLayer | bin/End.cs | 屏幕暗化效果。单例。战斗胜利时显示国徽+暗化。 |
 | `Store` : Control | Store.cs | 商店界面。CanvasLayer叠加于WorldMap上方。7张卡按稀有度加权随机生成，价格按稀有度生成，随机打折。点击购买→扣物资点→ChooseSomeCard选1张替换。refresh消耗5物资点重新生成7张卡。 |
-| `ChooseSomeCard` : Control | ChooseSomeCard.cs | 统一卡组选卡替换UI。静态Show(parent, pickCount, title)返回选中卡ID；通过SceneTree.Root上的最高层CanvasLayer覆盖当前界面，场景内最底层为浅黑遮罩。被PostBattleReward/EventScene/Store复用。 |
+| `ChooseSomeCard` : Control | ChooseSomeCard.cs | 统一卡组选卡替换UI。静态Show(parent, pickCount, title)返回选中卡ID；通过SceneTree.Root上的最高层CanvasLayer覆盖当前界面，场景内最底层为浅黑遮罩；使用五列大卡网格、悬浮缩放与高对比选中框，并延迟启用卡牌输入以隔离打开界面的点击。被PostBattleReward/EventScene/Store复用。 |
 
 ## 数据类型/枚举 (cardBase_.cs 末尾)
 

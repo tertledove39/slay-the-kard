@@ -16,11 +16,14 @@ public partial class ChooseSomeCard : Control
 
     private const float CardW = 180f;
     private const float CardH = 240f;
-    private const float CardScale = 0.75f;
-    private const int Cols = 7;
-    private const float GapX = 8f;
-    private const float GapY = 4f;
-    private static readonly Color HlColor = new(1f, 0.84f, 0, 0.4f);
+    private const float CardScale = 0.9f;
+    private const float HoverScale = 0.96f;
+    private const int Cols = 5;
+    private const float GapX = 32f;
+    private const float GapY = 28f;
+    private const float HighlightPadding = 8f;
+    private const float HoverDuration = 0.12f;
+    private static readonly Color HlColor = new(1f, 0.72f, 0.08f, 0.85f);
     private const string CardScenePath = "res://bin/cardbase.tscn";
     private const string ScenePath = "res://choose_some_card.tscn";
     private const int OverlayLayer = int.MaxValue;
@@ -144,12 +147,13 @@ public partial class ChooseSomeCard : Control
             card.SetIsFriend(IsFriend.friend);
             card.Scale = new Vector2(CardScale, CardScale);
             card.Position = new Vector2(x, y);
+            card.PivotOffset = new Vector2(CardW / 2f, CardH / 2f);
             card.MouseFilter = Control.MouseFilterEnum.Ignore;
             card.ZIndex = 10;
 
             var hl = new ColorRect();
-            hl.Position = new Vector2(x + pfX - 3, y + pfY - 3);
-            hl.Size = new Vector2(cw + 6, ch + 6);
+            hl.Position = new Vector2(x + pfX - HighlightPadding, y + pfY - HighlightPadding);
+            hl.Size = new Vector2(cw + HighlightPadding * 2f, ch + HighlightPadding * 2f);
             hl.Color = new Color(0, 0, 0, 0);
             hl.MouseFilter = Control.MouseFilterEnum.Ignore;
             hl.ZIndex = 9;
@@ -160,7 +164,7 @@ public partial class ChooseSomeCard : Control
             click.Position = new Vector2(x + pfX, y + pfY);
             click.Size = new Vector2(cw, ch);
             click.Color = new Color(0, 0, 0, 0);
-            click.MouseFilter = Control.MouseFilterEnum.Stop;
+            click.MouseFilter = Control.MouseFilterEnum.Ignore;
             click.ZIndex = 20;
             int idx = i;
             click.GuiInput += (e) =>
@@ -168,8 +172,18 @@ public partial class ChooseSomeCard : Control
                 if (e is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
                     Toggle(idx);
             };
+            click.MouseEntered += () => SetCardHover(card, true);
+            click.MouseExited += () => SetCardHover(card, false);
             container.AddChild(click);
+            click.CallDeferred(nameof(Control.Set), "mouse_filter", (int)Control.MouseFilterEnum.Stop);
         }
+    }
+
+    private static void SetCardHover(cardBase_ card, bool hovered)
+    {
+        var tween = card.CreateTween();
+        tween.TweenProperty(card, "scale", Vector2.One * (hovered ? HoverScale : CardScale), HoverDuration);
+        card.ZIndex = hovered ? 11 : 10;
     }
 
     private void Toggle(int idx)
