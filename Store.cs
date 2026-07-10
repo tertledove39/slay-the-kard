@@ -7,11 +7,15 @@ public partial class Store : Control
 {
     private cardBase_[] _cards = new cardBase_[7];
     private Label[] _priceLabels = new Label[7];
+    private Vector2[] _cardPositions = new Vector2[7];
     private bool _awaitingDeckSelect;
+    private int _hoveredCard = -1;
     private static readonly Color ColorCantAfford = new(1.0f, 0.27f, 0.0f);
     private static readonly Color ColorDiscount = new(0.2f, 0.5f, 1.0f);
     private const int RefreshCost = 5;
     private const int StoreCardCount = 7;
+    private const float CardRaise = 18f;
+    private const float CardAnimationDuration = 0.12f;
     private static readonly string[] CardNodeNames = { "card1", "card2", "card3", "card4", "card5", "card6", "card7" };
 
     public override void _Ready()
@@ -19,7 +23,11 @@ public partial class Store : Control
         for (int i = 0; i < StoreCardCount; i++)
         {
             _cards[i] = GetNodeOrNull<cardBase_>(CardNodeNames[i]);
-            if (_cards[i] != null) _cards[i].MouseFilter = MouseFilterEnum.Ignore;
+            if (_cards[i] != null)
+            {
+                _cards[i].MouseFilter = MouseFilterEnum.Ignore;
+                _cardPositions[i] = _cards[i].Position;
+            }
         }
         var bg = GetNodeOrNull<TextureRect>("backGround");
         if (bg != null) bg.MouseFilter = MouseFilterEnum.Stop;
@@ -69,7 +77,45 @@ public partial class Store : Control
         _priceLabels[index].Size = new Vector2(100, 28);
     }
 
-    public override void _Process(double delta) => UpdatePriceColors();
+    public override void _Process(double delta)
+    {
+        UpdatePriceColors();
+        UpdateHoveredCard();
+    }
+
+    private void UpdateHoveredCard()
+    {
+        int hovered = -1;
+        if (!_awaitingDeckSelect && BattleStateManager.StoreCurrentSlots != null)
+        {
+            var mousePosition = GetViewport().GetMousePosition();
+            for (int i = 0; i < StoreCardCount; i++)
+            {
+                if (!BattleStateManager.StoreCurrentSlots[i].IsSold && _cards[i]?.GetGlobalRect().HasPoint(mousePosition) == true)
+                {
+                    hovered = i;
+                    break;
+                }
+            }
+        }
+        SetHoveredCard(hovered);
+    }
+
+    private void SetHoveredCard(int index)
+    {
+        if (_hoveredCard == index) return;
+        UpdateCardVisual(_hoveredCard, false);
+        _hoveredCard = index;
+        UpdateCardVisual(_hoveredCard, true);
+    }
+
+    private void UpdateCardVisual(int index, bool hovered)
+    {
+        if (index < 0 || index >= StoreCardCount || _cards[index] == null) return;
+        _cards[index].SetHover(hovered);
+        var tween = _cards[index].CreateTween();
+        tween.TweenProperty(_cards[index], "position", _cardPositions[index] + new Vector2(0, hovered ? -CardRaise : 0), CardAnimationDuration);
+    }
 
     private void UpdatePriceColors()
     {
@@ -112,6 +158,7 @@ public partial class Store : Control
         }
         BattleStateManager.MaterialPoints -= price;
         slot.IsSold = true;
+        SetHoveredCard(-1);
         UpdateMaterialPointsLabel();
         if (_cards[index] != null) _cards[index].Modulate = new Color(0.3f, 0.3f, 0.3f, 0.5f);
         var cardData = BattleStateManager.GetCachedCard(slot.CardId);

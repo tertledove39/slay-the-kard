@@ -61,3 +61,4 @@
 | `tests/verify_spliteffect_fix.py` | SplitEffectByComma 修复验证（7项测试：括号/引号内逗号不分割） |
 | `tests/verify_choose_some_card_overlay.py` | 统一选卡入口、最高层CanvasLayer、浅黑遮罩顺序与精确选卡数量验证 |
 | `tests/verify_command_point_meter.py` | 指挥点效果互斥解析、当前点数上限及下回合扣点路径验证 |
+| `tests/verify_store_card_feedback.py` | 商店待购卡复用手牌悬浮边框、上移反馈及售罄卡排除验证 |
