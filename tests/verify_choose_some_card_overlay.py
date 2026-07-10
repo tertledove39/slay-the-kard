@@ -58,7 +58,7 @@ def main():
         check("click.MouseEntered += () => SetCardHover(card, true);" in chooser and
               "click.MouseExited += () => SetCardHover(card, false);" in chooser,
                "cards grow on hover and reset after mouse exit"),
-        check("click.CallDeferred(nameof(Control.Set), \"mouse_filter\", (int)Control.MouseFilterEnum.Stop);" in chooser,
+        check("Callable.From(() => click.MouseFilter = Control.MouseFilterEnum.Stop).CallDeferred();" in chooser,
                "card input activates after the opening click is dispatched"),
         check("private static readonly Color HlColor = new(1f, 0.72f, 0.08f, 0.85f);" in chooser,
                "selected cards receive a high-contrast highlight"),

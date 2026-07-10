@@ -175,7 +175,7 @@ public partial class ChooseSomeCard : Control
             click.MouseEntered += () => SetCardHover(card, true);
             click.MouseExited += () => SetCardHover(card, false);
             container.AddChild(click);
-            click.CallDeferred(nameof(Control.Set), "mouse_filter", (int)Control.MouseFilterEnum.Stop);
+            Callable.From(() => click.MouseFilter = Control.MouseFilterEnum.Stop).CallDeferred();
         }
     }
 
