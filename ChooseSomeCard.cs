@@ -16,21 +16,28 @@ public partial class ChooseSomeCard : Control
 
     private const float CardW = 180f;
     private const float CardH = 240f;
-    private const float Scale = 0.75f;
+    private const float CardScale = 0.75f;
     private const int Cols = 7;
     private const float GapX = 8f;
     private const float GapY = 4f;
     private static readonly Color HlColor = new(1f, 0.84f, 0, 0.4f);
     private const string CardScenePath = "res://bin/cardbase.tscn";
+    private const string ScenePath = "res://choose_some_card.tscn";
+    private const int OverlayLayer = int.MaxValue;
 
     public static async Task<List<string>> Show(Node parent, int pickCount, string title)
     {
-        var scene = ResourceLoader.Load<PackedScene>("res://choose_some_card.tscn");
+        if (parent?.GetTree()?.Root == null) return new List<string>();
+
+        var scene = ResourceLoader.Load<PackedScene>(ScenePath);
         var inst = scene.Instantiate() as ChooseSomeCard;
         if (inst == null) return new List<string>();
-        parent.AddChild(inst);
+
+        var layer = new CanvasLayer { Layer = OverlayLayer };
+        parent.GetTree().Root.AddChild(layer);
+        layer.AddChild(inst);
         var result = await inst.Run(pickCount, title);
-        inst.QueueFree();
+        layer.QueueFree();
         return result;
     }
 
@@ -62,12 +69,6 @@ public partial class ChooseSomeCard : Control
     private void BuildUI(string title)
     {
         var vs = GetViewport().GetVisibleRect().Size;
-
-        var bg = new ColorRect();
-        bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        bg.Color = new Color(0, 0, 0, 0.85f);
-        bg.MouseFilter = Control.MouseFilterEnum.Stop;
-        AddChild(bg);
 
         var titleLabel = GetNodeOrNull<Label>("Label");
         if (titleLabel != null)
@@ -102,9 +103,6 @@ public partial class ChooseSomeCard : Control
         var backBtn = GetNodeOrNull<Button>("Button");
         if (backBtn != null)
         {
-            backBtn.Text = "取消";
-            backBtn.Position = new Vector2(vs.X / 2 - 110, vs.Y - 55);
-            backBtn.Size = new Vector2(100, 40);
             backBtn.ZIndex = 60;
         }
         UpdateCountLabel();
@@ -112,7 +110,7 @@ public partial class ChooseSomeCard : Control
 
     private void BuildGrid(Vector2 vs)
     {
-        float cw = CardW * Scale, ch = CardH * Scale;
+        float cw = CardW * CardScale, ch = CardH * CardScale;
         int rows = (_deckIds.Count + Cols - 1) / Cols;
         float gridW = Cols * cw + (Cols - 1) * GapX;
         float startX = (vs.X - gridW) / 2;
@@ -128,7 +126,7 @@ public partial class ChooseSomeCard : Control
         scroll.AddChild(container);
 
         var cardScene = ResourceLoader.Load<PackedScene>(CardScenePath);
-        float pfX = CardW / 2f * (1f - Scale), pfY = CardH / 2f * (1f - Scale);
+        float pfX = CardW / 2f * (1f - CardScale), pfY = CardH / 2f * (1f - CardScale);
         _highlights = new ColorRect[_deckIds.Count];
 
         for (int i = 0; i < _deckIds.Count; i++)
@@ -144,7 +142,7 @@ public partial class ChooseSomeCard : Control
             container.AddChild(card);
             card.SetCardInformation(cd);
             card.SetIsFriend(IsFriend.friend);
-            card.Scale = new Vector2(Scale, Scale);
+            card.Scale = new Vector2(CardScale, CardScale);
             card.Position = new Vector2(x, y);
             card.MouseFilter = Control.MouseFilterEnum.Ignore;
             card.ZIndex = 10;
@@ -193,12 +191,12 @@ public partial class ChooseSomeCard : Control
     {
         _countLabel.Text = $"已选: {_selected.Count}/{_pickCount}";
         if (_confirmBtn != null)
-            _confirmBtn.Disabled = _selected.Count == 0;
+            _confirmBtn.Disabled = _selected.Count != _pickCount;
     }
 
     private void OnConfirm()
     {
-        if (_selected.Count == 0) return;
+        if (_selected.Count != _pickCount) return;
         var result = _selected.Select(i => _deckIds[i]).ToList();
         _tcs.TrySetResult(result);
     }

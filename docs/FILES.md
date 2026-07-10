@@ -35,6 +35,7 @@
 | `ChooseMission.cs` | ~113 | **任务选择界面** — 在 WorldMap 上叠加，显示3个任务（战斗/事件）。 |
 | `EventScene.cs` | ~340 | **事件界面** — 剧情事件叠加层。显示配图+描述+选项，支持 replaceCard/replaceRandomCard 效果。 |
 | `PostBattleReward.cs` | ~462 | **战后奖励界面** — 战斗胜利后的奖励系统。3组卡牌选择→卡组替换（稀有度限制）。 |
+| `ChooseSomeCard.cs` | ~210 | **统一卡组选卡界面** — 事件、商店、战后奖励共用；最高层CanvasLayer叠加，浅黑遮罩拦截下层输入。 |
 | `DisplayCard.cs` | ~128 | **卡组查看器** — 显示玩家卡组，支持滚轮翻页。 |
 | `End.cs` | ~70 | **屏幕暗化效果** — 单例 CanvasLayer，用于战场结束/胜利时的画面暗化+国徽显示。 |
 | `Area1.cs` | ~9 | **区域按钮桩** — `TextureButton` 扩展，空实现。 |
@@ -58,3 +59,4 @@
 | `tests/verify_enemy_cards.py` | 德军卡牌配置验证（7项测试：卡数量、稀有度、唯一性、无苏联卡引用等） |
 | `tests/verify_unit_dead_trigger.py` | 单位死亡时点触发验证（6项测试） |
 | `tests/verify_spliteffect_fix.py` | SplitEffectByComma 修复验证（7项测试：括号/引号内逗号不分割） |
+| `tests/verify_choose_some_card_overlay.py` | 统一选卡入口、最高层CanvasLayer、浅黑遮罩顺序与精确选卡数量验证 |

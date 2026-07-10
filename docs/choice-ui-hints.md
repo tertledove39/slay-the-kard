@@ -7,6 +7,15 @@
 
 ## 核心函数说明
 
+### `ChooseSomeCard.Show(parent, pickCount, title)`
+- 作用：统一显示“从玩家现有卡组选择指定数量卡牌”的界面，供事件换卡、商店购买和战后奖励替换复用。
+- 返回：选中的卡牌ID列表；取消或卡组为空时返回空列表。
+- 层级：实例挂到 `SceneTree.Root` 下的独立 `CanvasLayer`，层级为 `int.MaxValue`，不受调用者自身CanvasLayer影响。
+- 遮罩：`choose_some_card.tscn` 的 `OverlayMask` 是根节点第一个子节点，使用浅黑色并拦截输入；标题、卡牌、点击区和按钮均显示在其上方。
+- 选择数量：必须选择满 `pickCount` 才能确认。
+- 当前调用方：`Store`、`EventScene`、`PostBattleReward`。
+- 边界：战场 `Choose` / `Develop` 操作临时候选卡实例，包含动画、对象池与加入手牌流程，不属于现有卡组选卡替换，不应调用本组件。
+
 ### `RefreshAllCardDisplayOrder()`
 - 作用：重新整理战场和手牌中的卡牌显示层级。
 - 重点：
@@ -128,6 +137,7 @@
 ## 自己的最佳实践提示
 
 - 任何视觉交互逻辑与战场数据逻辑要分离。游戏状态走 `cardInPlaces` / `cardsInHand`，视觉层放到 `choiceLayer`。
+- 从持久化卡组选择待替换卡牌时必须调用 `ChooseSomeCard.Show`，禁止在事件、商店或奖励类中重复创建卡组网格。
 - 选择界面里不要复用普通点击判定函数；如果需要，新增专用命中检测。`
 
 - 临时 UI 卡片不应永久留在战场列表里。结算完成后它们必须从父节点剥离并清理。
