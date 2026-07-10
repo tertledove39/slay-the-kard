@@ -55,13 +55,13 @@ def main():
         check("private const float GapX = 32f;" in chooser and
               "private const float GapY = 28f;" in chooser,
                "card selection grid uses expanded spacing"),
-        check("click.MouseEntered += () => SetCardHover(card, true);" in chooser and
-              "click.MouseExited += () => SetCardHover(card, false);" in chooser,
-               "cards grow on hover and reset after mouse exit"),
+        check("_cards[idx].SetHover(active, scale);" in chooser and
+              "_cardPositions[idx] + new Vector2(0, active ? -CardRaise : 0)" in chooser,
+               "selected and hovered cards reuse the hand hover border, scale, and raise effect"),
         check("Callable.From(() => click.MouseFilter = Control.MouseFilterEnum.Stop).CallDeferred();" in chooser,
                "card input activates after the opening click is dispatched"),
-        check("private static readonly Color HlColor = new(1f, 0.72f, 0.08f, 0.85f);" in chooser,
-               "selected cards receive a high-contrast highlight"),
+        check("ColorRect[] _highlights" not in chooser,
+               "selected cards do not use a separate selection frame"),
     ]
 
     failed = results.count(False)

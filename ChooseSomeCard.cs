@@ -11,19 +11,21 @@ public partial class ChooseSomeCard : Control
     private int _pickCount;
     private Label _countLabel;
     private Button _confirmBtn;
-    private ColorRect[] _highlights;
+    private cardBase_[] _cards;
+    private Vector2[] _cardPositions;
     private List<string> _deckIds;
+    private int _hovered = -1;
 
     private const float CardW = 180f;
     private const float CardH = 240f;
     private const float CardScale = 0.9f;
     private const float HoverScale = 0.96f;
+    private const float SelectedScale = 0.99f;
+    private const float CardRaise = 18f;
     private const int Cols = 5;
     private const float GapX = 32f;
     private const float GapY = 28f;
-    private const float HighlightPadding = 8f;
     private const float HoverDuration = 0.12f;
-    private static readonly Color HlColor = new(1f, 0.72f, 0.08f, 0.85f);
     private const string CardScenePath = "res://bin/cardbase.tscn";
     private const string ScenePath = "res://choose_some_card.tscn";
     private const int OverlayLayer = int.MaxValue;
@@ -130,7 +132,8 @@ public partial class ChooseSomeCard : Control
 
         var cardScene = ResourceLoader.Load<PackedScene>(CardScenePath);
         float pfX = CardW / 2f * (1f - CardScale), pfY = CardH / 2f * (1f - CardScale);
-        _highlights = new ColorRect[_deckIds.Count];
+        _cards = new cardBase_[_deckIds.Count];
+        _cardPositions = new Vector2[_deckIds.Count];
 
         for (int i = 0; i < _deckIds.Count; i++)
         {
@@ -142,23 +145,16 @@ public partial class ChooseSomeCard : Control
             var card = cardScene.Instantiate() as cardBase_;
             card.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
             card.Size = new Vector2(CardW, CardH);
+            card.Scale = new Vector2(CardScale, CardScale);
             container.AddChild(card);
             card.SetCardInformation(cd);
             card.SetIsFriend(IsFriend.friend);
-            card.Scale = new Vector2(CardScale, CardScale);
             card.Position = new Vector2(x, y);
             card.PivotOffset = new Vector2(CardW / 2f, CardH / 2f);
             card.MouseFilter = Control.MouseFilterEnum.Ignore;
             card.ZIndex = 10;
-
-            var hl = new ColorRect();
-            hl.Position = new Vector2(x + pfX - HighlightPadding, y + pfY - HighlightPadding);
-            hl.Size = new Vector2(cw + HighlightPadding * 2f, ch + HighlightPadding * 2f);
-            hl.Color = new Color(0, 0, 0, 0);
-            hl.MouseFilter = Control.MouseFilterEnum.Ignore;
-            hl.ZIndex = 9;
-            container.AddChild(hl);
-            _highlights[i] = hl;
+            _cards[i] = card;
+            _cardPositions[i] = card.Position;
 
             var click = new ColorRect();
             click.Position = new Vector2(x + pfX, y + pfY);
@@ -172,18 +168,31 @@ public partial class ChooseSomeCard : Control
                 if (e is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
                     Toggle(idx);
             };
-            click.MouseEntered += () => SetCardHover(card, true);
-            click.MouseExited += () => SetCardHover(card, false);
+            click.MouseEntered += () => SetHovered(idx);
+            click.MouseExited += () => SetHovered(-1);
             container.AddChild(click);
             Callable.From(() => click.MouseFilter = Control.MouseFilterEnum.Stop).CallDeferred();
         }
     }
 
-    private static void SetCardHover(cardBase_ card, bool hovered)
+    private void SetHovered(int idx)
     {
-        var tween = card.CreateTween();
-        tween.TweenProperty(card, "scale", Vector2.One * (hovered ? HoverScale : CardScale), HoverDuration);
-        card.ZIndex = hovered ? 11 : 10;
+        if (_hovered == idx) return;
+        int previous = _hovered;
+        _hovered = idx;
+        UpdateCardVisual(previous);
+        UpdateCardVisual(idx);
+    }
+
+    private void UpdateCardVisual(int idx)
+    {
+        if (idx < 0 || idx >= _cards.Length || _cards[idx] == null) return;
+        bool active = _selected.Contains(idx) || _hovered == idx;
+        float scale = _selected.Contains(idx) ? SelectedScale : HoverScale;
+        _cards[idx].SetHover(active, scale);
+        _cards[idx].ZIndex = active ? 30 : 10;
+        var tween = _cards[idx].CreateTween();
+        tween.TweenProperty(_cards[idx], "position", _cardPositions[idx] + new Vector2(0, active ? -CardRaise : 0), HoverDuration);
     }
 
     private void Toggle(int idx)
@@ -191,12 +200,12 @@ public partial class ChooseSomeCard : Control
         if (_selected.Contains(idx))
         {
             _selected.Remove(idx);
-            if (_highlights[idx] != null) _highlights[idx].Color = new Color(0, 0, 0, 0);
+            UpdateCardVisual(idx);
         }
         else if (_selected.Count < _pickCount)
         {
             _selected.Add(idx);
-            if (_highlights[idx] != null) _highlights[idx].Color = HlColor;
+            UpdateCardVisual(idx);
         }
         UpdateCountLabel();
     }
