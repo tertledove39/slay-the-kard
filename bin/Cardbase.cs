@@ -17,9 +17,7 @@ public partial class Cardbase : Node2D
     private float curveWidth = 1.0f;
     private float arrowWidth = 60.0f;  // 固定的箭头宽度
     private const int CurveSegments = 24;
-    private readonly Vector2[] upperCurve = new Vector2[CurveSegments + 1];
-    private readonly Vector2[] lowerCurve = new Vector2[CurveSegments + 1];
-    private readonly Vector2[] arrowBody = new Vector2[CurveSegments * 2 + 1];
+    private readonly Vector2[] centerCurve = new Vector2[CurveSegments + 1];
     private readonly Vector2[] arrowHead = new Vector2[3];
 
     [Export] private float arrowLength = 15.0f; // 箭头长度
@@ -42,33 +40,17 @@ public partial class Cardbase : Node2D
         
         // 计算箭头点
         var arrowLength = arrowWidth;  // 箭头长度是宽度的2倍
-        var a1 = p2 - mainDir * arrowLength + perpDir * arrowWidth/2;
-        var a2 = p2 - mainDir * arrowLength - perpDir * arrowWidth/2;
-        var b1 = a1 + perpDir * arrowWidth/2;
-        var b2 = a2 - perpDir * arrowWidth/2;
+        var arrowBase = p2 - mainDir * arrowLength;
+        var b1 = arrowBase + perpDir * arrowWidth;
+        var b2 = arrowBase - perpDir * arrowWidth;
         var b3 = p2 + mainDir * arrowLength/3;
 
         // 计算控制点
         ctl_len = (p2 - p1).Length() / 2;
         
         // 获取贝塞尔曲线点
-        FillBezierCurve(upperCurve, p1, a1, ctl_1, ctl_2);
-        FillBezierCurve(lowerCurve, p1, a2, ctl_1, ctl_2);
-        
-        // 绘制填充区域
-        for (int i = 0; i <= CurveSegments; i++)
-        {
-            arrowBody[i] = upperCurve[i];
-        }
-        for (int i = CurveSegments; i > 0; i--)
-        {
-            arrowBody[CurveSegments * 2 + 1 - i] = lowerCurve[i];
-        }
-        DrawColoredPolygon(arrowBody, Colors.Black);
-        
-        // 绘制边框
-        DrawPolyline(upperCurve, curve_color);
-        DrawPolyline(lowerCurve, curve_color);
+        FillBezierCurve(centerCurve, p1, arrowBase, ctl_1, ctl_2);
+        DrawPolyline(centerCurve, Colors.Black, arrowWidth, true);
         
         // 绘制箭头
         arrowHead[0] = b3;

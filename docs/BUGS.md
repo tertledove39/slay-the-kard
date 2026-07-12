@@ -146,7 +146,7 @@ async public Task AttackInf(cardBase_ target) { }
 
 ### 28. 箭身多边形三角剖分失败
 
-批次B首次合并箭身时同时写入两条曲线共有的起点，产生重复闭合顶点，导致Godot持续报告`Invalid polygon data`。修复为`upper[0..N] + lower[N..1]`，公共起点只保留一次，并跳过近零长度箭头。
+批次B将两条动态贝塞尔边界合并成凹多边形，随鼠标角度变化时可能自交，导致Godot持续报告`Invalid polygon data`。最终修复为宽`DrawPolyline`绘制箭身，彻底取消动态箭身多边形三角剖分；仅固定三角箭头头部保留`DrawColoredPolygon`。
 
 ### 24. LoadCardDataCache 缺失 IconPath 导致卡图不显示 (WorldMap.cs line 91)
 
