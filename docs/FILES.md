@@ -50,10 +50,10 @@
 | 文件 | 说明 |
 |------|------|
 | `cards/card.ini` | 卡牌数据定义（苏联卡 + 德军卡共12张de_前缀卡） |
-| `cards/enemyTurn.ini` | 敌方预设回合行动脚本（7个预设：berlin/wehrmacht/luftflotte/ss_panzer/ostwall/volkssturm/fuehrerbunker） |
+| `cards/enemyTurn.ini` | 50个按area2-9递进的东线历史战役行动脚本 |
 | `bin/AreaPool.ini` | 区域任务池配置 |
 | `bin/deck.ini` | 玩家初始卡组配置 |
-| `bin/event.ini` | 事件数据配置 |
+| `bin/event.ini` | 50个平衡的历史背景事件配置 |
 | `bin/setting.ini` | 开始菜单设置项配置；每个 section 定义一个动态设置控件 |
 
 ## 测试文件
@@ -68,3 +68,4 @@
 | `tests/verify_store_card_feedback.py` | 商店待购卡复用手牌悬浮边框、上移反馈及售罄卡排除验证 |
 | `tests/verify_world_map_return_performance.py` | 返回地图时的配置缓存短路和无固定等待验证 |
 | `tests/verify_start_menu_settings.py` | 启动菜单入口、按钮、设置配置和动态设置界面验证 |
+| `tests/verify_campaign_content.py` | 事件、战役、区域分配、卡牌引用、难度窗口和显示名验证 |

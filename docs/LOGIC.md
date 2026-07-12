@@ -164,6 +164,12 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 
 ---
 
+## 历史战役难度
+
+`AreaPool.ini` 将50个战役和50个事件各一次分配至area2-9。战役处决回合随区域递增，行动配置禁止使用 `everyNt=ADD:`，避免永久行动重复叠加。战役ID通过 `HistoricalBattleNames.Get()` 转换为中文名称。
+
+---
+
 ## 三、战斗核心流程 (Attack)
 
 位置：`battlefield_.cs` line 1788

@@ -39,7 +39,10 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 - 元数据由 `StripBracketsOutsideQuotes` 自动剥离，不影响执行
 
 ### bin/AreaPool.ini
-定义区域任务池。每个区域包含敌人预设和事件条目。
+定义区域任务池。area2-9均匀分配50个历史战役和50个事件，敌人值对应 `enemyTurn.ini` section，事件值使用 `event:事件ID`。
+
+### bin/event.ini
+定义50个历史背景事件。每个事件包含2至3个选项，效果仅使用 `none`、`replaceCard(id)` 和 `replaceRandomCard(id)`。
 
 ### bin/deck.ini
 定义玩家的初始卡组。
@@ -75,12 +78,4 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 
 ## 敌人预设主题
 
-| 预设名 | 主题 | 难度定位 |
-|--------|------|---------|
-| wehrmacht | 步兵师 | 早期关卡 |
-| luftflotte | 空军联队 | 中期关卡 |
-| ss_panzer | 装甲师 | 中后期关卡 |
-| ostwall | 防御阵地 | 后期关卡 |
-| volkssturm | 人海冲锋 | 中后期关卡 |
-| fuehrerbunker | 精锐卫队 | 后期关卡 |
-| berlin | 最终防线 | 终局关卡 |
+`cards/enemyTurn.ini` 包含50个按1941-1945时间线组织的历史战役预设。area2-9的处决回合依次由18-20提升至31-34，详细分配见 `CAMPAIGN_CONTENT.md`。

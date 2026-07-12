@@ -20,3 +20,4 @@
 | API.md | 各个对外API接口 |
 | TEST.md | 测试样例设计 |
 | START_MENU.md | 开始菜单、设置配置与运行时设置访问说明 |
+| CAMPAIGN_CONTENT.md | 50个事件与50个历史战役的分配、平衡和历史取材说明 |

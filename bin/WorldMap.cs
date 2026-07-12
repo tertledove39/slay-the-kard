@@ -347,7 +347,7 @@ public partial class WorldMap : Control
             };
         }
         // 敌人条目
-        var enemyName = BattleStateManager.EnemyDisplayNames.TryGetValue(id, out var name) ? name : id;
+        var enemyName = HistoricalBattleNames.Get(id);
         return new MissionEntry { Id = id, DisplayName = enemyName, Type = MissionType.Battle };
     }
 

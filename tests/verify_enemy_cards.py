@@ -96,23 +96,19 @@ def test4_no_soviet_cards():
     print(f"[PASS] 测试4: enemyTurn.ini中无任何苏联卡引用")
 
 def test5_all_presets_complete():
-    """验证7个敌人预设都存在且非空"""
+    """验证50个历史战役预设都非空且具有终止条件"""
     enemy_path = os.path.join(BASE, 'cards', 'enemyTurn.ini')
     presets = parse_ini(enemy_path)
 
-    expected_presets = ['berlin', 'wehrmacht', 'luftflotte', 'ss_panzer',
-                       'ostwall', 'volkssturm', 'fuehrerbunker']
-
-    for ep in expected_presets:
-        assert ep in presets, f"缺少敌人预设: {ep}"
-        assert len(presets[ep]) > 0, f"敌人预设{ep}为空"
+    assert len(presets) == 50, f"期望50个历史战役预设，实际{len(presets)}个"
 
     # 验证每个预设都有kill switch
-    for ep in expected_presets:
-        has_kill = any('KillAllTargets' in v for v in presets[ep].values())
+    for ep, actions in presets.items():
+        assert len(actions) > 0, f"敌人预设{ep}为空"
+        has_kill = any('KillAllTargets' in v for v in actions.values())
         assert has_kill, f"敌人预设{ep}缺少终止条件(KillAllTargets)"
 
-    print(f"[PASS] 测试5: 所有7个敌人预设完整且都有终止条件")
+    print(f"[PASS] 测试5: 所有50个历史战役预设完整且都有终止条件")
 
 def test6_preset_themes():
     """验证每个预设的主题一致性（只用对应的德军卡）"""
