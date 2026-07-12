@@ -1,0 +1,16 @@
+~ world_map_intro
+指挥员: 欢迎来到战役地图。这里可以通过全局接口插入对白。 [normal]
+指挥员: 情报已经整理完毕，我们可以选择下一处战场。 [happy]
+=> END
+
+~ battle_warning
+德军军官: 苏军正在接近，所有单位进入战斗位置。 [angry]
+- 继续进攻
+	苏军指挥员: 不要停下，突破他们的防线。 [happy]
+- 谨慎推进
+	苏军指挥员: 先确认敌军火力配置。 [normal]
+=> END
+
+~ missing_portrait_fallback
+士兵: sad.png缺失时会自动使用normal.png，不会中断对白。 [sad]
+=> END

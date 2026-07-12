@@ -9,6 +9,9 @@
 | data_*/ | Godot构建输出数据（.NET运行时DLL等），已配置进.gitignore |
 | docs/ | 项目文档目录 |
 | tests/ | 测试脚本（Python） |
+| core_logic/ | 独立核心逻辑服务，包括全局对白接口 |
+| core_ui/ | 独立UI场景和脚本，包括Galgame对白气泡 |
+| dialogues/ | Dialogue Manager `.dialogue`对白内容与示例 |
 | assest/ | 其它美术素材（国旗、图标、字体等） |
 | memory/ | （空目录，预留） |
 | .godot/ | Godot编辑器自动生成目录 |
@@ -69,3 +72,4 @@
 | `tests/verify_world_map_return_performance.py` | 返回地图时的配置缓存短路和无固定等待验证 |
 | `tests/verify_start_menu_settings.py` | 启动菜单入口、按钮、设置配置和动态设置界面验证 |
 | `tests/verify_campaign_content.py` | 事件、战役、区域分配、卡牌引用、难度窗口和显示名验证 |
+| `tests/verify_game_dialogue.py` | 全局对白接口、开始菜单限制、立绘回退和示例资源验证 |

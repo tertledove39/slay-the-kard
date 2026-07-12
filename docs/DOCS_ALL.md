@@ -16,6 +16,9 @@
 |--------|---------|
 | FILES.md | 项目目录说明、代码文件说明 |
 | CLASS.md | 各个类的功能与说明 |
+| DIALOGUE.md | Dialogue Manager全局接口、对白编写与立绘标签使用指南 |
+| API.md | 项目对外API接口 |
+| TEST.md | 项目测试样例与验证范围 |
 | CONFIG.md | 配置项文件的位置与各配置项的意义 |
 | API.md | 各个对外API接口 |
 | TEST.md | 测试样例设计 |

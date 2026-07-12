@@ -93,6 +93,14 @@
 
 ## 资源/工具类
 
+### `GameDialogue` : Node (core_logic/GameDialogue.cs)
+
+全局autoload对白门面。缓存Dialogue Manager资源、串行化播放请求，并提供等待式`PlayAsync()`和非等待式`Play()`；开始菜单禁止播放。
+
+### `GameDialogueBalloon` : CanvasLayer (core_ui/GameDialogueBalloon.cs)
+
+项目Galgame对白气泡控制器。组合Dialogue Manager官方C#气泡，根据行标签切换`happy`、`sad`、`angry`、`normal`立绘，缺失素材回退normal。
+
 ### `ResourceManager` : Node (bin/ResourceManager.cs)
 
 单例资源缓存节点。

@@ -47,6 +47,10 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 ### bin/deck.ini
 定义玩家的初始卡组。
 
+### Dialogue Manager
+
+`project.godot`启用`addons/dialogue_manager/plugin.cfg`，并注册`DialogueManager`和`GameDialogue`两个autoload。`dialogue_manager/runtime/balloon_path`指定项目气泡`res://core_ui/game_dialogue_balloon.tscn`。对白文件位于`dialogues/`，立绘位于`assest/{normal|happy|sad|angry}.png`。
+
 ### bin/setting.ini
 定义开始菜单中“设置”场景展示的设置项。每个 section 是一个设置项，当前支持布尔开关：
 

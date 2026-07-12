@@ -16,6 +16,11 @@ config/features=PackedStringArray("4.5", "C#", "Mobile")
 run/max_fps=144
 config/icon="res://icon.svg"
 
+[autoload]
+
+DialogueManager="*res://addons/dialogue_manager/dialogue_manager.gd"
+GameDialogue="*res://core_logic/GameDialogue.cs"
+
 [debug]
 
 settings/stdout/print_fps=true
@@ -29,6 +34,15 @@ window/stretch/mode="canvas_items"
 [dotnet]
 
 project/assembly_name="新建游戏项目"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/dialogue_manager/plugin.cfg")
+
+[dialogue_manager]
+
+runtime/advanced/uses_dotnet=true
+runtime/balloon_path="res://core_ui/game_dialogue_balloon.tscn"
 
 [rendering]
 
