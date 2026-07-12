@@ -148,6 +148,8 @@ async public Task AttackInf(cardBase_ target) { }
 
 批次B将两条动态贝塞尔边界合并成凹多边形，随鼠标角度变化时可能自交，导致Godot持续报告`Invalid polygon data`。最终修复为宽`DrawPolyline`绘制箭身，彻底取消动态箭身多边形三角剖分；仅固定三角箭头头部保留`DrawColoredPolygon`。
 
+宽Polyline与三角箭头仅边界接触时会因抗锯齿产生视觉接缝。拖尾终点现向箭头内部延伸半个拖尾宽度，使两者形成稳定重叠。
+
 ### 24. LoadCardDataCache 缺失 IconPath 导致卡图不显示 (WorldMap.cs line 91)
 
 commit `ebc702f`（CardParser 重构）在替换 `GetRarity`/`GetTypes` 等本地方法为 `CardParser.xxx` 调用时，误删了 `cd.IconPath = configFile[section.Key]["icon"].GetString();` 这一行。

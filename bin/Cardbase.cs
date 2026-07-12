@@ -41,6 +41,7 @@ public partial class Cardbase : Node2D
         // 计算箭头点
         var arrowLength = arrowWidth;  // 箭头长度是宽度的2倍
         var arrowBase = p2 - mainDir * arrowLength;
+        var trailEnd = arrowBase + mainDir * (arrowWidth / 2.0f);
         var b1 = arrowBase + perpDir * arrowWidth;
         var b2 = arrowBase - perpDir * arrowWidth;
         var b3 = p2 + mainDir * arrowLength/3;
@@ -49,7 +50,7 @@ public partial class Cardbase : Node2D
         ctl_len = (p2 - p1).Length() / 2;
         
         // 获取贝塞尔曲线点
-        FillBezierCurve(centerCurve, p1, arrowBase, ctl_1, ctl_2);
+        FillBezierCurve(centerCurve, p1, trailEnd, ctl_1, ctl_2);
         DrawPolyline(centerCurve, Colors.Black, arrowWidth, true);
         
         // 绘制箭头

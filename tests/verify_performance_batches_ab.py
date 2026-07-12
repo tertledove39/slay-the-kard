@@ -32,6 +32,7 @@ def main():
         check("DrawColoredPolygon(arrowBody" not in arrow and "DrawPolyline(centerCurve, Colors.Black, arrowWidth" in arrow, "arrow body avoids polygon triangulation"),
         check("new Vector2[" not in draw and "new Vector2[]" not in draw and "FillBezierCurve(centerCurve" in draw, "arrow drawing avoids per-frame curve arrays"),
         check("arrowBody" not in arrow and "upperCurve" not in arrow and "lowerCurve" not in arrow, "dynamic concave arrow polygons are absent"),
+        check("trailEnd = arrowBase + mainDir * (arrowWidth / 2.0f)" in draw and "FillBezierCurve(centerCurve, p1, trailEnd" in draw, "arrow trail overlaps the arrow head"),
         check("DistanceSquaredTo(p2) < 4.0f" in draw, "near-zero arrows skip drawing"),
         check("nextP2.IsEqualApprox(p2)" in arrow, "stationary pointer does not redraw the arrow"),
         check("moveTween" in move and "moveTween.Kill()" in move, "card movement cancels the previous tween"),
