@@ -19,7 +19,7 @@ public partial class Cardbase : Node2D
     private const int CurveSegments = 24;
     private readonly Vector2[] upperCurve = new Vector2[CurveSegments + 1];
     private readonly Vector2[] lowerCurve = new Vector2[CurveSegments + 1];
-    private readonly Vector2[] arrowBody = new Vector2[(CurveSegments + 1) * 2];
+    private readonly Vector2[] arrowBody = new Vector2[CurveSegments * 2 + 1];
     private readonly Vector2[] arrowHead = new Vector2[3];
 
     [Export] private float arrowLength = 15.0f; // 箭头长度
@@ -34,7 +34,7 @@ public partial class Cardbase : Node2D
 
     public override void _Draw()
     {
-        if (p1 == p2) return;
+        if (p1.DistanceSquaredTo(p2) < 4.0f) return;
 
         // 计算主方向和垂直方向
         var mainDir = (p2 - p1).Normalized();
@@ -59,7 +59,10 @@ public partial class Cardbase : Node2D
         for (int i = 0; i <= CurveSegments; i++)
         {
             arrowBody[i] = upperCurve[i];
-            arrowBody[arrowBody.Length - 1 - i] = lowerCurve[i];
+        }
+        for (int i = CurveSegments; i > 0; i--)
+        {
+            arrowBody[CurveSegments * 2 + 1 - i] = lowerCurve[i];
         }
         DrawColoredPolygon(arrowBody, Colors.Black);
         

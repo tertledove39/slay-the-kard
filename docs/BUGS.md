@@ -144,6 +144,10 @@ async public Task AttackInf(cardBase_ target) { }
 
 箭头由逐帧约100个三角形绘制改为缓存数组和单个箭身多边形；卡牌与商店移动Tween可取消；商店价格颜色按状态变化更新；属性Tooltip改用局部GUI输入并缓存命中图标。
 
+### 28. 箭身多边形三角剖分失败
+
+批次B首次合并箭身时同时写入两条曲线共有的起点，产生重复闭合顶点，导致Godot持续报告`Invalid polygon data`。修复为`upper[0..N] + lower[N..1]`，公共起点只保留一次，并跳过近零长度箭头。
+
 ### 24. LoadCardDataCache 缺失 IconPath 导致卡图不显示 (WorldMap.cs line 91)
 
 commit `ebc702f`（CardParser 重构）在替换 `GetRarity`/`GetTypes` 等本地方法为 `CardParser.xxx` 调用时，误删了 `cd.IconPath = configFile[section.Key]["icon"].GetString();` 这一行。

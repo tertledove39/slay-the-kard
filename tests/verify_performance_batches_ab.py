@@ -31,6 +31,8 @@ def main():
         check("private async Task ApplyEnemyTurnStartTraits()" in battle and "await ApplyEnemyTurnStartTraits()" in battle, "enemy trait changes are awaited"),
         check("DrawSimpleCurvesFill" not in arrow and "DrawColoredPolygon(arrowBody" in arrow, "arrow body uses one cached polygon draw"),
         check("new Vector2[" not in draw and "new Vector2[]" not in draw and "FillBezierCurve(upperCurve" in draw, "arrow drawing avoids per-frame curve arrays"),
+        check("CurveSegments * 2 + 1" in arrow and "i > 0" in draw, "arrow polygon includes the shared curve origin only once"),
+        check("DistanceSquaredTo(p2) < 4.0f" in draw, "near-zero arrows skip polygon triangulation"),
         check("nextP2.IsEqualApprox(p2)" in arrow, "stationary pointer does not redraw the arrow"),
         check("moveTween" in move and "moveTween.Kill()" in move, "card movement cancels the previous tween"),
         check("public override void _GuiInput" in card and "public override void _Input" not in card, "attribute tooltips use local GUI input"),
