@@ -1,26 +1,42 @@
 using Godot;
-using System.Threading.Tasks;
-
 public partial class StartMenu : Control
 {
     private const string WorldMapPath = "res://bin/worldMap.tscn";
     private const string SettingsPath = "res://bin/settings_menu.tscn";
     private const float HoverScale = 1.08f;
     private const float HoverDuration = 0.12f;
+    public void _on_credits_pressed()
+    {
+        var credits = GetNode<Label>("CreditsPanel");
+        credits.Visible = !credits.Visible;
+    }
+
+    public void _on_settings_pressed()
+    {
+        _ = SceneLoader.ChangeSceneAsync(this, SettingsPath);
+    }
+
+    public void _on_start_pressed()
+    {
+        _ = SceneLoader.ChangeSceneAsync(this, WorldMapPath);
+    }
+    public void _on_continue_pressed()
+    {
+        _ = SceneLoader.ChangeSceneAsync(this, WorldMapPath);
+    }
 
     public override void _Ready()
     {
         SettingsManager.Initialize();
-        ConnectButton("Continue", OpenWorldMap);
-        ConnectButton("Start", OpenWorldMap);
-        ConnectButton("Settings", OpenSettings);
-        ConnectButton("Credits", ShowCredits);
+        ConnectHover("Menu/Continue");
+        ConnectHover("Menu/Start");
+        ConnectHover("Menu/Settings");
+        ConnectHover("Menu/Credits");
     }
 
-    private void ConnectButton(string name, System.Action action)
+    private void ConnectHover(string path)
     {
-        var button = GetNode<Button>(name);
-        button.Pressed += action;
+        var button = GetNode<Button>(path);
         button.MouseEntered += () => AnimateButton(button, HoverScale);
         button.MouseExited += () => AnimateButton(button, 1f);
     }
@@ -29,21 +45,5 @@ public partial class StartMenu : Control
     {
         var tween = button.CreateTween();
         tween.TweenProperty(button, "scale", Vector2.One * scale, HoverDuration);
-    }
-
-    private void OpenWorldMap()
-    {
-        _ = SceneLoader.ChangeSceneAsync(this, WorldMapPath);
-    }
-
-    private void OpenSettings()
-    {
-        _ = SceneLoader.ChangeSceneAsync(this, SettingsPath);
-    }
-
-    private void ShowCredits()
-    {
-        var credits = GetNode<Label>("CreditsPanel");
-        credits.Visible = !credits.Visible;
     }
 }

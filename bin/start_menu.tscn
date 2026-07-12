@@ -67,3 +67,8 @@ theme_override_colors/font_color = Color(1, 0.84, 0.2, 1)
 theme_override_font_sizes/font_size = 24
 text = "感谢所有参与项目制作与测试的玩家。"
 horizontal_alignment = 1
+
+[connection signal="pressed" from="Menu/Continue" to="." method="_on_continue_pressed"]
+[connection signal="pressed" from="Menu/Start" to="." method="_on_start_pressed"]
+[connection signal="pressed" from="Menu/Settings" to="." method="_on_settings_pressed"]
+[connection signal="pressed" from="Menu/Credits" to="." method="_on_credits_pressed"]
