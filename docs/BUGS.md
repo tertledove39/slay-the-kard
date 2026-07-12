@@ -136,6 +136,14 @@ async public Task AttackInf(cardBase_ target) { }
 
 **修复**: 删除这些调试日志。
 
+### 26. 性能优化批次A：战斗异步串行化
+
+死亡检查改为门闩合并请求和固定点循环，等待change list、Dead效果及连锁死亡完成；回合切换增加防重入，并等待Trait结算、死亡检查和抽牌。
+
+### 27. 性能优化批次B：绘制、Tween与UI热路径
+
+箭头由逐帧约100个三角形绘制改为缓存数组和单个箭身多边形；卡牌与商店移动Tween可取消；商店价格颜色按状态变化更新；属性Tooltip改用局部GUI输入并缓存命中图标。
+
 ### 24. LoadCardDataCache 缺失 IconPath 导致卡图不显示 (WorldMap.cs line 91)
 
 commit `ebc702f`（CardParser 重构）在替换 `GetRarity`/`GetTypes` 等本地方法为 `CardParser.xxx` 调用时，误删了 `cd.IconPath = configFile[section.Key]["icon"].GetString();` 这一行。

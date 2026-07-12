@@ -24,6 +24,9 @@ public partial class battlefield_ : Control
     /// 是否暂停死亡检查 0 不暂停 1 暂停
     /// </summary>
     int pauseDeathCheck = 0;
+    private bool deathCheckRunning = false;
+    private bool deathCheckRequested = false;
+    private bool turnTransitionRunning = false;
 
     /// <summary>
     /// 允许控制输入
@@ -314,7 +317,7 @@ public partial class battlefield_ : Control
         }
 
         ResumeDeathCheck(); // 恢复死亡检查
-        CheckIfAnyUnitDiedAsync(); // 检查死亡
+        await CheckIfAnyUnitDiedAsync(); // 检查死亡
         RefreshAllBeGuardianedStatus(); // 部署后刷新被守护状态
     }
 
@@ -936,7 +939,7 @@ InputState currentInputState = InputState.nil;
         ConsolePrint($"> {cmd}");
         // 以友方总部为sourceCard和targetCard执行，确保setTarget和drawCard等指令能正常工作
         await ParseAndExecuteEffect(cmd, myHq, null, myHq);
-        CheckIfAnyUnitDiedAsync();
+        await CheckIfAnyUnitDiedAsync();
     }
 
     /// <summary>
@@ -1267,11 +1270,7 @@ InputState currentInputState = InputState.nil;
                     else
                         {
                             // 触发被指向时点
-                            _ = TriggerUnitEffects("BePicked", result.GetMyCard(), new List<cardBase_> { cardNowChoose }, checkOnlySourceCard: true);
-                            // 同仇特性：被指向时友方同仇单位+1+1
-                            _ = TriggerSharedHatred(result.GetMyCard());
-                             _ = ParseAndExecuteEffect(cardNowChoose.effect, cardNowChoose, [result.GetMyCard()]);
-                            CheckIfAnyUnitDiedAsync(); // 结算单位变化
+                            _ = ResolveTargetedCommandAsync(cardNowChoose, result.GetMyCard());
                             cardNowChoose = null;
                             currentInputState = InputState.nil;
                         }
@@ -1301,7 +1300,7 @@ InputState currentInputState = InputState.nil;
         
         _displayOrderDirty = true;
 
-        CheckIfAnyUnitDiedAsync();
+        _ = CheckIfAnyUnitDiedAsync();
 
             
     }
@@ -1990,7 +1989,7 @@ InputState currentInputState = InputState.nil;
         }
 
         ResumeDeathCheck(); // 恢复死亡检查
-        CheckIfAnyUnitDiedAsync(); // 统一检查死亡
+        await CheckIfAnyUnitDiedAsync(); // 统一检查死亡
         AllowControl();
     }
 
@@ -2061,7 +2060,7 @@ InputState currentInputState = InputState.nil;
         }
         
         card.SetMyPlace(position);
-        card.MoveToPosition(position.GetGlobalPosition());
+        await card.MoveToPosition(position.GetGlobalPosition());
         card.setState(CardState.placed);
         
         // 烟幕特性：单位第一次移动时失去烟幕
@@ -2112,7 +2111,7 @@ InputState currentInputState = InputState.nil;
             await TriggerUnitEffects("Moving", card, new List<cardBase_> { card }, checkOnlySourceCard: true);
         }
         ResumeDeathCheck(); // 恢复死亡检查
-        CheckIfAnyUnitDiedAsync(); // 统一检查死亡
+        await CheckIfAnyUnitDiedAsync(); // 统一检查死亡
         RefreshAllBeGuardianedStatus(); // 移动后刷新被守护状态
     }
 
@@ -2180,7 +2179,7 @@ InputState currentInputState = InputState.nil;
         RefreshAllCardInField();
 
         // 敌方回合开始时，对敌方单位应用动员等trait
-        ApplyEnemyTurnStartTraits();
+        await ApplyEnemyTurnStartTraits();
 
         // 执行敌方行动队列
         await ExecuteEnemyActionQueue();
@@ -2218,7 +2217,7 @@ InputState currentInputState = InputState.nil;
         }
         
         await ParseAndExecuteEffect(effectString, sourceCard, targetCards);
-        CheckIfAnyUnitDiedAsync(); // 检查死亡
+        await CheckIfAnyUnitDiedAsync(); // 检查死亡
     }
 
     /// <summary>
@@ -2930,65 +2929,75 @@ InputState currentInputState = InputState.nil;
 /// </summary>
     async Task CheckIfAnyUnitDiedAsync()
     {
-        // 如果死亡检查被暂停，则不执行
         if (pauseDeathCheck == 1)
         {
             return;
         }
 
-        var allCards = ReadCardInPlaces().ToList();
-        foreach (var c in allCards)
+        if (deathCheckRunning)
         {
-            if (c == null)
-                continue;
-
-            c.ExecChangeList();
+            deathCheckRequested = true;
+            return;
         }
 
-        var units = ReadCardInPlaces().Where(x => x.getState() == CardState.placed).ToList();
-        List<cardBase_> deadUnits = new List<cardBase_>();
-        
-        // 第一遍：收集所有死亡的单位
-        for (int i = units.Count - 1; i >= 0; i--)
+        deathCheckRunning = true;
+        try
         {
-            if (units[i].ReadDefence() <= 0)
+            do
             {
-                deadUnits.Add(units[i]);
-            }
+                deathCheckRequested = false;
+                await ProcessDeadUnitsOnceAsync();
+            } while (deathCheckRequested && pauseDeathCheck == 0);
         }
-        
-        // 第二遍：处理所有死亡单位的Dead效果
+        finally
+        {
+            deathCheckRunning = false;
+        }
+    }
+
+    private async Task ProcessDeadUnitsOnceAsync()
+    {
+        var allCards = ReadCardInPlaces().ToList();
+        foreach (var card in allCards)
+        {
+            if (card != null) await card.ExecChangeList();
+        }
+
+        var deadUnits = allCards.Where(IsDeadPlacedUnit).ToList();
         foreach (var deadUnit in deadUnits)
         {
-            if (deadUnit.GetIsFriend() == IsFriend.friend &&
-                (deadUnit.cardType == CardTypes.Infantry || deadUnit.cardType == CardTypes.Tank || deadUnit.cardType == CardTypes.Artillery))
-            {
-                lastDeadFriendlyLandUnitId = deadUnit.id ?? "";
-            }
-            TriggerUnitEffects("Dead", deadUnit, checkOnlySourceCard:true);
-            RemoveCard(deadUnit);
-            PlayDeadSound(1);
-            
-            if (deadUnit.GetIsFriend() == IsFriend.friend)
-                await TriggerUnitEffects("FriendlyUnitDead", deadUnit);
-            else if (deadUnit.GetIsFriend() == IsFriend.enemy)
-                await TriggerUnitEffects("EnemyUnitDead", deadUnit);
+            await ProcessDeadUnitAsync(deadUnit);
         }
 
-        foreach (var c in allCards.Where(x=>x.shouldBeRemoved == 1).ToList())
+        foreach (var card in allCards.Where(x => x?.shouldBeRemoved == 1))
         {
-            if (c == null)
-                continue;
-            else
-            {
-                c.DisableCombatAbility();
-                await c.DiscardCard();
-                RemoveCard(c);
-            }
+            card.DisableCombatAbility();
+            await card.DiscardCard();
+            RemoveCard(card);
         }
 
-        if (deadUnits.Count > 0)
-            CheckIfAnyUnitDiedAsync(); // 递归检查是否有新的死亡单位
+        deathCheckRequested |= deadUnits.Count > 0;
+    }
+
+    private static bool IsDeadPlacedUnit(cardBase_ card)
+    {
+        return card != null && card.getState() == CardState.placed && card.ReadDefence() <= 0;
+    }
+
+    private async Task ProcessDeadUnitAsync(cardBase_ deadUnit)
+    {
+        if (deadUnit.GetIsFriend() == IsFriend.friend &&
+            deadUnit.cardType is CardTypes.Infantry or CardTypes.Tank or CardTypes.Artillery)
+        {
+            lastDeadFriendlyLandUnitId = deadUnit.id ?? "";
+        }
+
+        await TriggerUnitEffects("Dead", deadUnit, checkOnlySourceCard: true);
+        IsFriend side = deadUnit.GetIsFriend();
+        RemoveCard(deadUnit);
+        PlayDeadSound(1);
+        if (side == IsFriend.friend) await TriggerUnitEffects("FriendlyUnitDead", deadUnit);
+        else if (side == IsFriend.enemy) await TriggerUnitEffects("EnemyUnitDead", deadUnit);
     }
 
 
@@ -2996,6 +3005,22 @@ InputState currentInputState = InputState.nil;
             /// 暂时用作测试
             /// </summary>
     public async void OnNextTurnButtonPressed()
+    {
+        if (turnTransitionRunning) return;
+        turnTransitionRunning = true;
+        ForbidControl();
+        try
+        {
+            await RunTurnTransitionAsync();
+        }
+        finally
+        {
+            turnTransitionRunning = false;
+            AllowControl();
+        }
+    }
+
+    private async Task RunTurnTransitionAsync()
     {
         // 触发友方回合结束时点
         await TriggerUnitEffects("FriendlyTurnEnd", null);
@@ -3030,7 +3055,7 @@ InputState currentInputState = InputState.nil;
         await TriggerUnitEffects("TurnBegin", null);
 
         // 回合开始时trait处理
-        ApplyTurnStartTraits();
+        await ApplyTurnStartTraits();
 
         // 增加所有已部署单位的存活回合数
         foreach(var card in cardInPlaces.Where(x=>x.getState()==CardState.placed).ToList())
@@ -3038,11 +3063,11 @@ InputState currentInputState = InputState.nil;
             card.IncrementLifeTime();
         }
         
-        CheckIfAnyUnitDiedAsync(); // 检查死亡
+        await CheckIfAnyUnitDiedAsync(); // 检查死亡
 
         
         
-        _ = player1.DrawCard();
+        await player1.DrawCard();
         player1.AddPointMaxNatural();
 
         int pendingLoss = ReadMemory("pendingPointLoss");
@@ -3066,7 +3091,7 @@ InputState currentInputState = InputState.nil;
     /// <summary>
     /// 回合开始时处理trait效果：动员buff、伏击重置、烟幕前线检查、被守护刷新
     /// </summary>
-    private void ApplyTurnStartTraits()
+    private async Task ApplyTurnStartTraits()
     {
         foreach (var card in cardInPlaces.Where(x => x.getState() == CardState.placed).ToList())
         {
@@ -3081,7 +3106,7 @@ InputState currentInputState = InputState.nil;
         }
 
         // 执行动员buff
-        _ = ExecuteChangeLists();
+        await ExecuteChangeLists();
 
         // 烟幕前线检查：前线的单位无法具有烟幕
         foreach (var place in frontLine)
@@ -3100,7 +3125,7 @@ InputState currentInputState = InputState.nil;
     /// <summary>
     /// 敌方回合开始时处理trait效果：敌方动员buff
     /// </summary>
-    private void ApplyEnemyTurnStartTraits()
+    private async Task ApplyEnemyTurnStartTraits()
     {
         foreach (var card in cardInPlaces.Where(x => x.getState() == CardState.placed).ToList())
         {
@@ -3114,7 +3139,7 @@ InputState currentInputState = InputState.nil;
             }
         }
 
-        _ = ExecuteChangeLists();
+        await ExecuteChangeLists();
     }
 
     /// <summary>
@@ -3269,6 +3294,15 @@ InputState currentInputState = InputState.nil;
         }
 
         await ExecuteChangeLists();
+    }
+
+    private async Task ResolveTargetedCommandAsync(cardBase_ source, cardBase_ target)
+    {
+        if (source == null || target == null) return;
+        await TriggerUnitEffects("BePicked", target, new List<cardBase_> { source }, checkOnlySourceCard: true);
+        await TriggerSharedHatred(target);
+        await ParseAndExecuteEffect(source.effect, source, new List<cardBase_> { target });
+        await CheckIfAnyUnitDiedAsync();
     }
 
     private int _discardZCounter = 50;
@@ -5026,7 +5060,7 @@ InputState currentInputState = InputState.nil;
 
         // 效果结算
         await ParseAndExecuteEffect(commandCard.effect, commandCard, targets);
-        CheckIfAnyUnitDiedAsync();
+        await CheckIfAnyUnitDiedAsync();
     }
 
     /// <summary>

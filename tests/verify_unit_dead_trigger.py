@@ -52,9 +52,9 @@ def test3_friend_enemy_distinction():
     func_end = content.find('async void OnNextTurnButtonPressed', func_start)
     func_body = content[func_start:func_end]
 
-    assert 'GetIsFriend() == IsFriend.friend' in func_body, \
+    assert 'side == IsFriend.friend' in func_body, \
         "缺少友方判定"
-    assert 'GetIsFriend() == IsFriend.enemy' in func_body, \
+    assert 'side == IsFriend.enemy' in func_body, \
         "缺少敌方判定"
 
     print("[PASS] 测试3: 使用 GetIsFriend() 正确区好友方/敌方")
@@ -111,7 +111,7 @@ def test6_hq_not_dead_unit():
     dead_trigger = func_body[func_body.find('TriggerUnitEffects("Dead"'):]
     dead_trigger = dead_trigger[:dead_trigger.find(');') + 2]
 
-    assert 'checkOnlySourceCard:true' in dead_trigger, \
+    assert re.search(r'checkOnlySourceCard\s*:\s*true', dead_trigger), \
         "Dead 时点只触发自身效果（checkOnlySourceCard:true）"
 
     print("[PASS] 测试6: Dead 时点正确只触发死亡单位自身效果")

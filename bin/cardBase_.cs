@@ -30,6 +30,7 @@ public partial class cardBase_ : Control
 
     // 悬停高亮和缩放效果
     private Tween hoverTween;
+    private Tween moveTween;
     private Panel hoverHighlight;
     private bool isHovering = false;
     private Vector2 originalScale = Vector2.One;
@@ -77,6 +78,7 @@ public partial class cardBase_ : Control
     private Panel _attrTooltipPanel;
     private Label _attrTooltipLabel;
     private List<Rect2> _attrIconRects = new(); // 图标在_attrPanel中的本地rect
+    private int _hoveredAttributeIndex = -1;
     private List<string> _attrIconDescs = new();
     private Dictionary<string, TextureRect> _attrIconWidgets = new(); // trait名→图标控件
     private const int AttrIconSize = 22;
@@ -1503,7 +1505,7 @@ public partial class cardBase_ : Control
     /// <summary>
     /// 检测鼠标是否悬停在attribute图标上，显示/隐藏描述tooltip
     /// </summary>
-    public override void _Input(InputEvent @event)
+    public override void _GuiInput(InputEvent @event)
     {
         if (_attrIconRects.Count == 0 || _attrTooltipPanel == null) return;
 
@@ -1511,23 +1513,32 @@ public partial class cardBase_ : Control
 
         var mousePos = GetLocalMousePosition();
         var panelPos = (_attrPanel != null) ? _attrPanel.Position : Vector2.Zero;
-        bool found = false;
+        int hoveredIndex = -1;
 
         for (int i = 0; i < _attrIconRects.Count; i++)
         {
             if (_attrIconRects[i].HasPoint(mousePos - panelPos))
             {
-                _attrTooltipLabel.Text = _attrIconDescs[i];
-                _attrTooltipPanel.Position = mousePos + new Vector2(16, 8);
-                _attrTooltipPanel.Size = _attrTooltipLabel.GetMinimumSize() + new Vector2(8, 4);
-                _attrTooltipPanel.Visible = true;
-                found = true;
+                hoveredIndex = i;
                 break;
             }
         }
 
-        if (!found)
+        if (hoveredIndex < 0)
+        {
             _attrTooltipPanel.Visible = false;
+            _hoveredAttributeIndex = -1;
+            return;
+        }
+
+        if (_hoveredAttributeIndex != hoveredIndex)
+        {
+            _hoveredAttributeIndex = hoveredIndex;
+            _attrTooltipLabel.Text = _attrIconDescs[hoveredIndex];
+            _attrTooltipPanel.Size = _attrTooltipLabel.GetMinimumSize() + new Vector2(8, 4);
+            _attrTooltipPanel.Visible = true;
+        }
+        _attrTooltipPanel.Position = mousePos + new Vector2(16, 8);
     }
 
 /// <summary>
@@ -1589,13 +1600,17 @@ public partial class cardBase_ : Control
     /// <returns></returns>
     async public Task MoveToPosition(Vector2 destination, float duration = 0.5f)
     {
-        var tween = CreateTween();
-        tween.SetTrans(Tween.TransitionType.Sine);
-        tween.SetEase(Tween.EaseType.InOut);
-        tween.TweenProperty(this, "position", destination, duration);
+        if (moveTween != null && moveTween.IsValid()) moveTween.Kill();
+        Tween currentTween = CreateTween();
+        moveTween = currentTween;
+        currentTween.SetTrans(Tween.TransitionType.Sine);
+        currentTween.SetEase(Tween.EaseType.InOut);
+        currentTween.TweenProperty(this, "position", destination, duration);
 
-        // 等待 Tween 完成
-        await ToSignal(tween, Tween.SignalName.Finished);
+        while (moveTween == currentTween && currentTween.IsValid() && currentTween.IsRunning())
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
     }
 
     /// <summary>

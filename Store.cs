@@ -10,6 +10,12 @@ public partial class Store : Control
     private Vector2[] _cardPositions = new Vector2[7];
     private bool _awaitingDeckSelect;
     private int _hoveredCard = -1;
+    private int _lastPricePoints = int.MinValue;
+    private readonly bool[] _lastSoldStates = new bool[StoreCardCount];
+    private readonly bool[] _lastDiscountStates = new bool[StoreCardCount];
+    private readonly int[] _lastEffectivePrices = new int[StoreCardCount];
+    private readonly bool[] _priceStateInitialized = new bool[StoreCardCount];
+    private readonly Tween[] _cardTweens = new Tween[StoreCardCount];
     private static readonly Color ColorCantAfford = new(1.0f, 0.27f, 0.0f);
     private static readonly Color ColorDiscount = new(0.2f, 0.5f, 1.0f);
     private const int RefreshCost = 5;
@@ -113,8 +119,9 @@ public partial class Store : Control
     {
         if (index < 0 || index >= StoreCardCount || _cards[index] == null) return;
         _cards[index].SetHover(hovered);
-        var tween = _cards[index].CreateTween();
-        tween.TweenProperty(_cards[index], "position", _cardPositions[index] + new Vector2(0, hovered ? -CardRaise : 0), CardAnimationDuration);
+        if (_cardTweens[index] != null && _cardTweens[index].IsValid()) _cardTweens[index].Kill();
+        _cardTweens[index] = _cards[index].CreateTween();
+        _cardTweens[index].TweenProperty(_cards[index], "position", _cardPositions[index] + new Vector2(0, hovered ? -CardRaise : 0), CardAnimationDuration);
     }
 
     private void UpdatePriceColors()
@@ -122,15 +129,26 @@ public partial class Store : Control
         var slots = BattleStateManager.StoreCurrentSlots;
         if (slots == null) return;
         int points = BattleStateManager.MaterialPoints;
+        bool pointsChanged = points != _lastPricePoints;
         for (int i = 0; i < StoreCardCount && i < slots.Count; i++)
         {
             if (_priceLabels[i] == null) continue;
             var slot = slots[i];
+            bool stateChanged = !_priceStateInitialized[i] ||
+                _lastSoldStates[i] != slot.IsSold ||
+                _lastDiscountStates[i] != slot.IsDiscounted ||
+                _lastEffectivePrices[i] != slot.EffectivePrice;
+            if (!pointsChanged && !stateChanged) continue;
+            _priceStateInitialized[i] = true;
+            _lastSoldStates[i] = slot.IsSold;
+            _lastDiscountStates[i] = slot.IsDiscounted;
+            _lastEffectivePrices[i] = slot.EffectivePrice;
             _priceLabels[i].AddThemeColorOverride("font_color",
                 slot.IsSold ? Colors.Gray :
                 points < slot.EffectivePrice ? ColorCantAfford :
                 slot.IsDiscounted ? ColorDiscount : Colors.White);
         }
+        _lastPricePoints = points;
     }
 
     public override void _Input(InputEvent @event)
