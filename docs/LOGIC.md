@@ -146,11 +146,10 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 
 1. `RefreshAllCardInField()` 刷新所有单位
 2. `ApplyEnemyTurnStartTraits()` 敌方动员buff
-3. `ExecuteEnemyActionQueue()` 执行行动脚本（tN/everyNt/ADD/default）
+3. `ExecuteEnemyActionQueue()` 执行行动脚本（tN/everyNt/ADD/default）；固定`tN=ADD:`在触发时注册，并从当回合起每个敌方回合重复执行
 4. `EnemyPerformActionsAsync()` AI行动：
    - 阶段1：前线无我方单位时，把敌方支援线非空军单位推到前线
-   - 阶段2：攻击（优先级：能一击杀死HQ > 能杀死单位 > 攻击HQ > 随机攻击）
-
+    - 阶段2：攻击（优先级：能一击杀死HQ > 能杀死单位 > 攻击HQ > 随机攻击）
 
 ### 战斗状态串行化
 
@@ -175,7 +174,7 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 
 ## 历史战役难度
 
-`AreaPool.ini` 将50个战役和50个事件各一次分配至area2-9。战役处决回合随区域递增，行动配置禁止使用 `everyNt=ADD:`，避免永久行动重复叠加。战役ID通过 `HistoricalBattleNames.Get()` 转换为中文名称。
+`AreaPool.ini` 将50个战役和50个事件各一次分配至area2-9。战役处决回合与行动密度随区域递增，使用贴膜、刷兵、随机伤害、降攻和压制构成压力。行动配置禁止 `everyNt=ADD:`，且每关必须恰有一个固定回合成长效果。战役ID通过 `HistoricalBattleNames.Get()` 转换为中文名称。
 
 ---
 
@@ -192,16 +191,17 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 6. BePicked 时点 + 同仇触发
 7. 预计算伤害（考虑重甲-1、免疫=0）+ 溢出量
 8. Attacking / BeingAttacked 等时点效果触发
-9. 应用伤害（`LoseDefence`）
-10. 移除动员（受伤后）+ 移除烟幕（攻击后）
-11. 冲击特性处理（无视伏击+反击免疫）
-12. 反击计算（伏击先发反击、重甲/免疫影响）
-13. 飞弹动画+音效
-14. `HaveAttacked()` 标记 + `IncrementAttackCountThisTurn()`
-15. trait闪烁
-16. 战后移动限制（非坦克单位攻击后禁止移动，奋战例外）
-17. 恢复死亡检查+单位死亡判定
-18. 解锁控制
+9. **冲击判定+消耗**（攻击后失去冲击）
+10. **伏击先制**：无冲击且防守者伏击可用时，先对攻击方造成反击伤害；若攻击方死亡，跳过本次攻击伤害
+11. **攻击伤害**：攻击方存活时才对防守方执行 `LoseDefence`；受伤后移除动员
+12. 移除烟幕（攻击后）
+13. **普通反击**：无冲击且未触发伏击时，按兵种限制执行普通反击
+14. 飞弹动画+音效
+15. `HaveAttacked()` 标记 + `IncrementAttackCountThisTurn()`
+16. trait闪烁
+17. 战后移动限制（非坦克单位攻击后禁止移动，奋战例外）
+18. 恢复死亡检查+单位死亡判定
+19. 解锁控制
 
 ### 特性在战斗中的交互
 

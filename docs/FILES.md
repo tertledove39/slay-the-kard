@@ -74,3 +74,4 @@
 | `tests/verify_campaign_content.py` | 事件、战役、区域分配、卡牌引用、难度窗口和显示名验证 |
 | `tests/verify_game_dialogue.py` | 全局对白接口、开始菜单限制、立绘回退和示例资源验证 |
 | `tests/verify_performance_batches_ab.py` | 战斗异步串行、箭头绘制、Tween和UI热路径性能回归验证 |
+| `tests/verify_ambush.py` | 伏击先制伤害结算顺序和冲击交互验证 |

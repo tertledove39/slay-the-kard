@@ -1884,88 +1884,47 @@ InputState currentInputState = InputState.nil;
             await TriggerUnitEffects("EnemyUnitBeingAttacked", from, new List<cardBase_> { to, from });
         }
 
-    await to.LoseDefence(attackDamage);
+    bool attackerHasShock = from.HasShockActive();
+        if (attackerHasShock) from.RemoveShock();
 
-        // 触发受到伤害时点
-        if (attackDamage > 0)
+        int counterDamage = to.ReadAttack();
+        if (from.HasTrait(UnitTraits.HeavyArmor)) counterDamage = Math.Max(0, counterDamage - 1);
+        if (from.HasTrait(UnitTraits.Immunity)) counterDamage = 0;
+
+        bool ambushTriggered = !attackerHasShock && to.HasAmbushActive();
+        bool attackerKilledByAmbush = false;
+
+        if (ambushTriggered)
         {
-            await TriggerUnitEffects("TakingDamage", to, new List<cardBase_> { to }, checkOnlySourceCard: true);
+            to.FlashTraitIcon("Ambush");
+            to.UseAmbush();
+            int defBefore = from.ReadDefence();
+            await from.LoseDefence(counterDamage);
+            lastOverflowDamage += Math.Max(0, counterDamage - defBefore);
+            attackerKilledByAmbush = from.ReadDefence() <= 0;
         }
 
-        // 动员特性：受到伤害后消失
-        if (to.HasMobilizeActive() && attackDamage > 0)
+        if (!attackerKilledByAmbush)
         {
-            to.RemoveMobilize();
-        }
-
-        // 烟幕特性：单位第一次攻击时失去烟幕
-        if (from.HasSmokeScreenActive())
-        {
-            from.RemoveSmokeScreen();
-        }
-
-        // 冲击特性：攻击时不受到反击，无视伏击
-        bool attackerHasShock = from.HasShockActive();
-        if (attackerHasShock)
-        {
-            from.RemoveShock(); // 攻击后失去冲击
-        }
-
-        // 判断是否进行反击（冲击特性完全免疫反击）
-        if (!attackerHasShock)
-        {
-            // 战斗机、步兵、坦克、火炮可以反击敌人，轰炸机不能
-            bool canCounterAttack = to.cardType != CardTypes.Bomber;
-
-            // 战斗机、步兵、坦克在攻击后会受到反击，轰炸机、火炮不会
-            bool willReceiveCounterAttack =
-                from.cardType == CardTypes.Plane ||
-                from.cardType == CardTypes.Infantry ||
-                from.cardType == CardTypes.Tank;
-
-            // 伏击特性：被攻击时先造成反击伤害（冲击无视伏击）
-            bool defenderHasAmbush = to.HasAmbushActive();
-
-            // 执行反击
-            if (canCounterAttack && willReceiveCounterAttack)
+            await to.LoseDefence(attackDamage);
+            if (attackDamage > 0)
             {
-                int counterDamage = to.ReadAttack();
-
-                // 重甲特性：单位受到的战斗伤害-1
-                if (from.HasTrait(UnitTraits.HeavyArmor))
-                {
-                    counterDamage = Math.Max(0, counterDamage - 1);
-                }
-
-                // 免疫特性：不受到战斗伤害
-                if (from.HasTrait(UnitTraits.Immunity))
-                {
-                    counterDamage = 0;
-                }
-
-                // 伏击特性：先造成反击伤害（一回合一次）
-                if (defenderHasAmbush)
-                {
-                    to.FlashTraitIcon("Ambush");
-                    to.UseAmbush(); // 标记伏击已被使用
-                    int fromDefBeforeCounter = from.ReadDefence();
-                    await from.LoseDefence(counterDamage);
-                    lastOverflowDamage += Math.Max(0, counterDamage - fromDefBeforeCounter);
-                    // 若敌方单位因此死亡，则不受到来自对方的伤害
-                    if (from.ReadDefence() <= 0)
-                    {
-                        counterDamage = 0;
-                    }
-                }
-                else
-                {
-                    int fromDefBeforeCounter = from.ReadDefence();
-                    await from.LoseDefence(counterDamage);
-                    lastOverflowDamage += Math.Max(0, counterDamage - fromDefBeforeCounter);
-                }
+                await TriggerUnitEffects("TakingDamage", to, new List<cardBase_> { to }, checkOnlySourceCard: true);
+                if (to.HasMobilizeActive()) to.RemoveMobilize();
             }
         }
-        
+
+        if (from.HasSmokeScreenActive()) from.RemoveSmokeScreen();
+
+        bool canCounterAttack = to.cardType != CardTypes.Bomber;
+        bool willReceiveCounterAttack = from.cardType is CardTypes.Plane or CardTypes.Infantry or CardTypes.Tank;
+        if (!attackerHasShock && !ambushTriggered && canCounterAttack && willReceiveCounterAttack)
+        {
+            int defBefore = from.ReadDefence();
+            await from.LoseDefence(counterDamage);
+            lastOverflowDamage += Math.Max(0, counterDamage - defBefore);
+        }
+
         PlayBattleSound(1);
         await FlyBullets(from,to);
 
