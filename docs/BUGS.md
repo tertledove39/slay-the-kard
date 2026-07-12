@@ -150,6 +150,8 @@ async public Task AttackInf(cardBase_ target) { }
 
 宽Polyline与三角箭头仅边界接触时会因抗锯齿产生视觉接缝。拖尾终点现向箭头内部延伸半个拖尾宽度，使两者形成稳定重叠。
 
+以上箭头绘制优化及后续修补已按要求全部撤销，`Cardbase.cs`恢复为提交`7a5258e`中的原始绘制函数。批次A和其他批次B优化不受影响。
+
 ### 24. LoadCardDataCache 缺失 IconPath 导致卡图不显示 (WorldMap.cs line 91)
 
 commit `ebc702f`（CardParser 重构）在替换 `GetRarity`/`GetTypes` 等本地方法为 `CardParser.xxx` 调用时，误删了 `cd.IconPath = configFile[section.Key]["icon"].GetString();` 这一行。
