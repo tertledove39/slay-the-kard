@@ -32,6 +32,9 @@
 | `BattleStateManager` 类 | CardRestoration.cs (~167) | **跨场景状态管理** — 静态类。持久化卡组ID、选中的敌人、已完成的区域、卡牌数据缓存。 |
 | `MeterLabel.cs` | ~210 | **电表数字组件** — 机械式数字滚动显示（指挥点计数用）。 |
 | `WorldMap.cs` | ~499 | **世界地图场景** — 战役主界面。10个区域按钮，随递次解锁。点击弹出 ChooseMission。含调试控制台。 |
+| `StartMenu.cs` | ~50 | **开始菜单** — 初始化设置，处理继续、开始、设置和鸣谢入口，以及按钮悬浮缩放。 |
+| `SettingsMenu.cs` | ~50 | **设置界面** — 根据 `SettingsManager` 中的配置项动态生成设置控件。 |
+| `SettingsManager.cs` | ~65 | **设置静态管理器** — 读取 `setting.ini`，提供设置项枚举和布尔值读写。 |
 | `ChooseMission.cs` | ~113 | **任务选择界面** — 在 WorldMap 上叠加，显示3个任务（战斗/事件）。 |
 | `EventScene.cs` | ~340 | **事件界面** — 剧情事件叠加层。显示配图+描述+选项，支持 replaceCard/replaceRandomCard 效果。 |
 | `PostBattleReward.cs` | ~462 | **战后奖励界面** — 战斗胜利后的奖励系统。3组卡牌选择→卡组替换（稀有度限制）。 |
@@ -51,6 +54,7 @@
 | `bin/AreaPool.ini` | 区域任务池配置 |
 | `bin/deck.ini` | 玩家初始卡组配置 |
 | `bin/event.ini` | 事件数据配置 |
+| `bin/setting.ini` | 开始菜单设置项配置；每个 section 定义一个动态设置控件 |
 
 ## 测试文件
 
@@ -63,3 +67,4 @@
 | `tests/verify_command_point_meter.py` | 指挥点效果互斥解析、当前点数上限及下回合扣点路径验证 |
 | `tests/verify_store_card_feedback.py` | 商店待购卡复用手牌悬浮边框、上移反馈及售罄卡排除验证 |
 | `tests/verify_world_map_return_performance.py` | 返回地图时的配置缓存短路和无固定等待验证 |
+| `tests/verify_start_menu_settings.py` | 启动菜单入口、按钮、设置配置和动态设置界面验证 |

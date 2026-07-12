@@ -44,6 +44,16 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 ### bin/deck.ini
 定义玩家的初始卡组。
 
+### bin/setting.ini
+定义开始菜单中“设置”场景展示的设置项。每个 section 是一个设置项，当前支持布尔开关：
+
+| 字段 | 说明 | 示例 |
+|------|------|------|
+| type | 设置类型，当前仅支持 `bool` | bool |
+| name | 设置界面显示名 | 允许屏幕震动 |
+| key | `SettingsManager` 读取使用的唯一键 | allow_screen_shake |
+| value | 初始布尔值 | true |
+
 ## 德军敌人卡牌清单（v2.0）
 
 | ID | 名称 | 费用 | 攻/防 | 类型 | 特性 |

@@ -135,6 +135,10 @@
 
 电表式数字滚动显示组件。每个数位独立裁剪窗口+垂直滚条+Tween动画。
 
+### `SettingsManager` : static (bin/SettingsManager.cs)
+
+设置项静态存储。读取 `setting.ini` 的 `bool` section，提供 `Items`、`GetBool()` 和 `SetBool()`。
+
 ## 场景类
 
 | 类 | 文件 | 说明 |
@@ -147,6 +151,8 @@
 | `End` : CanvasLayer | bin/End.cs | 屏幕暗化效果。单例。战斗胜利时显示国徽+暗化。 |
 | `Store` : Control | Store.cs | 商店界面。CanvasLayer叠加于WorldMap上方。7张卡按稀有度加权随机生成，价格按稀有度生成，随机打折；待购卡复用手牌式金色边框、放大、置顶和上移反馈。点击购买→扣物资点→ChooseSomeCard选1张替换。refresh消耗5物资点重新生成7张卡。 |
 | `ChooseSomeCard` : Control | ChooseSomeCard.cs | 统一卡组选卡替换UI。静态Show(parent, pickCount, title)返回选中卡ID；通过SceneTree.Root上的最高层CanvasLayer覆盖当前界面，场景内最底层为浅黑遮罩；使用五列大卡网格、悬浮缩放与高对比选中框，并延迟启用卡牌输入以隔离打开界面的点击。被PostBattleReward/EventScene/Store复用。 |
+| `StartMenu` : Control | bin/StartMenu.cs | 游戏启动界面。显示全屏底图和继续、开始、设置、鸣谢入口；按钮带悬浮缩放。 |
+| `SettingsMenu` : Control | bin/SettingsMenu.cs | 设置场景。按 `SettingsManager.Items` 动态生成布尔设置开关。 |
 
 ## 数据类型/枚举 (cardBase_.cs 末尾)
 
