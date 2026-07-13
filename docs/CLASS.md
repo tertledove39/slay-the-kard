@@ -97,6 +97,10 @@
 
 全局autoload对白门面。缓存Dialogue Manager资源、串行化播放请求，并提供等待式`PlayAsync()`和非等待式`Play()`；开始菜单禁止播放。
 
+### `MusicManager` : Node (core_logic/MusicManager.cs)
+
+全局autoload背景音乐管理器。读取`configs/music.ini`中的槽位配置，维护单一常驻`AudioStreamPlayer`，确保StartMenu、WorldMap和battlefield_在场景切换时不会因节点销毁而中断音乐。
+
 ### `GameDialogueBalloon` : CanvasLayer (core_ui/GameDialogueBalloon.cs)
 
 项目Galgame对白气泡控制器。组合Dialogue Manager官方C#气泡，根据行标签切换`happy`、`sad`、`angry`、`normal`立绘，缺失素材回退normal。

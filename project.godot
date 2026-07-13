@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 DialogueManager="*res://addons/dialogue_manager/dialogue_manager.gd"
+MusicManager="*res://core_logic/MusicManager.cs"
 GameDialogue="*res://core_logic/GameDialogue.cs"
 
 [debug]

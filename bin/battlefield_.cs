@@ -402,6 +402,7 @@ TextureButton buttonNextTurn;
 /// </summary>
     public override void _Ready()
     {
+        MusicManager.Instance?.PlaySlot("battle");
         GD.Print("_Ready method called");
 
         // 资源管理器：缓存纹理/场景并维护空卡牌池（同步初始化，一次性完成）

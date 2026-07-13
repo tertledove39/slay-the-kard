@@ -28,6 +28,7 @@ public partial class StartMenu : Control
     public override void _Ready()
     {
         SettingsManager.Initialize();
+        MusicManager.Instance?.PlaySlot("start_menu");
         ConnectHover("Menu/Continue");
         ConnectHover("Menu/Start");
         ConnectHover("Menu/Settings");

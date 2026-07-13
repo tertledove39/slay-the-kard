@@ -10,6 +10,7 @@
 | docs/ | 项目文档目录 |
 | tests/ | 测试脚本（Python） |
 | core_logic/ | 独立核心逻辑服务，包括全局对白接口 |
+| configs/ | 结构化配置目录，包括背景音乐槽位配置 |
 | core_ui/ | 独立UI场景和脚本，包括Galgame对白气泡 |
 | dialogues/ | Dialogue Manager `.dialogue`对白内容与示例 |
 | assest/ | 其它美术素材（国旗、图标、字体等） |
@@ -76,3 +77,4 @@
 | `tests/verify_performance_batches_ab.py` | 战斗异步串行、箭头绘制、Tween和UI热路径性能回归验证 |
 | `tests/verify_ambush.py` | 伏击先制伤害结算顺序和冲击交互验证 |
 | `tests/verify_button_animations.py` | 世界地图、任务选择、商店、事件、奖励与卡组查看按钮动态效果验证 |
+| `tests/verify_music_manager.py` | 全局音乐管理器autoload、配置与场景接入验证 |

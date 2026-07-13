@@ -41,6 +41,7 @@ public partial class WorldMap : Control
 
     public override void _Ready()
     {
+        MusicManager.Instance?.PlaySlot("world_map");
         // 启动时立即初始化卡牌数据和卡组（之后所有场景均可直接使用）
         LoadCardDataCache();
         LoadDeck();
