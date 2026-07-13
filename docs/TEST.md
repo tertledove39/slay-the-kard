@@ -53,3 +53,4 @@
 - `WorldMap.cs`不再动态创建卡组按钮。
 - WorldMap的`store`与`deck`按钮使用统一hover缩放Tween。
 - ChooseMission、Store、EventScene、PostBattleReward、DisplayCard中的按钮使用统一1.08倍/0.12秒hover缩放。 
+- 所有按钮hover缩放前都会把`PivotOffset`设为控件中心，避免围绕锚点缩放。

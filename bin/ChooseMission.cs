@@ -124,6 +124,7 @@ public partial class ChooseMission : Control
 
     private static void AnimateButton(CanvasItem button, float scale)
     {
+        if (button is Control control) control.PivotOffset = control.Size / 2f;
         var tween = button.CreateTween();
         tween.TweenProperty(button, "scale", Vector2.One * scale, HoverDuration);
     }

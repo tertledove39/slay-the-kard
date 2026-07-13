@@ -40,6 +40,13 @@ def main():
             ('private const float HoverScale = 1.08f;', display),
             ('private const float HoverDuration = 0.12f;', display),
         ]), 'hover effects reuse the standard 1.08x / 0.12s parameters')
+        ,check('PivotOffset = button.Size / 2f' in worldmap_cs and
+               'PivotOffset = control.Size / 2f' in choose and
+               'PivotOffset = control.Size / 2f' in store and
+               'PivotOffset = button.Size / 2f' in event_scene and
+               'PivotOffset = button.Size / 2f' in reward and
+               'PivotOffset = button.Size / 2f' in display,
+               'button hover scaling uses the control center as pivot')
     ]
 
     failed = results.count(False)

@@ -77,6 +77,7 @@ public partial class WorldMap : Control
 
     private static void AnimateButton(Button button, float scale)
     {
+        button.PivotOffset = button.Size / 2f;
         var tween = button.CreateTween();
         tween.TweenProperty(button, "scale", Vector2.One * scale, HoverDuration);
     }
