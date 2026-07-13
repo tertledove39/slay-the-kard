@@ -19,6 +19,8 @@ public partial class PostBattleReward : CanvasLayer
     private const int GroupsCount = 3;
     private const int CardsPerGroup = 5;
     private const int MaxSwapCards = 5;
+    private const float HoverScale = 1.08f;
+    private const float HoverDuration = 0.12f;
 
     // 每种稀有度在牌组中的最大拥有数量（按卡牌ID计）
     private static readonly Dictionary<Rarity, int> RarityMaxCopies = new()
@@ -237,6 +239,8 @@ public partial class PostBattleReward : CanvasLayer
             btn.Text = $"选择第{g + 1}组";
             btn.Position = new Vector2(startX + rowWidth + 30, gy + (scaledH - btnHeight) / 2);
             btn.Size = new Vector2(btnWidth, btnHeight);
+            btn.MouseEntered += () => AnimateButton(btn, HoverScale);
+            btn.MouseExited += () => AnimateButton(btn, 1f);
             int gi = g;
             btn.Pressed += () =>
             {
@@ -252,10 +256,18 @@ public partial class PostBattleReward : CanvasLayer
         skipBtn.Text = "跳过奖励";
         skipBtn.Position = new Vector2(viewSize.X / 2 - 70, btnAreaBottom + 20);
         skipBtn.Size = new Vector2(140, 44);
+        skipBtn.MouseEntered += () => AnimateButton(skipBtn, HoverScale);
+        skipBtn.MouseExited += () => AnimateButton(skipBtn, 1f);
         skipBtn.Pressed += () => { if (!tcs.Task.IsCompleted) tcs.SetResult(null); };
         AddChild(skipBtn);
 
         return await tcs.Task;
+    }
+
+    private static void AnimateButton(Button button, float scale)
+    {
+        var tween = button.CreateTween();
+        tween.TweenProperty(button, "scale", Vector2.One * scale, HoverDuration);
     }
 
     /// <summary>

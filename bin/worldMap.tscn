@@ -1,10 +1,13 @@
-[gd_scene load_steps=6 format=3 uid="uid://d35dy87rvq1mc"]
+[gd_scene load_steps=7 format=3 uid="uid://d35dy87rvq1mc"]
 
 [ext_resource type="Script" uid="uid://dbkfpoeflekpg" path="res://bin/WorldMap.cs" id="1_kanex"]
 [ext_resource type="Texture2D" uid="uid://1wq05532vpn4" path="res://assest/worldMap.png" id="1_wpv1p"]
 [ext_resource type="Texture2D" uid="uid://cn2kgl0dgbhey" path="res://assest/chooseThisArea.png" id="2_cs12g"]
 [ext_resource type="Texture2D" uid="uid://tijuuut6gmwa" path="res://assest/chooseThisAreaPresssed.png" id="3_kanex"]
 [ext_resource type="Texture2D" uid="uid://cl2c37lfu3l2y" path="res://assest/chooseThisAreaHover.png" id="4_ord10"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_cs12g"]
+font_size = 43
 
 [node name="Control" type="Control"]
 layout_mode = 3
@@ -129,3 +132,42 @@ texture_normal = ExtResource("2_cs12g")
 texture_pressed = ExtResource("3_kanex")
 texture_hover = ExtResource("4_ord10")
 stretch_mode = 0
+
+[node name="pointLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 81.0
+offset_top = 25.0
+offset_right = 227.0
+offset_bottom = 91.0
+text = "资源点 =>"
+label_settings = SubResource("LabelSettings_cs12g")
+
+[node name="pointNum" type="Label" parent="."]
+layout_mode = 0
+offset_left = 281.0
+offset_top = 27.0
+offset_right = 407.0
+offset_bottom = 88.0
+text = "1"
+label_settings = SubResource("LabelSettings_cs12g")
+
+[node name="store" type="Button" parent="."]
+layout_mode = 0
+offset_left = 1401.0
+offset_top = 91.0
+offset_right = 1553.0
+offset_bottom = 159.0
+theme_override_font_sizes/font_size = 40
+text = "store"
+
+[node name="deck" type="Button" parent="."]
+layout_mode = 0
+offset_left = 1401.0
+offset_top = 182.0
+offset_right = 1550.0
+offset_bottom = 240.0
+theme_override_font_sizes/font_size = 30
+text = "卡组"
+
+[connection signal="pressed" from="store" to="." method="_on_store_pressed"]
+[connection signal="pressed" from="deck" to="." method="_on_deck_pressed"]

@@ -30,6 +30,15 @@ public partial class WorldMap : Control
         "unlockall",
     };
 
+    private const float HoverScale = 1.08f;
+    private const float HoverDuration = 0.12f;
+
+    public void _on_deck_pressed()
+    {
+        var displayDeck = BattleStateManager.BuildDisplayDeck();
+        BattleStateManager.ShowDeckViewer(this, displayDeck);
+    }
+
     public override void _Ready()
     {
         // 启动时立即初始化卡牌数据和卡组（之后所有场景均可直接使用）
@@ -54,19 +63,22 @@ public partial class WorldMap : Control
 
         BattleStateManager.EnsureStoreCardQueue(14);
 
-        // 右上角"查看卡组"按钮
-        var viewSize = GetViewportRect().Size;
-        var viewDeckBtn = new Button();
-        viewDeckBtn.Text = "卡组";
-        viewDeckBtn.Position = new Vector2(viewSize.X - 110, 10);
-        viewDeckBtn.Size = new Vector2(90, 36);
-        viewDeckBtn.ZIndex = 1000;
-        viewDeckBtn.Pressed += () =>
-        {
-            var displayDeck = BattleStateManager.BuildDisplayDeck();
-            BattleStateManager.ShowDeckViewer(this, displayDeck);
-        };
-        AddChild(viewDeckBtn);
+        ConnectHover("store");
+        ConnectHover("deck");
+    }
+
+    private void ConnectHover(string path)
+    {
+        var button = GetNodeOrNull<Button>(path);
+        if (button == null) return;
+        button.MouseEntered += () => AnimateButton(button, HoverScale);
+        button.MouseExited += () => AnimateButton(button, 1f);
+    }
+
+    private static void AnimateButton(Button button, float scale)
+    {
+        var tween = button.CreateTween();
+        tween.TweenProperty(button, "scale", Vector2.One * scale, HoverDuration);
     }
 
     /// <summary>从card.ini加载所有卡牌数据到BattleStateManager缓存中</summary>

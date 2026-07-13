@@ -22,6 +22,8 @@ public partial class Store : Control
     private const int StoreCardCount = 7;
     private const float CardRaise = 18f;
     private const float CardAnimationDuration = 0.12f;
+    private const float HoverScale = 1.08f;
+    private const float HoverDuration = 0.12f;
     private static readonly string[] CardNodeNames = { "card1", "card2", "card3", "card4", "card5", "card6", "card7" };
 
     public override void _Ready()
@@ -44,6 +46,14 @@ public partial class Store : Control
             backBtn.Size = new Vector2(100, 44);
             var vs = GetViewport().GetVisibleRect().Size;
             backBtn.Position = new Vector2(vs.X - 120, vs.Y - 60);
+            backBtn.MouseEntered += () => AnimateButton(backBtn, HoverScale);
+            backBtn.MouseExited += () => AnimateButton(backBtn, 1f);
+        }
+        var refreshBtn = GetNodeOrNull<TextureButton>("refresh");
+        if (refreshBtn != null)
+        {
+            refreshBtn.MouseEntered += () => AnimateButton(refreshBtn, HoverScale);
+            refreshBtn.MouseExited += () => AnimateButton(refreshBtn, 1f);
         }
         if (BattleStateManager.StoreCurrentSlots == null) BattleStateManager.InitializeStoreSlots();
         DisplayCards();
@@ -235,5 +245,11 @@ public partial class Store : Control
     {
         if (GetParent() is CanvasLayer layer) layer.QueueFree();
         else QueueFree();
+    }
+
+    private static void AnimateButton(CanvasItem button, float scale)
+    {
+        var tween = button.CreateTween();
+        tween.TweenProperty(button, "scale", Vector2.One * scale, HoverDuration);
     }
 }

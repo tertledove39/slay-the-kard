@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 
 public partial class DisplayCard : Control
 {
+    private const float HoverScale = 1.08f;
+    private const float HoverDuration = 0.12f;
     [Export] public float PanSpeed = 100.0f;
     [Export] public float MinY = -1000f;
     [Export] public float MaxY = 200f;
@@ -32,6 +34,8 @@ public partial class DisplayCard : Control
         // 连接返回按钮信号，并确保按钮在最上层
         var button = GetNode<Button>("Button");
         button.Pressed += _on_button_pressed;
+        button.MouseEntered += () => AnimateButton(button, HoverScale);
+        button.MouseExited += () => AnimateButton(button, 1f);
         MoveChild(button, GetChildCount() - 1);
 
         // 异步加载卡牌，Display内部首帧让出使背景先渲染
@@ -124,5 +128,11 @@ public partial class DisplayCard : Control
         // 取消进行中的异步加载，避免继续向即将释放的节点添加子节点造成泄漏
         _cancelled = true;
         QueueFree();
+    }
+
+    private static void AnimateButton(Button button, float scale)
+    {
+        var tween = button.CreateTween();
+        tween.TweenProperty(button, "scale", Vector2.One * scale, HoverDuration);
     }
 }

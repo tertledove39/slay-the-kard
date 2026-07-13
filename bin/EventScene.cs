@@ -15,6 +15,8 @@ public partial class EventScene : CanvasLayer
     private EventData _event;
     /// <summary>触发此事件的区域名，完成后标记为已完成</summary>
     private string _areaName;
+    private const float HoverScale = 1.08f;
+    private const float HoverDuration = 0.12f;
 
     /// <summary>左侧事件配图宽度（像素）</summary>
     private const float ImageWidth = 400f;
@@ -116,6 +118,8 @@ public partial class EventScene : CanvasLayer
             btn.Position = new Vector2(textX, choicesY + i * 50);
             btn.Size = new Vector2(480, 42);
             btn.AddThemeFontSizeOverride("font_size", 16);
+            btn.MouseEntered += () => AnimateButton(btn, HoverScale);
+            btn.MouseExited += () => AnimateButton(btn, 1f);
             int idx = i;
             btn.Pressed += () =>
             {
@@ -134,6 +138,12 @@ public partial class EventScene : CanvasLayer
         // 标记区域已完成
         BattleStateManager.MarkAreaCompleted(_areaName);
         GD.Print($"[EventScene] 事件完成，区域 {_areaName} 已标记");
+    }
+
+    private static void AnimateButton(Button button, float scale)
+    {
+        var tween = button.CreateTween();
+        tween.TweenProperty(button, "scale", Vector2.One * scale, HoverDuration);
     }
 
     // ============================ 效果执行 ============================

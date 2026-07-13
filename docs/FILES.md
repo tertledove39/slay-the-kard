@@ -75,3 +75,4 @@
 | `tests/verify_game_dialogue.py` | 全局对白接口、开始菜单限制、立绘回退和示例资源验证 |
 | `tests/verify_performance_batches_ab.py` | 战斗异步串行、箭头绘制、Tween和UI热路径性能回归验证 |
 | `tests/verify_ambush.py` | 伏击先制伤害结算顺序和冲击交互验证 |
+| `tests/verify_button_animations.py` | 世界地图、任务选择、商店、事件、奖励与卡组查看按钮动态效果验证 |

@@ -54,6 +54,10 @@ public partial class ChooseMission : Control
         _btn2.Pressed += () => OnChoose(1);
         _btn3.Pressed += () => OnChoose(2);
 
+        ConnectHover(_btn1);
+        ConnectHover(_btn2);
+        ConnectHover(_btn3);
+
         ApplyNames();
     }
 
@@ -107,6 +111,21 @@ public partial class ChooseMission : Control
         label.Position = button.Position + offset;
         button.GetParent().AddChild(label);
         return label;
+    }
+
+    private const float HoverScale = 1.08f;
+    private const float HoverDuration = 0.12f;
+
+    private static void ConnectHover(TextureButton button)
+    {
+        button.MouseEntered += () => AnimateButton(button, HoverScale);
+        button.MouseExited += () => AnimateButton(button, 1f);
+    }
+
+    private static void AnimateButton(CanvasItem button, float scale)
+    {
+        var tween = button.CreateTween();
+        tween.TweenProperty(button, "scale", Vector2.One * scale, HoverDuration);
     }
 
     private void OnChoose(int index)

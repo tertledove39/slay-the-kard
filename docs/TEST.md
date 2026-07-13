@@ -44,3 +44,12 @@
 - 伏击在攻击伤害之前结算；击杀攻击方时跳过攻击伤害。
 - 普通反击仅在未触发伏击时执行。
 - 冲击消耗在伏击判定之前，绕过伏击且不消耗目标伏击状态。
+
+## 按钮动态效果
+
+测试脚本：`tests/verify_button_animations.py`。
+
+- `worldMap.tscn`中的`deck`按钮连接到`_on_deck_pressed`。
+- `WorldMap.cs`不再动态创建卡组按钮。
+- WorldMap的`store`与`deck`按钮使用统一hover缩放Tween。
+- ChooseMission、Store、EventScene、PostBattleReward、DisplayCard中的按钮使用统一1.08倍/0.12秒hover缩放。 
