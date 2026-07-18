@@ -63,3 +63,11 @@
 - `configs/music.ini`包含`start_menu`、`world_map`、`battle`三个槽位。
 - `StartMenu`、`WorldMap`和`battlefield_`会在进入场景时请求对应BGM。
 - `Store`、`ChooseMission`、`EventScene`和`PostBattleReward`不主动切歌，继承当前音乐。
+
+## 剧情事件资源点
+
+测试脚本：`tests/verify_event_material_points.py`。
+
+- 冒烟测试：事件配置至少存在一个合法的 `materialPoints(n)` 效果。
+- 基本验证：效果写入 `BattleStateManager.MaterialPoints` 并即时刷新世界地图 `pointNum`。
+- 边界白盒测试：拒绝负数、非整数和超出 `int` 范围的参数，记录带时间和代码位置的错误；累计结果限制在 `int.MaxValue`。

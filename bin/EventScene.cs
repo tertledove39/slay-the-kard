@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 /// <summary>
 /// 事件场景界面：在WorldMap或ChooseMission上以CanvasLayer叠加显示。
 /// 布局：左侧400x600事件配图、上方金色标题栏、右侧可滚动剧情描述、下方选项按钮。
-/// 玩家选择选项后执行对应效果（如replaceCard/replaceRandomCard），完成时标记区域并返回世界地图。
+/// 玩家选择选项后执行对应效果（如materialPoints/replaceCard/replaceRandomCard），完成时标记区域并返回世界地图。
 /// </summary>
 public partial class EventScene : CanvasLayer
 {
@@ -107,7 +107,6 @@ public partial class EventScene : CanvasLayer
 
         // --- 选项按钮区 ---
         float choicesY = startY + textAreaH + 20;
-        List<string> chosenEffect = new() { null }; // 闭包捕获用
         var tcs = new TaskCompletionSource<string>();
 
         for (int i = 0; i < _event.Choices.Count; i++)
@@ -123,7 +122,6 @@ public partial class EventScene : CanvasLayer
             int idx = i;
             btn.Pressed += () =>
             {
-                chosenEffect[0] = _event.Choices[idx].Effect;
                 tcs.TrySetResult(_event.Choices[idx].Effect);
             };
             AddChild(btn);
@@ -150,7 +148,8 @@ public partial class EventScene : CanvasLayer
     // ============================ 效果执行 ============================
 
     /// <summary>
-    /// 解析并执行事件效果字符串。支持两种内置效果语法：
+    /// 解析并执行事件效果字符串。支持三种内置效果语法：
+    /// materialPoints(数量)：获得指定数量的战役资源点；
     /// replaceCard(卡牌ID)：让玩家从卡组中选择一张卡替换为指定卡；
     /// replaceRandomCard(卡牌ID)：随机替换卡组中的一张卡。
     /// 空字符串或"none"表示无效果，直接跳过。
@@ -164,11 +163,17 @@ public partial class EventScene : CanvasLayer
         var segments = effect.Split(',');
         var replaceCardIds = new List<string>();
         var randomReplaceCardIds = new List<string>();
+        int materialPointsGained = 0;
 
         foreach (var seg in segments)
         {
             var s = seg.Trim();
-            if (s.StartsWith("replaceCard(") && s.EndsWith(")"))
+            if (s.StartsWith("materialPoints("))
+            {
+                if (EventMaterialPoints.TryParse(s, out int amount))
+                    materialPointsGained = EventMaterialPoints.Add(materialPointsGained, amount);
+            }
+            else if (s.StartsWith("replaceCard(") && s.EndsWith(")"))
             {
                 string cardId = s["replaceCard(".Length..^1];
                 replaceCardIds.Add(cardId);
@@ -179,6 +184,9 @@ public partial class EventScene : CanvasLayer
                 randomReplaceCardIds.Add(cardId);
             }
         }
+
+        if (materialPointsGained > 0)
+            AddMaterialPoints(materialPointsGained);
 
         if (replaceCardIds.Count > 0)
         {
@@ -194,6 +202,18 @@ public partial class EventScene : CanvasLayer
         {
             await DoReplaceCard(newCardId, random: true);
         }
+    }
+
+    private void AddMaterialPoints(int amount)
+    {
+        BattleStateManager.MaterialPoints = EventMaterialPoints.Add(
+            BattleStateManager.MaterialPoints, amount);
+
+        var pointNum = GetTree().CurrentScene.GetNodeOrNull<Label>("pointNum");
+        if (pointNum != null)
+            pointNum.Text = BattleStateManager.MaterialPoints.ToString();
+
+        GD.Print($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] EventScene.AddMaterialPoints: 获得资源点 {amount}，当前 {BattleStateManager.MaterialPoints}");
     }
 
     private void ReplaceCardInDeck(string oldCardId, string newCardId)
@@ -264,6 +284,6 @@ public class EventChoice
 {
     /// <summary>选项按钮上显示的文本，如"接受补给"、"继续前进"</summary>
     public string Text;
-    /// <summary>选项的效果指令字符串，支持 replaceCard(id)、replaceRandomCard(id) 或 "none"</summary>
+    /// <summary>选项的效果指令字符串，支持 materialPoints(n)、replaceCard(id)、replaceRandomCard(id) 或 "none"</summary>
     public string Effect;
 }

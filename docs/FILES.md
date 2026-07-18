@@ -40,7 +40,8 @@
 | `SettingsMenu.cs` | ~50 | **设置界面** — 根据 `SettingsManager` 中的配置项动态生成设置控件。 |
 | `SettingsManager.cs` | ~65 | **设置静态管理器** — 读取 `setting.ini`，提供设置项枚举和布尔值读写。 |
 | `ChooseMission.cs` | ~113 | **任务选择界面** — 在 WorldMap 上叠加，显示3个任务（战斗/事件）。 |
-| `EventScene.cs` | ~340 | **事件界面** — 剧情事件叠加层。显示配图+描述+选项，支持 replaceCard/replaceRandomCard 效果。 |
+| `EventScene.cs` | ~290 | **事件界面** — 剧情事件叠加层。显示配图+描述+选项，支持资源点与卡牌替换效果。 |
+| `EventMaterialPoints.cs` | ~35 | **事件资源点效果** — 解析 `materialPoints(n)` 并提供防溢出的资源点加法。 |
 | `PostBattleReward.cs` | ~462 | **战后奖励界面** — 战斗胜利后的奖励系统。3组卡牌选择→卡组替换（稀有度限制）。 |
 | `ChooseSomeCard.cs` | ~210 | **统一卡组选卡界面** — 事件、商店、战后奖励共用；最高层CanvasLayer叠加，浅黑遮罩拦截下层输入。 |
 | `DisplayCard.cs` | ~128 | **卡组查看器** — 显示玩家卡组，支持滚轮翻页。 |
@@ -78,3 +79,4 @@
 | `tests/verify_ambush.py` | 伏击先制伤害结算顺序和冲击交互验证 |
 | `tests/verify_button_animations.py` | 世界地图、任务选择、商店、事件、奖励与卡组查看按钮动态效果验证 |
 | `tests/verify_music_manager.py` | 全局音乐管理器autoload、配置与场景接入验证 |
+| `tests/verify_event_material_points.py` | 事件资源点效果配置、状态更新、日志和溢出边界验证 |

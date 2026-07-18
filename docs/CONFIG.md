@@ -42,7 +42,9 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 定义区域任务池。area2-9均匀分配50个历史战役和50个事件，敌人值对应 `enemyTurn.ini` section，事件值使用 `event:事件ID`。
 
 ### bin/event.ini
-定义50个历史背景事件。每个事件包含2至3个选项，效果仅使用 `none`、`replaceCard(id)` 和 `replaceRandomCard(id)`。
+定义50个历史背景事件。每个事件包含2至3个选项，效果支持 `none`、`materialPoints(n)`、`replaceCard(id)` 和 `replaceRandomCard(id)`，多个效果使用逗号连接。
+
+`materialPoints(n)` 让玩家获得非负整数 `n` 点战役资源，结果即时同步到世界地图，资源总量最高为 `int.MaxValue`。负数、非整数和超出整数范围的参数不会生效，并记录包含时间和代码位置的错误日志。该效果与战斗内指挥点 `AddPoint(n)` 无关。
 
 ### bin/deck.ini
 定义玩家的初始卡组。

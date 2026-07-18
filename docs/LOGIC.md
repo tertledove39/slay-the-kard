@@ -170,6 +170,12 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 3. 标记区域完成并立即调用 `SceneLoader.ChangeSceneAsync()` 返回地图。
 4. `WorldMap` 复用 `BattleStateManager` 中的卡牌、事件和区域池缓存，不重复解析 INI。
 
+### 事件资源点效果
+
+位置：`EventScene.cs` `ExecuteEffect()` / `AddMaterialPoints()`，`EventMaterialPoints.cs`。
+
+事件选项可配置 `materialPoints(n)` 获得非负整数资源点。`EventMaterialPoints.TryParse()` 负责参数校验，`Add()` 使用 `long` 中间值并将结果限制在 `int.MaxValue`；`EventScene` 写入 `BattleStateManager.MaterialPoints` 后立即刷新世界地图 `pointNum`。非法参数不改变资源点，并通过 Godot 错误日志记录时间与代码位置。
+
 ---
 
 ## 历史战役难度

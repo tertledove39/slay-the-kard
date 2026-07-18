@@ -157,7 +157,8 @@
 |----|------|------|
 | `WorldMap` : Control | bin/WorldMap.cs | 世界地图主界面。10个区域按钮随进度解锁。含调试控制台；卡牌、事件与区域池配置首次解析后跨场景复用。 |
 | `ChooseMission` : Control | bin/ChooseMission.cs | 任务选择面板。3个任务按钮（战斗或事件）。 |
-| `EventScene` : CanvasLayer | bin/EventScene.cs | 剧情事件界面。配图+描述+选项，支持卡牌替换效果。 |
+| `EventScene` : CanvasLayer | bin/EventScene.cs | 剧情事件界面。配图+描述+选项，支持获得战役资源点和卡牌替换效果。 |
+| `EventMaterialPoints` : static | bin/EventMaterialPoints.cs | 解析事件 `materialPoints(n)` 效果，并以 `int.MaxValue` 为上限执行安全加法。 |
 | `PostBattleReward` : CanvasLayer | bin/PostBattleReward.cs | 战后奖励系统。3组卡牌选择→卡组替换。稀有度限制。 |
 | `DisplayCard` : Control | bin/DisplayCard.cs | 卡组查看器。滚轮翻页。 |
 | `End` : CanvasLayer | bin/End.cs | 屏幕暗化效果。单例。战斗胜利时显示国徽+暗化。 |
