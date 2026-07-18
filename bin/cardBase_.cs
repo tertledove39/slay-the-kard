@@ -16,6 +16,8 @@ public partial class cardBase_ : Control
     [Export] public int attack = 1;
     [Export] public int defence = 1;
     [Export] public string effect = "";
+    [Export] public string playEffect = "";
+    [Export] public string attackEffect = "";
     [Export] public int cost = 1;
     [Export] public string name = "轻步兵";
 
@@ -874,6 +876,8 @@ public partial class cardBase_ : Control
         attack      = cardData.Attack;
         defence     = cardData.Defense;
         effect      = cardData.Effect;
+        playEffect  = cardData.PlayEffect;
+        attackEffect = cardData.AttackEffect;
         cost        = cardData.Cost;
         cardType    = cardData.CardType;
         rarity      = cardData.Rarity;
@@ -1131,26 +1135,43 @@ public partial class cardBase_ : Control
 
     public void RefreshState()
     {
+        bool isCommand = cardType == CardTypes.Command;
+        bool isHeadquarters = isHq == HQ.hq;
+        var attackLabel = GetNode<Label>("attack");
+        var defenceLabel = GetNode<Label>("defence");
+        var iconSprite = GetNode<Sprite2D>("icon");
+        var unitTypeSprite = GetNode<Sprite2D>("unitType");
+        var costLabel = GetNode<Label>("cost");
+        var nameLabel = GetNode<Label>("name");
+        var cardBackground = GetNode<Sprite2D>("cardbase");
+
+        attackLabel.Visible = !isCommand && !isHeadquarters;
+        defenceLabel.Visible = !isCommand;
+        iconSprite.Visible = !isHeadquarters;
+        unitTypeSprite.Visible = !isHeadquarters;
+        costLabel.Visible = !isHeadquarters;
+        nameLabel.Visible = !isHeadquarters;
+
         // 指令卡使用特殊的背景图
-        if (cardType == CardTypes.Command)
+        if (isCommand)
         {
             if (FileAccess.FileExists(IconPath))
-                GetNode<Sprite2D>("icon").Texture = ResourceManager.Instance?.GetTexture(IconPath) ?? GD.Load<Texture2D>(IconPath);
-            GetNode<Sprite2D>("cardbase").Texture = ResourceManager.Instance?.GetTexture("res://cards/卡背_command.png") ?? GD.Load<Texture2D>("res://cards/卡背_command.png");
+                iconSprite.Texture = ResourceManager.Instance?.GetTexture(IconPath) ?? GD.Load<Texture2D>(IconPath);
+            cardBackground.Texture = ResourceManager.Instance?.GetTexture("res://cards/卡背_command.png") ?? GD.Load<Texture2D>("res://cards/卡背_command.png");
         }
-        else if(isHq != HQ.hq)
+        else if(!isHeadquarters)
         {
             if (FileAccess.FileExists(IconPath))
-                GetNode<Sprite2D>("icon").Texture = ResourceManager.Instance?.GetTexture(IconPath) ?? GD.Load<Texture2D>(IconPath);
+                iconSprite.Texture = ResourceManager.Instance?.GetTexture(IconPath) ?? GD.Load<Texture2D>(IconPath);
+            cardBackground.Texture = ResourceManager.Instance?.GetTexture("res://cards/卡背1.png") ?? GD.Load<Texture2D>("res://cards/卡背1.png");
         }
         else
         {
             if (FileAccess.FileExists(IconPath))
-                GetNode<Sprite2D>("cardbase").Texture = ResourceManager.Instance?.GetTexture(IconPath) ?? GD.Load<Texture2D>(IconPath);
+                cardBackground.Texture = ResourceManager.Instance?.GetTexture(IconPath) ?? GD.Load<Texture2D>(IconPath);
         }
         if (name != null)
         {
-            var nameLabel = GetNode<Label>("name");
             string currentName = name;
             nameLabel.Text = currentName;
 
@@ -1162,9 +1183,9 @@ public partial class cardBase_ : Control
                 lastNameLabelSize = nameLabel.Size;
             }
         }
-        GetNode<Label>("attack").Text = attack.ToString();
-        GetNode<Label>         ("defence").Text                                                    = defence.ToString();
-        GetNode<Label>         ("cost").Text                                                       = cost.ToString();
+        attackLabel.Text = attack.ToString();
+        defenceLabel.Text = defence.ToString();
+        costLabel.Text = cost.ToString();
         if                     (description!= null)
         {
             var descriptionLabel = GetNode<RichTextLabel>("description");
@@ -1180,13 +1201,6 @@ public partial class cardBase_ : Control
         
         OnRefreshUnitType((int)cardType);
 
-        // 指令卡的特殊UI设置
-        if (cardType == CardTypes.Command)
-        {
-            GetNode<Label>("defence").Visible = false;
-            GetNode<Label>("attack").Visible = false;
-        }
-
         // 构建attribute图标面板
         BuildAttributePanel();
     }
@@ -1196,11 +1210,8 @@ public partial class cardBase_ : Control
     /// </summary>
     private void BuildAttributePanel()
     {
-        // 指令卡不显示attribute
-        if (cardType == CardTypes.Command) return;
-
         // 缓存比较：内容未变则跳过重建，避免视觉抖动
-        var newAttrs = GetAllAttributes();
+        var newAttrs = cardType == CardTypes.Command ? new List<EffectAttribute>() : GetAllAttributes();
         if (_cachedAttrList != null && _cachedAttrList.Count == newAttrs.Count)
         {
             bool same = true;
@@ -1234,8 +1245,9 @@ public partial class cardBase_ : Control
         _attrIconRects.Clear();
         _attrIconDescs.Clear();
         _attrIconWidgets.Clear();
+        _hoveredAttributeIndex = -1;
 
-        var attrs = GetAllAttributes();
+        var attrs = newAttrs;
         if (attrs.Count == 0) return;
 
         _attrPanel = new Control();
@@ -1505,11 +1517,15 @@ public partial class cardBase_ : Control
     /// <summary>
     /// 检测鼠标是否悬停在attribute图标上，显示/隐藏描述tooltip
     /// </summary>
-    public override void _GuiInput(InputEvent @event)
+    public override void _Input(InputEvent @event)
     {
-        if (_attrIconRects.Count == 0 || _attrTooltipPanel == null) return;
-
         if (!(@event is InputEventMouseMotion)) return;
+        if (!IsVisibleInTree())
+        {
+            HideAttributeTooltip();
+            return;
+        }
+        if (_attrIconRects.Count == 0 || _attrTooltipPanel == null) return;
 
         var mousePos = GetLocalMousePosition();
         var panelPos = (_attrPanel != null) ? _attrPanel.Position : Vector2.Zero;
@@ -1539,6 +1555,12 @@ public partial class cardBase_ : Control
             _attrTooltipPanel.Visible = true;
         }
         _attrTooltipPanel.Position = mousePos + new Vector2(16, 8);
+    }
+
+    private void HideAttributeTooltip()
+    {
+        if (_attrTooltipPanel != null) _attrTooltipPanel.Visible = false;
+        _hoveredAttributeIndex = -1;
     }
 
 /// <summary>
@@ -1894,7 +1916,8 @@ public static class IconCache
         "action", "Determination", "Guardian",
         "greenLight", "yellowLight", "redLight",
         "blitz", "mobilize", "smoke", "impact",
-        "ambush", "heavyArmour", "beGuardianed", "hatred", "dead", "suppress"
+        "ambush", "heavyArmour", "beGuardianed", "hatred", "dead", "suppress",
+        "boss", "normalUnit", "bigUnit", "heal", "damage", "upgrade"
     };
 
     // trait -> icon 映射
@@ -1956,6 +1979,8 @@ public partial class CardData : Resource
     [Export] public int Defense { get; set; } = 1;
     [Export] public int Cost { get; set; } = 1;
     [Export] public string Effect { get; set; } = "";
+    [Export] public string PlayEffect { get; set; } = "";
+    [Export] public string AttackEffect { get; set; } = "";
 
     // 元数据
     [Export] public CardTypes CardType { get; set; } = CardTypes.Infantry; // plane bomber tank infantry artillery

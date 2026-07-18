@@ -108,6 +108,15 @@ public partial class MeterLabel : Control
     public void DisplayImmediate(int value)
     {
         _currentValue = value;
+
+        int needed = value == 0 ? 1 : (int)Math.Floor(Math.Log10(value)) + 1;
+        if (needed > _digitCount)
+        {
+            _digitCount = needed;
+            _digitW = _fontSize * DigitWidthRatio;
+            RebuildStrips();
+        }
+
         int displayCount = _digitCount;
         string str = value.ToString().PadLeft(displayCount);
 
