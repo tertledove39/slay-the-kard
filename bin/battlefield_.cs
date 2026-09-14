@@ -294,6 +294,7 @@ public partial class battlefield_ : Control
         card.setState(CardState.placed);
         //RefreshAllCardDisplayOrder();
         await card.MoveToPosition(place.GetPlaceGlobalPosition());
+        PlayCardEffect(card);
 
         // 重置Z-index，防止新部署单位始终在最前
         card.ZIndex = 10;
@@ -392,10 +393,10 @@ public CardMaganer GetCardMaganer()
     }
 
 
-List<Bullet> bullets;
-AudioStreamPlayer2D battleSound;
-AudioStreamPlayer2D deadSound;
+AudioStreamPlayer battleSound;
+AudioStreamPlayer deadSound;
 TextureButton buttonNextTurn;
+private bool defeatTransitionStarted;
 
 /// <summary>
 /// 初始化
@@ -409,6 +410,9 @@ TextureButton buttonNextTurn;
         var resourceManager = new ResourceManager();
         AddChild(resourceManager);
         resourceManager.Initialize();
+        var effectPool = new BattleEffectPool();
+        AddChild(effectPool);
+        effectPool.Prewarm(resourceManager);
 
         CreateChoiceOverlay();
 
@@ -420,20 +424,8 @@ TextureButton buttonNextTurn;
         supportLine = [(place_)GetNode("Place11"), (place_)GetNode("Place12"), (place_)GetNode("Place13"), (place_)GetNode("Place14"), (place_)GetNode("Place15")];
         allPlaces = [.. enemySupprotLine, .. frontLine, .. supportLine];
 
-        //子弹效果
-        bullets = new List<Bullet>();
-        
-        for(int i=0; i < 10; i++)
-        {
-            var bulletScene = ResourceManager.Instance?.GetScene("res://bin/bullet.tscn");
-            bullets.Add(((bulletScene ?? ResourceLoader.Load<PackedScene>("res://bin/bullet.tscn")).Instantiate() as Bullet));
-            AddChild(bullets[i]);
-            bullets[i].Visible = false;
-        }
-    
-
-        deadSound = GetNode<AudioStreamPlayer2D>("deadSound");
-        battleSound = GetNode<AudioStreamPlayer2D>("battleSound");
+        deadSound = GetNode<AudioStreamPlayer>("deadSound");
+        battleSound = GetNode<AudioStreamPlayer>("battleSound");
         
         //初始化打牌判定区域
         validArea = GetNode<Control>("validCardArea");
@@ -478,6 +470,8 @@ TextureButton buttonNextTurn;
                 card.Cost        = configFile[section.Key]["price"].ToInt();
                 card.IsHq        = (HQ)configFile[section.Key]["isHq"].ToInt();
                 card.Effect      = configFile[section.Key]["effect"].ToString().Trim();
+                card.PlayEffect  = GetOptionalValue(configFile[section.Key], "playEffect");
+                card.AttackEffect = GetOptionalValue(configFile[section.Key], "attackEffect");
                 card.CardType    = CardParser.GetTypes(configFile[section.Key]["cardType"].ToString().Trim());
                 card.Rarity      = CardParser.GetRarity(configFile[section.Key]["rarity"].ToString().Trim());
                 card.IconPath    = configFile[section.Key]["icon"].ToString().Trim();
@@ -750,35 +744,46 @@ TextureButton buttonNextTurn;
 
 
 
-    async Task FlyBullets(cardBase_ from, cardBase_ to)
+    private void PlayCardEffect(cardBase_ card)
     {
-        // 检查目标是否已被释放
-        if (to == null || !IsInstanceValid(to))
+        if (card == null || !IsInstanceValid(card)) return;
+        StartEffect(card.playEffect, new List<Vector2> { GetCardCenter(card) });
+    }
+
+    private bool PlayAttackEffect(cardBase_ from, cardBase_ to)
+    {
+        if (from == null || to == null || !IsInstanceValid(from) || !IsInstanceValid(to)) return false;
+        if (from.ReadAttack() <= 0) return false;
+        return StartEffect(from.attackEffect, new List<Vector2> { GetCardCenter(from), GetCardCenter(to) });
+    }
+
+    private bool StartEffect(string effectName, IReadOnlyList<Vector2> positions, float? time = null)
+    {
+        Effect effect = EffectRegistry.Create(effectName);
+        if (effect == null) return false;
+        AddChild(effect);
+        effect.PrepareForUse();
+        _ = RunEffect(effect, positions, time);
+        return true;
+    }
+
+    private async Task RunEffect(Effect effect, IReadOnlyList<Vector2> positions, float? time)
+    {
+        try
         {
-            return;
+            await effect.Play(positions, time);
         }
-
-        var rnd = new Random();
-        foreach(var bullet in bullets)
+        finally
         {
-            // 检查子弹是否有效
-            if (bullet == null || !IsInstanceValid(bullet))
-            {
-                continue;
-            }
-
-            // 检查目标和源是否仍然有效
-            if (!IsInstanceValid(from) || !IsInstanceValid(to))
-            {
-                break;
-            }
-
-            if (!bullet.Visible)
-            {
-                bullet.Fly(from, to);
-                await Task.Delay(rnd.Next(0,100));
-            }
+            if (IsInstanceValid(effect)) EffectRegistry.Release(effect);
         }
+    }
+
+    private static Vector2 GetCardCenter(cardBase_ card) => card.GlobalPosition + card.Size / 2f;
+
+    private static string GetOptionalValue(IniSection section, string key)
+    {
+        return section.TryGetValue(key, out IniValue value) ? value.GetString().Trim() : "";
     }
 
 /// <summary>
@@ -1894,6 +1899,7 @@ InputState currentInputState = InputState.nil;
 
         bool ambushTriggered = !attackerHasShock && to.HasAmbushActive();
         bool attackerKilledByAmbush = false;
+        SceneTreeTimer attackPresentationTimer = null;
 
         if (ambushTriggered)
         {
@@ -1903,11 +1909,15 @@ InputState currentInputState = InputState.nil;
             await from.LoseDefence(counterDamage);
             lastOverflowDamage += Math.Max(0, counterDamage - defBefore);
             attackerKilledByAmbush = from.ReadDefence() <= 0;
+            if (PlayAttackEffect(to, from))
+                attackPresentationTimer ??= GetTree().CreateTimer(0.5);
         }
 
         if (!attackerKilledByAmbush)
         {
             await to.LoseDefence(attackDamage);
+            if (PlayAttackEffect(from, to))
+                attackPresentationTimer ??= GetTree().CreateTimer(0.5);
             if (attackDamage > 0)
             {
                 await TriggerUnitEffects("TakingDamage", to, new List<cardBase_> { to }, checkOnlySourceCard: true);
@@ -1924,10 +1934,11 @@ InputState currentInputState = InputState.nil;
             int defBefore = from.ReadDefence();
             await from.LoseDefence(counterDamage);
             lastOverflowDamage += Math.Max(0, counterDamage - defBefore);
+            if (PlayAttackEffect(to, from))
+                attackPresentationTimer ??= GetTree().CreateTimer(0.5);
         }
 
         PlayBattleSound(1);
-        await FlyBullets(from,to);
 
         // 标记单位已经攻击，减少可攻击次数
         from.HaveAttacked();
@@ -1948,6 +1959,8 @@ InputState currentInputState = InputState.nil;
             from.HaveMoved();
         }
 
+        if (attackPresentationTimer != null)
+            await ToSignal(attackPresentationTimer, SceneTreeTimer.SignalName.Timeout);
         ResumeDeathCheck(); // 恢复死亡检查
         await CheckIfAnyUnitDiedAsync(); // 统一检查死亡
         AllowControl();
@@ -2038,6 +2051,7 @@ InputState currentInputState = InputState.nil;
         // 如果是从手上部署，触发 deployed 效果
         if (isDeployedFromHand)
         {
+            PlayCardEffect(card);
             if(card.HasTrait(UnitTraits.Blitz)) card.RefreshUnit();
             await TriggerUnitEffects("Deployed", card, new List<cardBase_>(), checkOnlySourceCard: true);
 
@@ -2243,6 +2257,7 @@ InputState currentInputState = InputState.nil;
         
         foreach (var key in keys)
         {
+            if (key == "name") continue;
             var value = configFile[enemyHqName][key].ToString().Trim();
             GD.Print($"Loading action: key={key}, value={value}");
             
@@ -2298,18 +2313,18 @@ InputState currentInputState = InputState.nil;
 
         int nextTurn = turn + 1;
         var actions = GetNextTurnActions(nextTurn);
-        var iconTexture = ResourceLoader.Load<Texture2D>("res://assest/boss.png");
 
         foreach (var action in actions)
         {
-            string desc = ParseActionDescription(action);
+            var metadata = ParseActionMetadata(action);
+            string desc = metadata.description;
             if (string.IsNullOrEmpty(desc)) continue;
 
             var row = new HBoxContainer();
             row.MouseFilter = Control.MouseFilterEnum.Ignore;
 
             var icon = new TextureRect();
-            icon.Texture = iconTexture;
+            icon.Texture = IconCache.GetIcon(metadata.icon) ?? IconCache.GetIcon("boss");
             icon.CustomMinimumSize = new Vector2(64, 64);
             icon.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
             icon.StretchMode = TextureRect.StretchModeEnum.KeepAspect;
@@ -2358,14 +2373,28 @@ InputState currentInputState = InputState.nil;
 
     string ParseActionDescription(string action)
     {
+        return ParseActionMetadata(action).description;
+    }
+
+    (string icon, string description) ParseActionMetadata(string action)
+    {
         int bracketIdx = action.LastIndexOf('[');
-        if (bracketIdx == -1) return "";
+        if (bracketIdx == -1) return ("boss", "");
         int endIdx = action.LastIndexOf(']');
-        if (endIdx <= bracketIdx) return "";
+        if (endIdx <= bracketIdx) return ("boss", "");
         string meta = action.Substring(bracketIdx + 1, endIdx - bracketIdx - 1);
-        int descIdx = meta.IndexOf("description=");
-        if (descIdx == -1) return "";
-        return meta.Substring(descIdx + "description=".Length);
+        string icon = "boss";
+        string description = "";
+        foreach (string field in meta.Split(','))
+        {
+            int separator = field.IndexOf('=');
+            if (separator <= 0) continue;
+            string key = field.Substring(0, separator).Trim();
+            string value = field.Substring(separator + 1).Trim();
+            if (key == "icon" && !string.IsNullOrEmpty(value)) icon = value;
+            else if (key == "description") description = value;
+        }
+        return (icon, description);
     }
 
     /// <summary>
@@ -2386,6 +2415,7 @@ InputState currentInputState = InputState.nil;
             {
                 await ExecuteEnemyAction(action);
                 hasAction = true;
+                await Task.Delay(200);
             }
         }
 
@@ -2397,6 +2427,7 @@ InputState currentInputState = InputState.nil;
             foreach (var action in defaultActions)
             {
                 await ExecuteEnemyAction(action);
+                await Task.Delay(200);
             }
         }
         
@@ -2416,6 +2447,7 @@ InputState currentInputState = InputState.nil;
                     foreach (var action in actions)
                     {
                         await ExecuteEnemyAction(action);
+                        await Task.Delay(200);
                     }
                 }
             }
@@ -2429,6 +2461,7 @@ InputState currentInputState = InputState.nil;
             foreach (var action in addActions)
             {
                 await ExecuteEnemyAction(action);
+                await Task.Delay(200);
             }
         }
     }
@@ -2775,7 +2808,7 @@ InputState currentInputState = InputState.nil;
         {
             var attacker = attackers[i];
             if (attacker == null) continue;
-
+            await Task.Delay(500);
             GD.Print($"Processing enemy unit: {attacker}, Type: {attacker.cardType}, Attack: {attacker.ReadAttack()}, Place: {attacker.GetMyPlace()}");
 
             // 如果是总部或攻击力为0则不主动攻击
@@ -2954,7 +2987,9 @@ InputState currentInputState = InputState.nil;
 
         await TriggerUnitEffects("Dead", deadUnit, checkOnlySourceCard: true);
         IsFriend side = deadUnit.GetIsFriend();
+        Vector2 deathCenter = GetCardCenter(deadUnit);
         RemoveCard(deadUnit);
+        StartEffect("smoke", new List<Vector2> { deathCenter });
         PlayDeadSound(1);
         if (side == IsFriend.friend) await TriggerUnitEffects("FriendlyUnitDead", deadUnit);
         else if (side == IsFriend.enemy) await TriggerUnitEffects("EnemyUnitDead", deadUnit);
@@ -2980,6 +3015,11 @@ InputState currentInputState = InputState.nil;
         }
     }
 
+
+/// <summary>
+/// 切换回合.这个函数主要用作点击next turn按钮点击后从己方回合->敌方回合->己方回合的全过程
+/// </summary>
+/// <returns></returns>
     private async Task RunTurnTransitionAsync()
     {
         // 触发友方回合结束时点
@@ -3001,7 +3041,7 @@ InputState currentInputState = InputState.nil;
         await TriggerUnitEffects("EnemyTurnBegin", null);
         
         // 增加所有已部署单位的存活回合数
-        foreach(var card in cardInPlaces.Where(x=>x.getState()==CardState.placed).ToList())
+        foreach(var card in cardInPlaces.Where(x=>x.getState()==CardState.placed).Where(x=>x.isFriend==IsFriend.enemy).ToList())
         {
             card.IncrementLifeTime();
         }
@@ -3018,7 +3058,7 @@ InputState currentInputState = InputState.nil;
         await ApplyTurnStartTraits();
 
         // 增加所有已部署单位的存活回合数
-        foreach(var card in cardInPlaces.Where(x=>x.getState()==CardState.placed).ToList())
+        foreach(var card in cardInPlaces.Where(x=>x.getState()==CardState.placed).Where(x=>x.isFriend==IsFriend.friend).ToList())
         {
             card.IncrementLifeTime();
         }
@@ -3154,6 +3194,12 @@ InputState currentInputState = InputState.nil;
 
     public void RemoveCard(cardBase_ card)
     {
+        if (card == null) return;
+        if (card.GetIsFriend() == IsFriend.friend && card.isHq == HQ.hq && !defeatTransitionStarted)
+        {
+            defeatTransitionStarted = true;
+            _ = ReturnToStartMenuAfterDefeat();
+        }
         if(card.GetIsFriend()== IsFriend.enemy && card.isHq == HQ.hq)
         {
             CalculateMaterialPoints();
@@ -3183,6 +3229,15 @@ InputState currentInputState = InputState.nil;
         card.Dead();
         RefreshAllBeGuardianedStatus();
         _displayOrderDirty = true;
+    }
+
+    private async Task ReturnToStartMenuAfterDefeat()
+    {
+        ForbidControl();
+        var endNode = GetNodeOrNull<End>("end");
+        if (endNode != null) await endNode.ShowDefeat();
+        BattleStateManager.IsCampaignMode = false;
+        await SceneLoader.ChangeSceneAsync(this, "res://bin/start_menu.tscn");
     }
 
     private void CalculateMaterialPoints()
@@ -3221,7 +3276,7 @@ InputState currentInputState = InputState.nil;
                 BattleStateManager.LastBattleHqDefenceLost,
                 BattleStateManager.LastBattlePointsGained);
 
-        BattleStateManager.MarkAreaCompleted(BattleStateManager.SelectedArea);
+        BattleStateManager.AdvanceArea(BattleStateManager.SelectedArea);
 
         await PostBattleReward.Show(this, player1);
 
@@ -4943,6 +4998,8 @@ InputState currentInputState = InputState.nil;
     /// <param name="unit">要撤退的单位</param>
     private async Task RetreatUnit(cardBase_ unit)
     {
+
+        //如果不是已经部署的单位 那么无法被撤退
         if (unit == null || unit.getState() != CardState.placed)
             return;
 
@@ -4960,10 +5017,14 @@ InputState currentInputState = InputState.nil;
                 // 移动到支援阵线
                 unitPlace.UnbondCard();
                 var validPos = (isFriendly)?GetTheFirstValidFriendlyPlace():GetTheFirstValidEnemySupportPlace();
-                unit.SetMyPlace(validPos);
-                unit.MoveToPosition(validPos.GetGlobalPosition());
-                unit.setState(CardState.placed);
-                return;
+                if(validPos != null)
+                {
+                    unit.SetMyPlace(validPos);
+                    unit.MoveToPosition(validPos.GetGlobalPosition());
+                    unit.setState(CardState.placed);
+                    return;
+                } 
+                
             }
         }
 
@@ -4985,6 +5046,10 @@ InputState currentInputState = InputState.nil;
 
         // 无法返回手牌或敌方单位，直接弃置
         unit.AddChange(ChangeType.DiscardCard,1);
+
+        await Task.Delay(100);
+
+        return;
     }
 
     /// <summary>
@@ -4992,6 +5057,7 @@ InputState currentInputState = InputState.nil;
     /// </summary>
     private async void ExecuteCommandAndDiscard(cardBase_ commandCard, List<cardBase_> targets, bool needRestoreColor = false)
     {
+        PlayCardEffect(commandCard);
         commandCard.ResetVisualsInstant();
         player1.RemoveFromHand(commandCard);
 
@@ -5042,6 +5108,7 @@ InputState currentInputState = InputState.nil;
         else
         {
             // 如果是指令卡，直接执行效果
+            PlayCardEffect(card);
             await ParseAndExecuteEffect(card.effect, card, null);
         }
 

@@ -1,10 +1,11 @@
-[gd_scene load_steps=7 format=3 uid="uid://d35dy87rvq1mc"]
+[gd_scene load_steps=8 format=3 uid="uid://d35dy87rvq1mc"]
 
 [ext_resource type="Script" uid="uid://dbkfpoeflekpg" path="res://bin/WorldMap.cs" id="1_kanex"]
 [ext_resource type="Texture2D" uid="uid://1wq05532vpn4" path="res://assest/worldMap.png" id="1_wpv1p"]
 [ext_resource type="Texture2D" uid="uid://cn2kgl0dgbhey" path="res://assest/chooseThisArea.png" id="2_cs12g"]
 [ext_resource type="Texture2D" uid="uid://tijuuut6gmwa" path="res://assest/chooseThisAreaPresssed.png" id="3_kanex"]
 [ext_resource type="Texture2D" uid="uid://cl2c37lfu3l2y" path="res://assest/chooseThisAreaHover.png" id="4_ord10"]
+[ext_resource type="Texture2D" uid="uid://357opc6t10uq" path="res://assest/资源点.png" id="6_kanex"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_cs12g"]
 font_size = 43
@@ -25,10 +26,10 @@ texture = ExtResource("1_wpv1p")
 
 [node name="area1" type="TextureButton" parent="."]
 layout_mode = 0
-offset_left = 1190.0
-offset_top = 180.0
-offset_right = 1379.0
-offset_bottom = 355.0
+offset_left = 1179.5
+offset_top = 177.0
+offset_right = 1368.5
+offset_bottom = 352.0
 texture_normal = ExtResource("2_cs12g")
 texture_pressed = ExtResource("3_kanex")
 texture_hover = ExtResource("4_ord10")
@@ -36,10 +37,10 @@ stretch_mode = 0
 
 [node name="area2" type="TextureButton" parent="."]
 layout_mode = 0
-offset_left = 1470.0
-offset_top = 645.0
-offset_right = 1659.0
-offset_bottom = 820.0
+offset_left = 1460.5
+offset_top = 646.5
+offset_right = 1649.5
+offset_bottom = 821.5
 texture_normal = ExtResource("2_cs12g")
 texture_pressed = ExtResource("3_kanex")
 texture_hover = ExtResource("4_ord10")
@@ -47,10 +48,10 @@ stretch_mode = 0
 
 [node name="area3" type="TextureButton" parent="."]
 layout_mode = 0
-offset_left = 1063.0
-offset_top = 491.0
-offset_right = 1252.0
-offset_bottom = 666.0
+offset_left = 952.7
+offset_top = 246.3
+offset_right = 1141.7
+offset_bottom = 421.3
 texture_normal = ExtResource("2_cs12g")
 texture_pressed = ExtResource("3_kanex")
 texture_hover = ExtResource("4_ord10")
@@ -58,10 +59,10 @@ stretch_mode = 0
 
 [node name="area4" type="TextureButton" parent="."]
 layout_mode = 0
-offset_left = 889.0
-offset_top = 345.0
-offset_right = 1078.0
-offset_bottom = 520.0
+offset_left = 1123.6
+offset_top = 566.5
+offset_right = 1312.6
+offset_bottom = 741.5
 texture_normal = ExtResource("2_cs12g")
 texture_pressed = ExtResource("3_kanex")
 texture_hover = ExtResource("4_ord10")
@@ -69,10 +70,10 @@ stretch_mode = 0
 
 [node name="area5" type="TextureButton" parent="."]
 layout_mode = 0
-offset_left = 744.0
-offset_top = 412.0
-offset_right = 933.0
-offset_bottom = 587.0
+offset_left = 1122.0
+offset_top = 454.7
+offset_right = 1311.0
+offset_bottom = 629.7
 texture_normal = ExtResource("2_cs12g")
 texture_pressed = ExtResource("3_kanex")
 texture_hover = ExtResource("4_ord10")
@@ -80,10 +81,10 @@ stretch_mode = 0
 
 [node name="area6" type="TextureButton" parent="."]
 layout_mode = 0
-offset_left = 661.0
-offset_top = 531.0
-offset_right = 850.0
-offset_bottom = 706.0
+offset_left = 770.1
+offset_top = 308.0
+offset_right = 959.1
+offset_bottom = 483.0
 texture_normal = ExtResource("2_cs12g")
 texture_pressed = ExtResource("3_kanex")
 texture_hover = ExtResource("4_ord10")
@@ -91,63 +92,21 @@ stretch_mode = 0
 
 [node name="area7" type="TextureButton" parent="."]
 layout_mode = 0
-offset_left = 559.0
-offset_top = 362.0
-offset_right = 748.0
-offset_bottom = 537.0
+offset_left = 193.8
+offset_top = 402.2
+offset_right = 382.8
+offset_bottom = 577.2
 texture_normal = ExtResource("2_cs12g")
 texture_pressed = ExtResource("3_kanex")
 texture_hover = ExtResource("4_ord10")
 stretch_mode = 0
-
-[node name="area8" type="TextureButton" parent="."]
-layout_mode = 0
-offset_left = 458.0
-offset_top = 528.0
-offset_right = 647.0
-offset_bottom = 703.0
-texture_normal = ExtResource("2_cs12g")
-texture_pressed = ExtResource("3_kanex")
-texture_hover = ExtResource("4_ord10")
-stretch_mode = 0
-
-[node name="area9" type="TextureButton" parent="."]
-layout_mode = 0
-offset_left = 370.0
-offset_top = 427.0
-offset_right = 559.0
-offset_bottom = 602.0
-texture_normal = ExtResource("2_cs12g")
-texture_pressed = ExtResource("3_kanex")
-texture_hover = ExtResource("4_ord10")
-stretch_mode = 0
-
-[node name="area10" type="TextureButton" parent="."]
-layout_mode = 0
-offset_left = 189.0
-offset_top = 406.0
-offset_right = 378.0
-offset_bottom = 581.0
-texture_normal = ExtResource("2_cs12g")
-texture_pressed = ExtResource("3_kanex")
-texture_hover = ExtResource("4_ord10")
-stretch_mode = 0
-
-[node name="pointLabel" type="Label" parent="."]
-layout_mode = 0
-offset_left = 81.0
-offset_top = 25.0
-offset_right = 227.0
-offset_bottom = 91.0
-text = "资源点 =>"
-label_settings = SubResource("LabelSettings_cs12g")
 
 [node name="pointNum" type="Label" parent="."]
 layout_mode = 0
-offset_left = 281.0
-offset_top = 27.0
-offset_right = 407.0
-offset_bottom = 88.0
+offset_left = 86.0
+offset_top = 25.0
+offset_right = 212.0
+offset_bottom = 86.0
 text = "1"
 label_settings = SubResource("LabelSettings_cs12g")
 
@@ -168,6 +127,11 @@ offset_right = 1550.0
 offset_bottom = 240.0
 theme_override_font_sizes/font_size = 30
 text = "卡组"
+
+[node name="pointPic" type="Sprite2D" parent="."]
+modulate = Color(1.6845763e-06, 0.706827, 9.62615e-07, 1)
+position = Vector2(49, 55)
+texture = ExtResource("6_kanex")
 
 [connection signal="pressed" from="store" to="." method="_on_store_pressed"]
 [connection signal="pressed" from="deck" to="." method="_on_deck_pressed"]

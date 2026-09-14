@@ -12,7 +12,7 @@
 
 配置文件：`bin/setting.ini`
 
-每个 section 定义一个设置项。当前支持 `bool`：
+每个 section 定义一个设置项，支持 `bool` 和 `float`：
 
 ```ini
 [allowScreenShake]
@@ -22,9 +22,11 @@ key=allow_screen_shake
 value=true
 ```
 
-- `type`：设置类型，当前仅支持 `bool`。
+- `type`：设置类型，支持 `bool` 和 `float`。
 - `name`：设置界面展示名称。
 - `key`：代码读取设置的唯一键。
 - `value`：首次运行的布尔值，`true` 或 `false`。
 
-`SettingsManager.Initialize()` 在开始菜单启动时读取配置；`SettingsManager.GetBool(key)` 和 `SettingsManager.SetBool(key, value)` 用于跨场景访问和修改当前运行时设置。设置界面按 section 自动创建 `CheckButton`。
+`float` 设置额外使用 `min`、`max` 和 `step` 配置滑块范围与步长。当前提供主音量、配乐音量、效果音量和UI音量四项，默认范围为0至100。
+
+`SettingsManager.Initialize()`读取默认配置和`user://settings.cfg`中的用户值；`GetBool`/`SetBool`及`GetFloat`/`SetFloat`用于跨场景访问。设置界面按类型自动创建`CheckButton`或`HSlider`，修改后立即保存并应用。

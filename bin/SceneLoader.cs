@@ -135,17 +135,6 @@ public static class SceneLoader
         bg.Color = new Color(0, 0, 0, OverlayAlpha);
         bg.MouseFilter = Control.MouseFilterEnum.Stop;
         canvasLayer.AddChild(bg);
-
-        var label = new Label();
-        label.Text = "Loading...";
-        label.HorizontalAlignment = HorizontalAlignment.Center;
-        label.VerticalAlignment = VerticalAlignment.Center;
-        label.SetAnchorsPreset(Control.LayoutPreset.Center);
-        label.SetCustomMinimumSize(new Vector2(300, 80));
-        label.AddThemeFontSizeOverride("font_size", LabelFontSize);
-        label.AddThemeColorOverride("font_color", Colors.White);
-        canvasLayer.AddChild(label);
-
         return canvasLayer;
     }
 }

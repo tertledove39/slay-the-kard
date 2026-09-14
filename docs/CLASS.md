@@ -59,13 +59,29 @@
 | `UnbondCard()` | 解绑卡牌 |
 | `GetPlaceGlobalPosition()` | 返回该格子的全局坐标 |
 
-### `Bullet` : Control (bin/Bullet.cs)
+### `Effect` : Control (core_logic/Effect.cs)
 
-飞弹动画。从攻击卡飞向目标卡。
+所有视觉效果的抽象基类。`Play`接收可选的全局`Vector2`位置列表和以秒为单位的可选播放时间；省略参数时由具体效果采用默认值。`EffectRegistry`将卡牌配置短名称映射到效果场景。
+
+### `Bullet` : Effect (bin/Bullet.cs)
+
+单发飞弹动画，从一个全局位置飞向另一个全局位置。
 
 | 方法 | 说明 |
 |------|------|
-| `Fly(from, to, duration)` | 异步动画：从攻击者飞向目标，带随机偏移 |
+| `Play(positions, time)` | 异步动画：使用前两个位置和可选时长播放飞弹 |
+
+### `BulletEffect` : Effect (core_logic/BulletEffect.cs)
+
+攻击子弹效果控制器，保持原有每次攻击发射10发随机间隔子弹的表现。
+
+### `SmokeEffect` : Effect (core_logic/SmokeEffect.cs)
+
+单位被消灭时在其中心播放的烟雾动画。使用`assest/Smoke_006.png`的4×4图集，每帧256×256，按行依次播放16帧，默认总时长0.4秒；前10%时间淡入，从30%进度开始淡出。
+
+### `BattleEffectPool` : Node (core_logic/BattleEffectPool.cs)
+
+战斗场景级视觉效果对象池。进入战斗时预加载并预渲染效果资源，预留4个子弹效果根、40颗子弹和8个烟雾效果；并发超出容量时允许临时扩容，播放结束后只保留池容量内的对象。
 
 ### `Player` 类 (battlefield_.cs ~line 4904)
 
@@ -132,10 +148,10 @@
 | 职责 | 说明 |
 |------|------|
 | 卡组持久化 | `DeckCardIds` 跨战役保留卡组ID列表 |
-| 战役状态 | `SelectedEnemy`/`SelectedArea`/`IsCampaignMode`/`CompletedAreas` |
+| 战役状态 | `SelectedEnemy`/`SelectedArea`/`IsCampaignMode`/`UnlockedArea` |
 | 卡牌缓存 | `CacheAllCards()`/`GetCachedCard()`/`GetAllCachedCards()` |
 | 配置缓存 | `CacheAllCards()`/`GetCachedCard()`、`CacheAllEvents()`/`GetEvent()`、`CacheAreaPools()`/`GetCachedAreaPools()`；返回地图时复用缓存，避免重复解析 INI |
-| 区域管理 | `IsAreaUnlocked()`/`MarkAreaCompleted()` |
+| 区域管理 | `AdvanceArea()`/`UnlockAllAreas()` |
 | 卡组查看 | `ShowDeckViewer()`/`BuildDisplayDeck()` |
 | 商店数据 | `StoreCardQueue`/`StoreCurrentSlots`/`InitializeStoreSlots()`/`RefreshStoreSlots()` |
 
@@ -155,7 +171,7 @@
 
 | 类 | 文件 | 说明 |
 |----|------|------|
-| `WorldMap` : Control | bin/WorldMap.cs | 世界地图主界面。10个区域按钮随进度解锁。含调试控制台；卡牌、事件与区域池配置首次解析后跨场景复用。 |
+| `WorldMap` : Control | bin/WorldMap.cs | 世界地图主界面。7个区域按钮随进度解锁，按钮按墨卡托投影落在对应历史城市。含调试控制台；卡牌、事件与区域池配置首次解析后跨场景复用。 |
 | `ChooseMission` : Control | bin/ChooseMission.cs | 任务选择面板。3个任务按钮（战斗或事件）。 |
 | `EventScene` : CanvasLayer | bin/EventScene.cs | 剧情事件界面。配图+描述+选项，支持获得战役资源点和卡牌替换效果。 |
 | `EventMaterialPoints` : static | bin/EventMaterialPoints.cs | 解析事件 `materialPoints(n)` 效果，并以 `int.MaxValue` 为上限执行安全加法。 |

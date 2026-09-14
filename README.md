@@ -38,7 +38,7 @@
   - 每个区域对应AreaPool.ini中的敌人池，随机抽取3个互不相同的敌人
   - ChooseMission界面显示3个按钮+敌人名称标签，选择后进入战斗
   - 敌方总部被摧毁后自动返回WorldMap（战役模式）
-  - BattleStateManager静态类扩展：SelectedEnemy、IsCampaignMode、EnemyDisplayNames
+  - BattleStateManager静态类扩展：SelectedEnemy、IsCampaignMode；战斗显示名由`enemyTurn.ini`的`name`提供
   - 7种德军敌人预设从enemyTurn.ini加载
 - 新增"同仇"(SharedHatred)特性：拥有同仇的单位被指向时，所有其他友方同仇单位获得+1攻击+1防御
   - 被指向判定：友方指令点选目标时 / 敌方单位攻击选为目标时（复用已有 BePicked 时点）

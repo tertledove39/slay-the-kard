@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3 uid="uid://evqf3f0uq3ao"]
+[gd_scene load_steps=14 format=3 uid="uid://evqf3f0uq3ao"]
 
 [ext_resource type="Script" uid="uid://bddqh2hovnp6b" path="res://bin/battlefield_.cs" id="1_8yftg"]
 [ext_resource type="Texture2D" uid="uid://chj5lq5e5hl7b" path="res://assest/table.jpeg" id="2_h5p18"]
@@ -11,31 +11,6 @@
 [ext_resource type="PackedScene" uid="uid://bqw3sp6xgknb" path="res://bin/place.tscn" id="8_r58wv"]
 [ext_resource type="Script" uid="uid://ceefw2hlywr3l" path="res://bin/Cardbase.cs" id="9_uwbmh"]
 [ext_resource type="Script" uid="uid://fcjignj7pq5c" path="res://End.cs" id="11_h5p18"]
-
-[sub_resource type="Gradient" id="Gradient_8yftg"]
-
-[sub_resource type="GradientTexture2D" id="GradientTexture2D_h5p18"]
-gradient = SubResource("Gradient_8yftg")
-fill_to = Vector2(1, 0.34700856)
-
-[sub_resource type="Environment" id="Environment_8yftg"]
-background_mode = 3
-background_energy_multiplier = 1.16
-tonemap_mode = 1
-tonemap_exposure = 0.83
-tonemap_white = 4.38
-glow_enabled = true
-glow_intensity = 8.0
-glow_strength = 0.7
-glow_bloom = 0.5
-glow_hdr_threshold = 0.9
-glow_hdr_scale = 2.16
-glow_hdr_luminance_cap = 256.0
-glow_map_strength = 0.82
-adjustment_enabled = true
-adjustment_brightness = 0.95
-adjustment_contrast = 1.04
-adjustment_color_correction = SubResource("GradientTexture2D_h5p18")
 
 [sub_resource type="LabelSettings" id="LabelSettings_ai4ba"]
 font = ExtResource("4_bmei2")
@@ -62,20 +37,19 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_8yftg")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
-environment = SubResource("Environment_8yftg")
-
 [node name="backGround" type="Sprite2D" parent="."]
 z_index = -8
 position = Vector2(813, 438)
 scale = Vector2(0.64166665, 0.64166665)
 texture = ExtResource("2_h5p18")
 
-[node name="battleSound" type="AudioStreamPlayer2D" parent="."]
+[node name="battleSound" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("3_ght0g")
+bus = &"SFX"
 
-[node name="deadSound" type="AudioStreamPlayer2D" parent="."]
+[node name="deadSound" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("4_h5p18")
+bus = &"SFX"
 
 [node name="point" type="Label" parent="."]
 z_index = 100

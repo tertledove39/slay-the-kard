@@ -38,9 +38,9 @@ horizontal_alignment = 1
 
 [node name="SettingsList" type="VBoxContainer" parent="."]
 layout_mode = 0
-offset_left = 590.0
+offset_left = 530.0
 offset_top = 230.0
-offset_right = 1010.0
+offset_right = 1070.0
 offset_bottom = 650.0
 theme_override_constants/separation = 16
 

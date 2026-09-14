@@ -19,18 +19,24 @@ config/icon="res://icon.svg"
 [autoload]
 
 DialogueManager="*res://addons/dialogue_manager/dialogue_manager.gd"
-MusicManager="*res://core_logic/MusicManager.cs"
 GameDialogue="*res://core_logic/GameDialogue.cs"
+MusicManager="*res://core_logic/MusicManager.cs"
 
 [debug]
 
 settings/stdout/print_fps=true
+
+[dialogue_manager]
+
+runtime/advanced/uses_dotnet=true
+runtime/balloon_path="res://core_ui/game_dialogue_balloon.tscn"
 
 [display]
 
 window/size/viewport_width=1600
 window/size/viewport_height=900
 window/stretch/mode="canvas_items"
+window/lossless_compression/force_png=false
 
 [dotnet]
 
@@ -40,13 +46,14 @@ project/assembly_name="新建游戏项目"
 
 enabled=PackedStringArray("res://addons/dialogue_manager/plugin.cfg")
 
-[dialogue_manager]
+[internationalization]
 
-runtime/advanced/uses_dotnet=true
-runtime/balloon_path="res://core_ui/game_dialogue_balloon.tscn"
+locale/translations_pot_files=PackedStringArray("res://dialogues/example.dialogue")
 
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0
+textures/vram_compression/import_etc2_astc=true
+textures/lossless_compression/force_png=true
 viewport/hdr_2d=true
 anti_aliasing/quality/screen_space_aa=2

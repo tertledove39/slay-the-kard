@@ -601,6 +601,7 @@ font = SubResource("FontFile_u3nyg")
 font_size = 28
 
 [node name="Control" type="Control"]
+texture_filter = 2
 layout_mode = 3
 anchor_right = 0.112
 anchor_bottom = 0.26700002
@@ -733,6 +734,7 @@ position = Vector2(1, 1)
 
 [node name="cardSoundPlayer" type="AudioStreamPlayer2D" parent="."]
 stream = ExtResource("15_3yh85")
+bus = &"SFX"
 
 [node name="country" type="Sprite2D" parent="."]
 position = Vector2(167, 50.999996)

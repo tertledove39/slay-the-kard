@@ -469,7 +469,11 @@ public partial class cardBase_ : Control
         return isFriend;
     }
 
-
+/// <summary>
+/// 给单位挂载一个改动,会在结算时进行结算.可能导致单位死亡的触发需要在这里结算
+/// </summary>
+/// <param name="type"></param>
+/// <param name="value"></param>
     public void AddChange(ChangeType type, int value)
     {
         ChangeList.Add(new Change(type, value));
@@ -902,6 +906,8 @@ public partial class cardBase_ : Control
         maxHistoryAttack = attack;
         maxHistoryDefence = defence;
         minHistoryCost = cost;
+        lifeTime = 0;
+
         
         RefreshState();
         
@@ -1568,6 +1574,8 @@ public partial class cardBase_ : Control
 /// </summary>
     public void Dead()
     {
+
+        //从当前位置解除绑定
         if (myPlace != null)
         {
             myPlace.UnbondCard();

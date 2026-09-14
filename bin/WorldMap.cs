@@ -1,11 +1,57 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Linq;
+
+
+
+
+public class Area
+{
+
+    /// <summary>
+    /// 这个area的id 比如area1
+    /// </summary>
+    string areaID = "";
+
+    /// <summary>
+    /// 可选项id列表
+    /// </summary>
+    List<string> entrysName;
+
+    public Area(string id)
+    {
+        entrysName = [];
+        areaID = id;
+    }
+
+/// <summary>
+/// 把一个id添加到列表中
+/// </summary>
+/// <param name="s"></param>
+    public void AddAnEntry(string s)
+    {
+        entrysName.Add(s);
+    }
+
+/// <summary>
+/// 读取当前area的entrys
+/// </summary>
+/// <returns></returns>
+    public List<string> ReadEntrys()
+    {
+        return entrysName;
+    }
+
+    int areaTimes  {get;set;}=1;
+}
+
+
 
 /// <summary>
 /// 世界地图界面：显示10个可点击区域，点击后弹出选择任务面板。
-/// 区域按顺序解锁（area1 → area2 → ... → area10）。
+/// 区域按顺序解锁（area1 → area2 → ... → area7）。
 /// 按 ` 键打开控制台，支持 help / unlockall 等调试指令。
 /// </summary>
 public partial class WorldMap : Control
@@ -13,16 +59,36 @@ public partial class WorldMap : Control
     private PackedScene _chooseMissionScene;
     private ChooseMission _chooseMissionPanel;
 
-    // 每个区域的敌人池（从AreaPool.ini加载）
-    private Dictionary<string, List<string>> _areaPools = new();
-    // 区域按钮缓存
+    /// <summary>
+    /// 每个区域的敌人池（从AreaPool.ini加载）
+    /// </summary>
+    private Dictionary<string, Area> _areaPools = new();
+    private readonly Dictionary<string, string> _battleNames = new();
+    /// <summary>
+    /// 区域按钮缓存
+    /// </summary>
     private Dictionary<string, TextureButton> _areaButtons = new();
 
-    // 控制台
+    /// <summary>
+    /// 控制台
+    /// </summary>
     private Panel _consolePanel;
+    /// <summary>
+    /// 控制台
+    /// </summary>
     private LineEdit _consoleInput;
+    /// <summary>
+    /// 控制台
+    /// </summary>
     private bool _consoleVisible;
+    /// <summary>
+    /// 控制台
+    /// </summary>
     private Label _consoleOutput;
+
+    /// <summary>
+    /// 控制台支持的指令
+    /// </summary>
 
     private static readonly string[] WorldMapCommands = new[]
     {
@@ -30,7 +96,14 @@ public partial class WorldMap : Control
         "unlockall",
     };
 
+    /// <summary>
+    /// store 卡组等按钮在鼠标悬浮在其上时的缩放比例
+    /// </summary>
     private const float HoverScale = 1.08f;
+
+    /// <summary>
+    /// store 卡组等按钮在鼠标悬浮在其上时达到对应缩放比例需要的时间
+    /// </summary>
     private const float HoverDuration = 0.12f;
 
     public void _on_deck_pressed()
@@ -39,6 +112,9 @@ public partial class WorldMap : Control
         BattleStateManager.ShowDeckViewer(this, displayDeck);
     }
 
+    private Label pointNum;
+
+
     public override void _Ready()
     {
         MusicManager.Instance?.PlaySlot("world_map");
@@ -46,13 +122,13 @@ public partial class WorldMap : Control
         LoadCardDataCache();
         LoadDeck();
         LoadEvents();
+        LoadBattleNames();
         LoadAreaPools();
         ConnectAreaButtons();
-        RefreshAreaStates();
 
-        var pointNum = GetNodeOrNull<Label>("pointNum");
-        if (pointNum != null)
-            pointNum.Text = BattleStateManager.MaterialPoints.ToString();
+
+        pointNum = GetNodeOrNull<Label>("pointNum");
+        RefreshMaterialPoint();
 
         // 预加载选择任务界面
         _chooseMissionScene = ResourceLoader.Load<PackedScene>("res://bin/chooseMission.tscn");
@@ -66,8 +142,14 @@ public partial class WorldMap : Control
 
         ConnectHover("store");
         ConnectHover("deck");
+
+        RefreshAreaStates();
     }
 
+    private void RefreshMaterialPoint()
+    {
+        pointNum.Text = BattleStateManager.MaterialPoints.ToString();
+    }
     private void ConnectHover(string path)
     {
         var button = GetNodeOrNull<Button>(path);
@@ -104,6 +186,8 @@ public partial class WorldMap : Control
             cd.Defense = configFile[section.Key]["defense"].ToInt();
             cd.Cost = configFile[section.Key]["price"].ToInt();
             cd.Effect = configFile[section.Key]["effect"].GetString();
+            cd.PlayEffect = GetOptionalValue(configFile[section.Key], "playEffect");
+            cd.AttackEffect = GetOptionalValue(configFile[section.Key], "attackEffect");
             cd.IsHq = (HQ)configFile[section.Key]["isHq"].ToInt();
             cd.Rarity = CardParser.GetRarity(configFile[section.Key]["rarity"].GetString());
             cd.IconPath = configFile[section.Key]["icon"].GetString();
@@ -113,6 +197,11 @@ public partial class WorldMap : Control
             items[cd.Id] = cd;
         }
         BattleStateManager.CacheAllCards(items);
+    }
+
+    private static string GetOptionalValue(IniSection section, string key)
+    {
+        return section.TryGetValue(key, out IniValue value) ? value.GetString().Trim() : "";
     }
 
     public override void _Input(InputEvent @event)
@@ -136,6 +225,7 @@ public partial class WorldMap : Control
     /// </summary>
     private void LoadAreaPools()
     {
+        //首先尝试读文件
         var cachedPools = BattleStateManager.GetCachedAreaPools();
         if (cachedPools != null)
         {
@@ -157,19 +247,28 @@ public partial class WorldMap : Control
             configFile.Load(stream);
         }
 
+
+        //接下来是语义分析
+
         foreach (var section in configFile)
         {
+            //首先,section的key要和对应的area编码对应
             var areaName = section.Key;
-            var entries = new List<string>();
+
+            //初始化一个area 接下来下列程序经过修改,从原来的List改成了由area保存
+            var area = new Area(areaName);
+
+            //在这里读取ini里的所有key!
             var keys = configFile.GetSectionKeys(areaName);
             foreach (var key in keys)
             {
                 var val = configFile[areaName][key].ToString().Trim();
-                if (!string.IsNullOrEmpty(val) && !entries.Contains(val))
-                    entries.Add(val);
-            }
-            if (entries.Count > 0)
-                _areaPools[areaName] = entries;
+                //这里是0827新增的筛选,保证只有entry enemy开头的key可以被识别为敌人,主要是为了防止新增的areaTimes这一key发生干扰
+                if (!string.IsNullOrEmpty(val) && (key.StartsWith("entry")||key.StartsWith("enemy")))
+                    area.AddAnEntry(val);
+            } 
+                _areaPools[areaName] = area;
+                
         }
 
         GD.Print($"Loaded area pools: {_areaPools.Count} areas");
@@ -275,11 +374,11 @@ public partial class WorldMap : Control
     /// </summary>
     private void RefreshAreaStates()
     {
-        foreach (var kv in _areaButtons)
+        foreach (var pair in _areaButtons)
         {
-            bool unlocked = BattleStateManager.IsAreaUnlocked(kv.Key);
-            // 锁定区域隐藏，解锁区域正常显示
-            kv.Value.Visible = unlocked;
+            bool unlocked = BattleStateManager.UnlockedArea.TryGetValue(pair.Key, out int value) && value == 1;
+            pair.Value.Visible = unlocked;
+            pair.Value.Disabled = !unlocked;
         }
     }
 
@@ -289,22 +388,19 @@ public partial class WorldMap : Control
     private void OnAreaPressed(string areaName)
     {
         if (_chooseMissionPanel != null) return;
-
-        if (!BattleStateManager.IsAreaUnlocked(areaName))
-        {
-            GD.Print($"Area {areaName} is locked");
-            return;
-        }
+        if (!BattleStateManager.UnlockedArea.TryGetValue(areaName, out int unlocked) || unlocked != 1) return;
 
         BattleStateManager.SelectedArea = areaName;
 
-        if (!_areaPools.TryGetValue(areaName, out var pool) || pool.Count == 0)
+        //从areaPool读取所有值 构成抽取本回合行动的pool
+
+        if (!_areaPools.TryGetValue(areaName, out Area pool))
         {
             GD.Print($"No pool for area: {areaName}");
             return;
         }
 
-        var candidates = new List<string>(pool);
+        var candidates = pool.ReadEntrys();
         var selectedIds = PickRandomEntries(candidates, 3);
 
         if (selectedIds.Count < 1)
@@ -331,6 +427,7 @@ public partial class WorldMap : Control
             _chooseMissionPanel.AddChild(bg);
             _chooseMissionPanel.MoveChild(bg, 0);
         }
+
     }
 
     /// <summary>
@@ -344,10 +441,11 @@ public partial class WorldMap : Control
             _chooseMissionPanel = null;
         }
         RefreshAreaStates();
+        RefreshMaterialPoint();
     }
 
     /// <summary>将池中的ID字符串解析为MissionEntry（"event:xxx"为事件，其余为敌人）</summary>
-    private static MissionEntry ParseEntry(string id)
+    private MissionEntry ParseEntry(string id)
     {
         if (id.StartsWith("event:"))
         {
@@ -361,8 +459,33 @@ public partial class WorldMap : Control
             };
         }
         // 敌人条目
-        var enemyName = HistoricalBattleNames.Get(id);
+        string enemyName;
+        if (!_battleNames.TryGetValue(id, out enemyName) || string.IsNullOrWhiteSpace(enemyName))
+        {
+            GD.PushError($"[WorldMap] 战斗配置缺少name: {id}");
+            enemyName = id;
+        }
         return new MissionEntry { Id = id, DisplayName = enemyName, Type = MissionType.Battle };
+    }
+
+    private void LoadBattleNames()
+    {
+        const string path = "res://cards/enemyTurn.ini";
+        _battleNames.Clear();
+        if (!Godot.FileAccess.FileExists(path))
+        {
+            GD.PushError($"[WorldMap] 战斗配置不存在: {path}");
+            return;
+        }
+        string content = Godot.FileAccess.Open(path, Godot.FileAccess.ModeFlags.Read).GetAsText();
+        var ini = new IniFile();
+        using var stream = new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
+        ini.Load(stream);
+        foreach (var section in ini)
+        {
+            if (section.Value.TryGetValue("name", out IniValue value))
+                _battleNames[section.Key] = value.GetString().Trim();
+        }
     }
 
     /// <summary>从候选列表中随机抽取count个互不相同的条目</summary>
@@ -396,6 +519,10 @@ public partial class WorldMap : Control
         }
     }
 
+
+/// <summary>
+/// 初始化控制台,未来考虑废弃,改为场景
+/// </summary>
     private void CreateConsole()
     {
         // 输出面板（控制台上方，显示多行帮助等信息）
@@ -429,6 +556,11 @@ public partial class WorldMap : Control
         _consolePanel.AddChild(_consoleInput);
     }
 
+
+/// <summary>
+/// 控制台语义分析
+/// </summary>
+/// <param name="text"></param>
     private void OnConsoleSubmit(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return;
@@ -441,16 +573,16 @@ public partial class WorldMap : Control
                 _consoleOutput.Text =
                     "=== WorldMap 控制台指令 ===\n" +
                     "  help        显示此帮助信息\n" +
-                    "  unlockall   解锁所有区域（area1 ~ area10）\n" +
+                    "  unlockall   解锁所有区域（area1 ~ area7）\n" +
                     "================================\n" +
-                    $"当前已完成区域: {string.Join(", ", BattleStateManager.CompletedAreas)}";
+                    $"当前开放区域: {string.Join(", ", BattleStateManager.UnlockedArea.Where(pair => pair.Value == 1).Select(pair => pair.Key))}";
                 _consoleOutput.Visible = true;
                 break;
 
             case "unlockall":
                 BattleStateManager.UnlockAllAreas();
                 RefreshAreaStates();
-                _consoleOutput.Text = "已解锁全部区域 (area1 ~ area10)";
+                _consoleOutput.Text = "已解锁全部区域 (area1 ~ area7)";
                 _consoleOutput.Visible = true;
                 GD.Print("All areas unlocked via console");
                 break;
@@ -461,7 +593,6 @@ public partial class WorldMap : Control
                 break;
         }
     }
-
     private void HandleAutocomplete()
     {
         if (_consoleInput == null) return;
@@ -496,6 +627,10 @@ public partial class WorldMap : Control
         _consoleInput.CaretColumn = _consoleInput.Text.Length;
     }
 
+
+/// <summary>
+/// 当store按钮被按下时,弹出商店界面,注意是叠加显示的
+/// </summary>
     void _on_store_pressed()
     {
         var storeScene = ResourceLoader.Load<PackedScene>("res://store.tscn");

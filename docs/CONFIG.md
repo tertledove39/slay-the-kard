@@ -49,7 +49,7 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 - 每个敌方预设必须配置且仅配置一个固定`tN=ADD:`成长行动；禁止与`everyNt`组合，避免重复注册和叠加失控
 
 ### bin/AreaPool.ini
-定义区域任务池。area2-9均匀分配50个历史战役和50个事件，敌人值对应 `enemyTurn.ini` section，事件值使用 `event:事件ID`。
+定义区域任务池，按 `[area1]`～`[area7]` 分区。敌人值对应 `enemyTurn.ini` section，事件值使用 `event:事件ID`。每个区域按钮对应一个分区，段名必须与 `bin/worldMap.tscn` 中的区域按钮节点名一致。
 
 ### bin/event.ini
 定义50个历史背景事件。每个事件包含2至3个选项，效果支持 `none`、`materialPoints(n)`、`replaceCard(id)` 和 `replaceRandomCard(id)`，多个效果使用逗号连接。

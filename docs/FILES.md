@@ -35,7 +35,7 @@
 | `SceneLoader.cs` | ~151 | **场景加载器** — 静态类。异步场景切换，支持后台预加载 `PackedScene`，带 Loading 覆盖层。 |
 | `BattleStateManager` 类 | CardRestoration.cs (~167) | **跨场景状态管理** — 静态类。持久化卡组ID、选中的敌人、已完成的区域、卡牌数据缓存。 |
 | `MeterLabel.cs` | ~210 | **电表数字组件** — 机械式数字滚动显示（指挥点计数用）。 |
-| `WorldMap.cs` | ~499 | **世界地图场景** — 战役主界面。10个区域按钮，随递次解锁。点击弹出 ChooseMission。含调试控制台。 |
+| `WorldMap.cs` | ~645 | **世界地图场景** — 战役主界面。7个区域按钮，随递次解锁。点击弹出 ChooseMission。含调试控制台。 |
 | `StartMenu.cs` | ~50 | **开始菜单** — 初始化设置，处理继续、开始、设置和鸣谢入口，以及按钮悬浮缩放。 |
 | `SettingsMenu.cs` | ~50 | **设置界面** — 根据 `SettingsManager` 中的配置项动态生成设置控件。 |
 | `SettingsManager.cs` | ~65 | **设置静态管理器** — 读取 `setting.ini`，提供设置项枚举和布尔值读写。 |
@@ -55,7 +55,7 @@
 | 文件 | 说明 |
 |------|------|
 | `cards/card.ini` | 卡牌数据定义（苏联卡 + 德军卡共12张de_前缀卡） |
-| `cards/enemyTurn.ini` | 50个按area2-9递进的东线历史战役行动脚本 |
+| `cards/enemyTurn.ini` | 50个按area2-7递进的东线历史战役行动脚本 |
 | `bin/AreaPool.ini` | 区域任务池配置 |
 | `bin/deck.ini` | 玩家初始卡组配置 |
 | `bin/event.ini` | 50个平衡的历史背景事件配置 |
@@ -80,3 +80,4 @@
 | `tests/verify_button_animations.py` | 世界地图、任务选择、商店、事件、奖励与卡组查看按钮动态效果验证 |
 | `tests/verify_music_manager.py` | 全局音乐管理器autoload、配置与场景接入验证 |
 | `tests/verify_event_material_points.py` | 事件资源点效果配置、状态更新、日志和溢出边界验证 |
+| `tests/verify_world_map_areas.py` | 世界地图区域按钮、区域池段、AreaOrder 与 UnlockedArea 一致性及地理落点验证 |

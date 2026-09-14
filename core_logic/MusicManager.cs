@@ -14,7 +14,8 @@ public partial class MusicManager : Node
     public override void _Ready()
     {
         Instance = this;
-        player = new AudioStreamPlayer();
+        SettingsManager.Initialize();
+        player = new AudioStreamPlayer { Bus = "Music" };
         AddChild(player);
         LoadConfig();
     }
@@ -29,12 +30,18 @@ public partial class MusicManager : Node
         if (string.IsNullOrWhiteSpace(slot)) return;
         if (!slotPaths.TryGetValue(slot, out string path) || string.IsNullOrWhiteSpace(path)) return;
         if (currentSlot == slot && player.Playing) return;
+        if (currentPath == path && player.Playing)
+        {
+            currentSlot = slot;
+            return;
+        }
         AudioStream stream = ResourceLoader.Load<AudioStream>(path);
         if (stream == null)
         {
             GD.PushWarning($"MusicManager: failed to load {path}");
             return;
         }
+        if (stream is AudioStreamMP3 mp3) mp3.Loop = true;
         currentSlot = slot;
         currentPath = path;
         player.Stream = stream;

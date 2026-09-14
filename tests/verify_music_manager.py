@@ -20,6 +20,8 @@ def main():
         check('public static MusicManager Instance' in music, "MusicManager exposes a global instance"),
         check('public void PlaySlot(string slot)' in music, "MusicManager exposes PlaySlot"),
         check('[music]' in config and 'start_menu=' in config and 'world_map=' in config and 'battle=' in config, "music slot config contains the expected entries"),
+        check(config.count('res://assest/music/配乐1.mp3') == 3, "all music slots use 配乐1"),
+        check('mp3.Loop = true' in music, "MP3 background music loops"),
         check('MusicManager.Instance?.PlaySlot("start_menu")' in start, "StartMenu requests menu music"),
         check('MusicManager.Instance?.PlaySlot("world_map")' in world, "WorldMap requests map music"),
         check('MusicManager.Instance?.PlaySlot("battle")' in battle, "battlefield requests battle music"),

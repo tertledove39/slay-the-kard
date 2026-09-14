@@ -13,7 +13,7 @@ public partial class PostBattleReward : CanvasLayer
     private Player _player;
     private List<CardData> _chosenGroup;
 
-    private const float CardDisplayScale = 0.75f; // 奖励组选择界面卡牌缩放
+    private const float CardDisplayScale = 1.0f;
     private const float CardDisplayWidth = 180f;
     private const float CardDisplayHeight = 240f;
     private const int GroupsCount = 3;
@@ -216,6 +216,18 @@ public partial class PostBattleReward : CanvasLayer
         title.Size = new Vector2(500, 50);
         AddChild(title);
 
+        var scroll = new ScrollContainer
+        {
+            Position = new Vector2(0, 95),
+            Size = new Vector2(viewSize.X, Mathf.Max(200, viewSize.Y - 175)),
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+            VerticalScrollMode = ScrollContainer.ScrollMode.Auto
+        };
+        AddChild(scroll);
+
+        var content = new Control();
+        scroll.AddChild(content);
+
         // 计算横向布局参数：5张卡牌一行
         float scaledW = CardDisplayWidth * CardDisplayScale;
         float scaledH = CardDisplayHeight * CardDisplayScale;
@@ -227,12 +239,14 @@ public partial class PostBattleReward : CanvasLayer
         float startX = (viewSize.X - rowTotalWidth) / 2;
         float groupGap = 10f;
         float groupHeight = scaledH + btnHeight + groupGap;
-        float startY = 120;
+        float startY = 25;
+        float contentHeight = startY + groups.Count * groupHeight + 25;
+        content.CustomMinimumSize = new Vector2(viewSize.X, contentHeight);
 
         for (int g = 0; g < groups.Count; g++)
         {
             float gy = startY + g * groupHeight;
-            var cards = CreateGroupCardRow(groups[g], startX, gy, this);
+            var cards = CreateGroupCardRow(groups[g], startX, gy, content);
 
             // 选择按钮放在卡牌行右侧垂直居中
             var btn = new Button();
@@ -247,14 +261,13 @@ public partial class PostBattleReward : CanvasLayer
                 if (!tcs.Task.IsCompleted)
                     tcs.SetResult(groups[gi]);
             };
-            AddChild(btn);
+            content.AddChild(btn);
         }
 
         // "跳过"按钮
-        float btnAreaBottom = startY + GroupsCount * groupHeight;
         var skipBtn = new Button();
         skipBtn.Text = "跳过奖励";
-        skipBtn.Position = new Vector2(viewSize.X / 2 - 70, btnAreaBottom + 20);
+        skipBtn.Position = new Vector2(viewSize.X / 2 - 70, viewSize.Y - 65);
         skipBtn.Size = new Vector2(140, 44);
         skipBtn.MouseEntered += () => AnimateButton(skipBtn, HoverScale);
         skipBtn.MouseExited += () => AnimateButton(skipBtn, 1f);

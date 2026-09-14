@@ -1,6 +1,11 @@
+using System.Threading.Tasks;
 using Godot;
 public partial class StartMenu : Control
 {
+
+
+
+
     private const string WorldMapPath = "res://bin/worldMap.tscn";
     private const string SettingsPath = "res://bin/settings_menu.tscn";
     private const float HoverScale = 1.08f;
@@ -18,21 +23,36 @@ public partial class StartMenu : Control
 
     public void _on_start_pressed()
     {
-        _ = SceneLoader.ChangeSceneAsync(this, WorldMapPath);
+        LoadWorldMap();
     }
     public void _on_continue_pressed()
     {
-        _ = SceneLoader.ChangeSceneAsync(this, WorldMapPath);
+        LoadWorldMap();
     }
+
+    async Task LoadWorldMap()
+    {
+
+        await SceneLoader.ChangeSceneAsync(this, WorldMapPath);
+    }
+
+    
+
 
     public override void _Ready()
     {
         SettingsManager.Initialize();
         MusicManager.Instance?.PlaySlot("start_menu");
+
+        //准备悬浮
         ConnectHover("Menu/Continue");
         ConnectHover("Menu/Start");
         ConnectHover("Menu/Settings");
         ConnectHover("Menu/Credits");
+
+        
+
+
     }
 
     private void ConnectHover(string path)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Formats.Asn1;
 using System.Linq;
 using Godot;
 
@@ -23,20 +24,16 @@ public static class BattleStateManager
     public static int LastBattleFriendlyDead { get; set; } = 0;
     public static int LastBattleHqDefenceLost { get; set; } = 0;
     public static int LastBattlePointsGained { get; set; } = 0;
-    // 已完成的区域集合（跨场景持久）
-    public static HashSet<string> CompletedAreas { get; private set; } = new();
-
-    private static readonly string[] AreaOrder = { "area1", "area2", "area3", "area4", "area5", "area6", "area7", "area8", "area9", "area10" };
-
-    public static readonly Dictionary<string, string> EnemyDisplayNames = new()
+    private static readonly string[] AreaOrder = { "area1", "area2", "area3", "area4", "area5", "area6", "area7" };
+    public static Dictionary<string, int> UnlockedArea { get; } = new()
     {
-        { "wehrmacht", "德国国防军" },
-        { "luftflotte", "德国航空舰队" },
-        { "ss_panzer", "党卫装甲军" },
-        { "ostwall", "东方壁垒防线" },
-        { "volkssturm", "国民冲锋队" },
-        { "fuehrerbunker", "元首地堡" },
-        { "berlin", "柏林保卫战" },
+        ["area1"] = 1,
+        ["area2"] = 0,
+        ["area3"] = 0,
+        ["area4"] = 0,
+        ["area5"] = 0,
+        ["area6"] = 0,
+        ["area7"] = 0
     };
 
     // ============================ 卡组持久化 ============================
@@ -51,7 +48,11 @@ public static class BattleStateManager
     private static Dictionary<string, CardData> _allCards;
     /// <summary>所有事件数据缓存（event.ini解析结果）</summary>
     private static Dictionary<string, EventData> _allEvents;
-    private static Dictionary<string, List<string>> _areaPools;
+
+    /// <summary>
+    /// 储存所有area对应数据的池子
+    /// </summary>
+    private static Dictionary<string, Area> _areaPools;
 
     /// <summary>缓存所有卡牌数据，供跨场景访问</summary>
     public static void CacheAllCards(Dictionary<string, CardData> cards)
@@ -86,13 +87,18 @@ public static class BattleStateManager
 
     public static bool IsEventDataCached => _allEvents != null && _allEvents.Count > 0;
 
-    public static void CacheAreaPools(Dictionary<string, List<string>> areaPools)
+    public static void CacheAreaPools(Dictionary<string, Area> areaPools)
     {
         if (areaPools != null && areaPools.Count > 0)
             _areaPools = areaPools;
     }
 
-    public static Dictionary<string, List<string>> GetCachedAreaPools()
+
+/// <summary>
+/// 阅读缓存的areaPool池
+/// </summary>
+/// <returns></returns>
+    public static Dictionary<string,Area> GetCachedAreaPools()
     {
         return _areaPools;
     }
@@ -126,35 +132,21 @@ public static class BattleStateManager
 
     // ============================ 区域管理 ============================
 
-    /// <summary>
-    /// 检查区域是否可进入：未完成且前序区域已完成（area1始终解锁但完成后锁定）
-    /// </summary>
-    public static bool IsAreaUnlocked(string areaName)
+    /// <summary>关闭当前区域并解锁下一个区域</summary>
+    public static void AdvanceArea(string areaName)
     {
-        // 已完成区域不可再进入
-        if (CompletedAreas.Contains(areaName)) return false;
-
-        if (areaName == "area1") return true;
-
-        int idx = System.Array.IndexOf(AreaOrder, areaName);
-        if (idx <= 0) return false;
-
-        string prevArea = AreaOrder[idx - 1];
-        return CompletedAreas.Contains(prevArea);
-    }
-
-    /// <summary>标记区域为已完成</summary>
-    public static void MarkAreaCompleted(string areaName)
-    {
-        if (!string.IsNullOrEmpty(areaName))
-            CompletedAreas.Add(areaName);
+        int index = Array.IndexOf(AreaOrder, areaName);
+        if (index < 0) return;
+        UnlockedArea[areaName] = 0;
+        if (index + 1 < AreaOrder.Length)
+            UnlockedArea[AreaOrder[index + 1]] = 1;
     }
 
     /// <summary>解锁所有区域（控制台调试用）</summary>
     public static void UnlockAllAreas()
     {
-        foreach (var area in AreaOrder)
-            CompletedAreas.Add(area);
+        foreach (string area in AreaOrder)
+            UnlockedArea[area] = 1;
     }
 
     // ============================ 商店数据 ============================

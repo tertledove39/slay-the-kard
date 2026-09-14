@@ -14,6 +14,10 @@ public partial class ResourceManager : Node
     private Dictionary<string, Texture2D> textureCache = new Dictionary<string, Texture2D>();
     private Dictionary<string, PackedScene> sceneCache = new Dictionary<string, PackedScene>();
     private Dictionary<string, FontFile> fontCache = new Dictionary<string, FontFile>();
+
+    /// <summary>
+    /// 空卡牌的池子.需要初始化卡牌的时候,需要读取这个池子
+    /// </summary>
     private Queue<cardBase_> emptyCardPool = new Queue<cardBase_>();
 
     // 默认的空卡牌池大小
@@ -22,6 +26,10 @@ public partial class ResourceManager : Node
     private const string CardScenePath = "res://bin/cardbase.tscn";
 
     private Task? poolRefillTask;
+
+    /// <summary>
+    /// 锁 保证初始化不会被打断
+    /// </summary>
     private bool isInitializing = false;
 
     public override void _EnterTree()

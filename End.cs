@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Threading.Tasks;
 
 public partial class End : CanvasLayer
 {
@@ -48,10 +49,51 @@ public partial class End : CanvasLayer
         _tween.TweenProperty(_overlay, "color", new Color(0, 0, 0, alpha), duration);
 
         var img = GetNode<Sprite2D>("img");
+        img.Modulate = Colors.White;
         img.Visible = true;
             img.Texture        = GD.Load<Texture2D>("res://assest/苏联国徽G.png");
             img.GlobalPosition = new Vector2(800, 300);
         img.Scale = new Vector2(4f, 4f);
+    }
+
+    public async Task ShowDefeat()
+    {
+        Dim();
+        var img = GetNode<Sprite2D>("img");
+        img.Modulate = new Color(0.35f, 0.35f, 0.35f, 1f);
+
+        var viewSize = GetViewport().GetVisibleRect().Size;
+        var panel = new Control
+        {
+            Size = new Vector2(360, 150),
+            Position = new Vector2((viewSize.X - 360) / 2, 520),
+            ZIndex = 200
+        };
+        AddChild(panel);
+
+        var title = new Label
+        {
+            Text = "战斗失败",
+            Size = new Vector2(360, 50),
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        title.AddThemeFontSizeOverride("font_size", 32);
+        title.AddThemeColorOverride("font_color", new Color(0.75f, 0.75f, 0.75f));
+        panel.AddChild(title);
+
+        var returnButton = new Button
+        {
+            Text = "返回主菜单",
+            Position = new Vector2(90, 75),
+            Size = new Vector2(180, 48)
+        };
+        returnButton.AddThemeFontSizeOverride("font_size", 20);
+        panel.AddChild(returnButton);
+
+        var completion = new TaskCompletionSource<bool>();
+        returnButton.Pressed += () => completion.TrySetResult(true);
+        await completion.Task;
+        panel.QueueFree();
     }
 
     /// <summary>

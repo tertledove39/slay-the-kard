@@ -180,7 +180,7 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 
 ## 历史战役难度
 
-`AreaPool.ini` 将50个战役和50个事件各一次分配至area2-9。战役处决回合与行动密度随区域递增，使用贴膜、刷兵、随机伤害、降攻和压制构成压力。行动配置禁止 `everyNt=ADD:`，且每关必须恰有一个固定回合成长效果。战役ID通过 `HistoricalBattleNames.Get()` 转换为中文名称。
+`AreaPool.ini` 将战役和事件分配至area2-7。战役处决回合与行动密度随区域递增，使用贴膜、刷兵、随机伤害、降攻和压制构成压力。行动配置禁止 `everyNt=ADD:`，且每关必须恰有一个固定回合成长效果。战役ID对应的中文名称直接读取`enemyTurn.ini`中相应section的`name`。
 
 ---
 

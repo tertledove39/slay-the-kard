@@ -5,23 +5,19 @@
 | 文件名 | 内容简介 |
 |--------|---------|
 | DOCS_ALL.md | 文档目录索引（本文件） |
-| CONFIG.md | 配置项文档：卡牌配置、敌人预设、区域配置说明 |
-| UnitTraitsGuide.md | 单位特性使用指南 |
-| choice-ui-hints.md | 选择界面函数说明与最佳实践 |
-| LOGIC.md | 逻辑功能文档：效果脚本变量系统、攻击流程 |
-
-## 推荐创建的文档
-
-| 文件名 | 内容简介 |
-|--------|---------|
 | FILES.md | 项目目录说明、代码文件说明 |
 | CLASS.md | 各个类的功能与说明 |
+| CONFIG.md | 配置项文件的位置与各配置项的意义 |
+| LOGIC.md | 逻辑功能文档：效果脚本系统、攻击流程、回合流程 |
+| UnitTraitsGuide.md | 单位特性使用指南 |
+| choice-ui-hints.md | 选择界面函数说明与最佳实践 |
+| BUGS.md | 已发现的代码逻辑问题汇总（非修改，仅收集） |
+| FUNCTION_INDEX.md | 所有函数的索引目录 |
+| NOTICE.md | 修改注意事项（每次修改前必读） |
+| START_MENU.md | 开始菜单、设置配置与运行时设置访问说明 |
+| CAMPAIGN_CONTENT.md | 50个事件与50个历史战役的分配、平衡和历史取材说明 |
 | DIALOGUE.md | Dialogue Manager全局接口、对白编写与立绘标签使用指南 |
 | API.md | 项目对外API接口 |
 | TEST.md | 项目测试样例与验证范围 |
 | MUSIC.md | 全局背景音乐管理器与场景BGM接入说明 |
-| CONFIG.md | 配置项文件的位置与各配置项的意义 |
-| API.md | 各个对外API接口 |
-| TEST.md | 测试样例设计 |
-| START_MENU.md | 开始菜单、设置配置与运行时设置访问说明 |
-| CAMPAIGN_CONTENT.md | 50个事件与50个历史战役的分配、平衡和历史取材说明 |
+| TODO_LIST.md | 全项目代码规范审查待办：按正确性、可维护性、耦合性、可扩展性排序并附修改建议 |

@@ -133,9 +133,8 @@ public partial class EventScene : CanvasLayer
         // --- 执行效果 ---
         await ExecuteEffect(effect);
 
-        // 标记区域已完成
-        BattleStateManager.MarkAreaCompleted(_areaName);
-        GD.Print($"[EventScene] 事件完成，区域 {_areaName} 已标记");
+        BattleStateManager.AdvanceArea(_areaName);
+        GD.Print($"[EventScene] 事件完成，已推进区域 {_areaName}");
     }
 
     private static void AnimateButton(Button button, float scale)
@@ -163,15 +162,17 @@ public partial class EventScene : CanvasLayer
         var segments = effect.Split(',');
         var replaceCardIds = new List<string>();
         var randomReplaceCardIds = new List<string>();
-        int materialPointsGained = 0;
 
         foreach (var seg in segments)
         {
             var s = seg.Trim();
             if (s.StartsWith("materialPoints("))
             {
-                if (EventMaterialPoints.TryParse(s, out int amount))
-                    materialPointsGained = EventMaterialPoints.Add(materialPointsGained, amount);
+                var amount = s["materialPoints(".Length..^1].ToInt();
+                {
+                    if(BattleStateManager.MaterialPoints+amount<=0) BattleStateManager.MaterialPoints=0;
+                    else BattleStateManager.MaterialPoints+=amount;
+                }
             }
             else if (s.StartsWith("replaceCard(") && s.EndsWith(")"))
             {
@@ -185,8 +186,6 @@ public partial class EventScene : CanvasLayer
             }
         }
 
-        if (materialPointsGained > 0)
-            AddMaterialPoints(materialPointsGained);
 
         if (replaceCardIds.Count > 0)
         {
@@ -204,17 +203,6 @@ public partial class EventScene : CanvasLayer
         }
     }
 
-    private void AddMaterialPoints(int amount)
-    {
-        BattleStateManager.MaterialPoints = EventMaterialPoints.Add(
-            BattleStateManager.MaterialPoints, amount);
-
-        var pointNum = GetTree().CurrentScene.GetNodeOrNull<Label>("pointNum");
-        if (pointNum != null)
-            pointNum.Text = BattleStateManager.MaterialPoints.ToString();
-
-        GD.Print($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] EventScene.AddMaterialPoints: 获得资源点 {amount}，当前 {BattleStateManager.MaterialPoints}");
-    }
 
     private void ReplaceCardInDeck(string oldCardId, string newCardId)
     {

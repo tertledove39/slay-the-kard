@@ -101,6 +101,12 @@ public partial class ChooseMission : Control
         }
     }
 
+/// <summary>
+/// 为每个按钮创建显示相关信息的label
+/// </summary>
+/// <param name="button"></param>
+/// <param name="offset"></param>
+/// <returns></returns>
     private static Label CreateLabel(TextureButton button, Vector2 offset)
     {
         var label = new Label();
@@ -116,17 +122,39 @@ public partial class ChooseMission : Control
     private const float HoverScale = 1.08f;
     private const float HoverDuration = 0.12f;
 
+/// <summary>
+/// 把按钮连接到悬浮的动画效果上
+/// </summary>
+/// <param name="button"></param>
     private static void ConnectHover(TextureButton button)
     {
         button.MouseEntered += () => AnimateButton(button, HoverScale);
         button.MouseExited += () => AnimateButton(button, 1f);
+        button.ButtonDown += () => AnimateButtonPressed(button, 0.9f);
     }
 
+/// <summary>
+/// 悬浮的动画效果
+/// </summary>
+/// <param name="button"></param>
+/// <param name="scale"></param>
     private static void AnimateButton(CanvasItem button, float scale)
     {
         if (button is Control control) control.PivotOffset = control.Size / 2f;
         var tween = button.CreateTween();
         tween.TweenProperty(button, "scale", Vector2.One * scale, HoverDuration);
+    }
+
+/// <summary>
+/// 按下去的时候按钮略为缩小
+/// </summary>
+/// <param name="button"></param>
+/// <param name="scale"></param>
+    private static void AnimateButtonPressed(CanvasItem button, float scale)
+    {
+        if (button is Control control) control.PivotOffset = control.Size / 2f;
+        var tween = button.CreateTween();
+        tween.TweenProperty(button, "scale", Vector2.One * scale, 0.1f);
     }
 
     private void OnChoose(int index)

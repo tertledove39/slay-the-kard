@@ -1,0 +1,161 @@
+[gd_scene load_steps=7 format=3 uid="uid://6suxyjaets1n"]
+
+[ext_resource type="Script" uid="uid://c5mlycfbeuwpg" path="res://Store.cs" id="1_s3f3m"]
+[ext_resource type="Texture2D" uid="uid://ib0pgdgl56xr" path="res://assest/商店.png" id="1_x7ts4"]
+[ext_resource type="PackedScene" uid="uid://bc1bwysmnoo2o" path="res://bin/cardbase.tscn" id="2_s3f3m"]
+[ext_resource type="Texture2D" uid="uid://djcd44l3eitkd" path="res://assest/refresh.png" id="3_jdgcu"]
+
+[sub_resource type="FontFile" id="FontFile_sxxsk"]
+cache/0/60/0/ascent = 0.0
+cache/0/60/0/descent = 0.0
+cache/0/60/0/underline_position = 0.0
+cache/0/60/0/underline_thickness = 0.0
+cache/0/60/0/scale = 1.0
+cache/0/16/0/ascent = 0.0
+cache/0/16/0/descent = 0.0
+cache/0/16/0/underline_position = 0.0
+cache/0/16/0/underline_thickness = 0.0
+cache/0/16/0/scale = 1.0
+cache/0/80/0/ascent = 0.0
+cache/0/80/0/descent = 0.0
+cache/0/80/0/underline_position = 0.0
+cache/0/80/0/underline_thickness = 0.0
+cache/0/80/0/scale = 1.0
+
+[sub_resource type="LabelSettings" id="LabelSettings_a4gqu"]
+font = SubResource("FontFile_sxxsk")
+font_size = 80
+
+[node name="Control" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_s3f3m")
+
+[node name="backGround" type="TextureRect" parent="."]
+layout_mode = 0
+offset_right = 1600.0
+offset_bottom = 900.0
+texture = ExtResource("1_x7ts4")
+
+[node name="Label" type="Label" parent="."]
+layout_mode = 0
+offset_left = 115.0
+offset_top = 57.0
+offset_right = 310.0
+offset_bottom = 140.0
+text = "后勤部"
+label_settings = SubResource("LabelSettings_a4gqu")
+
+[node name="card1" parent="." instance=ExtResource("2_s3f3m")]
+layout_mode = 1
+anchor_left = -0.103125
+anchor_top = -0.5711111
+anchor_right = 0.008875008
+anchor_bottom = -0.30411106
+offset_left = 685.0
+offset_top = 599.0
+offset_right = 685.8
+offset_bottom = 598.69995
+
+[node name="card2" parent="." instance=ExtResource("2_s3f3m")]
+layout_mode = 1
+anchor_left = -0.36152345
+anchor_top = -1.0865926
+anchor_right = -0.24952346
+anchor_bottom = -0.81959254
+offset_left = 1348.4375
+offset_top = 1062.9333
+offset_right = 1349.2375
+offset_bottom = 1062.6333
+
+[node name="card3" parent="." instance=ExtResource("2_s3f3m")]
+layout_mode = 1
+anchor_left = -0.97300047
+anchor_top = -1.9712051
+anchor_right = -0.86100054
+anchor_bottom = -1.7042052
+offset_left = 2576.8008
+offset_top = 1859.0846
+offset_right = 2577.6008
+offset_bottom = 1858.7845
+
+[node name="card4" parent="." instance=ExtResource("2_s3f3m")]
+layout_mode = 1
+anchor_left = -0.9383984
+anchor_top = -0.6221483
+anchor_right = -0.8263985
+anchor_bottom = -0.35514826
+offset_left = 1601.4375
+offset_top = 1059.9335
+offset_right = 1602.2375
+offset_bottom = 1059.6334
+
+[node name="card5" parent="." instance=ExtResource("2_s3f3m")]
+layout_mode = 1
+anchor_left = -0.36152345
+anchor_top = -1.0865926
+anchor_right = -0.24952346
+anchor_bottom = -0.81959254
+offset_left = 928.4375
+offset_top = 1477.9333
+offset_right = 929.23755
+offset_bottom = 1477.6333
+
+[node name="card6" parent="." instance=ExtResource("2_s3f3m")]
+layout_mode = 1
+anchor_left = -0.97300047
+anchor_top = -1.9712051
+anchor_right = -0.86100054
+anchor_bottom = -1.7042052
+offset_left = 2156.8008
+offset_top = 2274.0845
+offset_right = 2157.601
+offset_bottom = 2273.7847
+
+[node name="card7" parent="." instance=ExtResource("2_s3f3m")]
+layout_mode = 1
+anchor_left = -0.97300047
+anchor_top = -1.9712051
+anchor_right = -0.86100054
+anchor_bottom = -1.7042052
+offset_left = 2406.8008
+offset_top = 2274.0845
+offset_right = 2407.6016
+offset_bottom = 2273.7847
+
+[node name="refresh" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 1188.0
+offset_top = 530.0
+offset_right = 1319.0
+offset_bottom = 658.0
+texture_normal = ExtResource("3_jdgcu")
+texture_pressed = ExtResource("3_jdgcu")
+texture_hover = ExtResource("3_jdgcu")
+texture_disabled = ExtResource("3_jdgcu")
+texture_focused = ExtResource("3_jdgcu")
+
+[node name="Back" type="Button" parent="."]
+layout_mode = 0
+offset_left = 1396.0
+offset_top = 74.0
+offset_right = 1518.0
+offset_bottom = 151.0
+theme_override_font_sizes/font_size = 50
+text = "back"
+
+[node name="Label2" type="Label" parent="."]
+layout_mode = 0
+offset_left = 1233.0
+offset_top = 681.0
+offset_right = 1273.0
+offset_bottom = 736.0
+theme_override_font_sizes/font_size = 40
+text = "5"
+
+[connection signal="pressed" from="refresh" to="." method="_on_texture_button_pressed"]
+[connection signal="pressed" from="Back" to="." method="_on_back_pressed"]
