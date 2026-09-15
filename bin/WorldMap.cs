@@ -9,6 +9,10 @@ using System.Linq;
 
 public class Area
 {
+    /// <summary>
+    /// AreaPool.ini 未配置 areaTimes 时使用的默认战斗烈度
+    /// </summary>
+    public const int DefaultAreaTimes = 3;
 
     /// <summary>
     /// 这个area的id 比如area1
@@ -19,6 +23,11 @@ public class Area
     /// 可选项id列表
     /// </summary>
     List<string> entrysName;
+
+    /// <summary>
+    /// 该区域的战斗烈度：进入区域时的初始值，每完成一场战斗或事件减少1，归零时解锁下一区域
+    /// </summary>
+    int areaTimes = DefaultAreaTimes;
 
     public Area(string id)
     {
@@ -44,13 +53,29 @@ public class Area
         return entrysName;
     }
 
-    int areaTimes  {get;set;}=1;
+/// <summary>
+/// 读取该区域的战斗烈度
+/// </summary>
+/// <returns></returns>
+    public int ReadAreaTimes()
+    {
+        return areaTimes;
+    }
+
+/// <summary>
+/// 设置该区域的战斗烈度，最小为1
+/// </summary>
+/// <param name="value"></param>
+    public void SetAreaTimes(int value)
+    {
+        areaTimes = Math.Max(1, value);
+    }
 }
 
 
 
 /// <summary>
-/// 世界地图界面：显示10个可点击区域，点击后弹出选择任务面板。
+/// 世界地图界面：显示7个可点击区域，点击后弹出选择任务面板。
 /// 区域按顺序解锁（area1 → area2 → ... → area7）。
 /// 按 ` 键打开控制台，支持 help / unlockall 等调试指令。
 /// </summary>
@@ -263,12 +288,23 @@ public partial class WorldMap : Control
             foreach (var key in keys)
             {
                 var val = configFile[areaName][key].ToString().Trim();
-                //这里是0827新增的筛选,保证只有entry enemy开头的key可以被识别为敌人,主要是为了防止新增的areaTimes这一key发生干扰
+
+                //areaTimes 是区域元数据：决定进入该区域时的初始战斗烈度，不作为可抽取任务
+                if (key.Equals("areaTimes", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (int.TryParse(val, out int times) && times > 0)
+                        area.SetAreaTimes(times);
+                    else
+                        GD.PushError($"[WorldMap] areaTimes 非法，回退默认值 {Area.DefaultAreaTimes}: {areaName}.{key}={val}");
+                    continue;
+                }
+
+                //只有entry enemy开头的key可以被识别为任务条目
                 if (!string.IsNullOrEmpty(val) && (key.StartsWith("entry")||key.StartsWith("enemy")))
                     area.AddAnEntry(val);
-            } 
+            }
                 _areaPools[areaName] = area;
-                
+
         }
 
         GD.Print($"Loaded area pools: {_areaPools.Count} areas");
@@ -399,6 +435,9 @@ public partial class WorldMap : Control
             GD.Print($"No pool for area: {areaName}");
             return;
         }
+
+        // 首次进入该区域时按 AreaPool.ini 的 areaTimes 初始化战斗烈度
+        BattleStateManager.EnsureAreaIntensity(areaName, pool.ReadAreaTimes());
 
         var candidates = pool.ReadEntrys();
         var selectedIds = PickRandomEntries(candidates, 3);

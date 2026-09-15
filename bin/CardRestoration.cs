@@ -36,6 +36,12 @@ public static class BattleStateManager
         ["area7"] = 0
     };
 
+    /// <summary>
+    /// 各区域的剩余战斗烈度。进入区域时按 AreaPool.ini 的 areaTimes 初始化，
+    /// 每完成一场战斗或事件减1，归零时解锁下一区域。尚未进入过的区域不在此字典中。
+    /// </summary>
+    private static readonly Dictionary<string, int> _areaIntensity = new();
+
     // ============================ 卡组持久化 ============================
 
     /// <summary>临时卡牌引用列表（当前场景的Player.deck引用，不跨场景持久）</summary>
@@ -147,6 +153,46 @@ public static class BattleStateManager
     {
         foreach (string area in AreaOrder)
             UnlockedArea[area] = 1;
+    }
+
+    // ============================ 区域战斗烈度 ============================
+
+    /// <summary>读取区域剩余战斗烈度；返回 -1 表示该区域尚未进入过</summary>
+    public static int ReadAreaIntensity(string areaName)
+    {
+        if (string.IsNullOrEmpty(areaName)) return -1;
+        return _areaIntensity.TryGetValue(areaName, out int value) ? value : -1;
+    }
+
+    /// <summary>进入区域时按 areaTimes 初始化烈度；已初始化的区域不会被重置</summary>
+    public static void EnsureAreaIntensity(string areaName, int areaTimes)
+    {
+        if (string.IsNullOrEmpty(areaName)) return;
+        if (_areaIntensity.ContainsKey(areaName)) return;
+        _areaIntensity[areaName] = Math.Max(1, areaTimes);
+    }
+
+    /// <summary>
+    /// 消耗1点区域烈度；归零时解锁下一区域。
+    /// 返回 true 表示本次消耗后烈度刚好归零。
+    /// </summary>
+    public static bool ConsumeAreaIntensity(string areaName)
+    {
+        if (string.IsNullOrEmpty(areaName)) return false;
+        if (!_areaIntensity.TryGetValue(areaName, out int value) || value <= 0) return false;
+
+        value--;
+        _areaIntensity[areaName] = value;
+        if (value > 0) return false;
+
+        AdvanceArea(areaName);
+        return true;
+    }
+
+    /// <summary>判断是否为战役的最后一个区域</summary>
+    public static bool IsFinalArea(string areaName)
+    {
+        return Array.IndexOf(AreaOrder, areaName) == AreaOrder.Length - 1;
     }
 
     // ============================ 商店数据 ============================

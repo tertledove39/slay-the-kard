@@ -51,6 +51,8 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 ### bin/AreaPool.ini
 定义区域任务池，按 `[area1]`～`[area7]` 分区。敌人值对应 `enemyTurn.ini` section，事件值使用 `event:事件ID`。每个区域按钮对应一个分区，段名必须与 `bin/worldMap.tscn` 中的区域按钮节点名一致。
 
+`areaTimes` 是该区域的**战斗烈度**：进入区域时任务选择面板显示该值，每完成一场战斗或一个事件减 1，归零时解锁下一区域。缺失时使用默认值 3（`Area.DefaultAreaTimes`）；非正整数会被记录错误并回退默认值。该键是区域元数据，不会被当作可抽取任务。
+
 ### bin/event.ini
 定义50个历史背景事件。每个事件包含2至3个选项，效果支持 `none`、`materialPoints(n)`、`replaceCard(id)` 和 `replaceRandomCard(id)`，多个效果使用逗号连接。
 

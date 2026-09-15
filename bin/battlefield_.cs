@@ -3276,12 +3276,19 @@ InputState currentInputState = InputState.nil;
                 BattleStateManager.LastBattleHqDefenceLost,
                 BattleStateManager.LastBattlePointsGained);
 
-        BattleStateManager.AdvanceArea(BattleStateManager.SelectedArea);
+        // 战斗胜利消耗1点区域烈度；归零时解锁下一区域
+        string clearedArea = BattleStateManager.SelectedArea;
+        bool areaCleared = BattleStateManager.ConsumeAreaIntensity(clearedArea);
+        bool campaignCompleted = areaCleared && BattleStateManager.IsFinalArea(clearedArea);
 
         await PostBattleReward.Show(this, player1);
 
         BattleStateManager.IsCampaignMode = false;
-        await SceneLoader.ChangeSceneAsync(this, "res://bin/worldMap.tscn");
+
+        if (campaignCompleted)
+            await CampaignVictory.ShowAndReturnToMenu(this);
+        else
+            await SceneLoader.ChangeSceneAsync(this, "res://bin/worldMap.tscn");
     }
 
     /// <summary>

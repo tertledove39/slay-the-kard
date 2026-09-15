@@ -59,6 +59,7 @@ public partial class ChooseMission : Control
         ConnectHover(_btn3);
 
         ApplyNames();
+        RefreshIntensityLabel();
     }
 
     /// <summary>设置任务条目列表和区域名，并刷新显示</summary>
@@ -67,6 +68,20 @@ public partial class ChooseMission : Control
         _entries = entries ?? new();
         _areaName = areaName;
         ApplyNames();
+        RefreshIntensityLabel();
+    }
+
+    /// <summary>
+    /// 刷新战斗烈度显示。烈度由 AreaPool.ini 的 areaTimes 初始化，
+    /// 每完成一场战斗或事件减1，归零时解锁下一区域。
+    /// </summary>
+    private void RefreshIntensityLabel()
+    {
+        var label = GetNodeOrNull<Label>("intensityLabel");
+        if (label == null) return;
+
+        int intensity = BattleStateManager.ReadAreaIntensity(_areaName);
+        label.Text = intensity >= 0 ? $"战斗烈度：{intensity}" : "";
     }
 
     private void ApplyNames()

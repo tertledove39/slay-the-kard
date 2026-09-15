@@ -46,6 +46,7 @@
 | `ChooseSomeCard.cs` | ~210 | **统一卡组选卡界面** — 事件、商店、战后奖励共用；最高层CanvasLayer叠加，浅黑遮罩拦截下层输入。 |
 | `DisplayCard.cs` | ~128 | **卡组查看器** — 显示玩家卡组，支持滚轮翻页。 |
 | `End.cs` | ~70 | **屏幕暗化效果** — 单例 CanvasLayer，用于战场结束/胜利时的画面暗化+国徽显示。 |
+| `CampaignVictory.cs` | ~45 | **战役通关浮层** — 最后一个区域烈度归零时播放副官总结对白，结束后返回开始菜单。 |
 | `Area1.cs` | ~9 | **区域按钮桩** — `TextureButton` 扩展，空实现。 |
 | `TextureButton1.cs` | ~21 | **选择按钮桩** — `TextureButton` 扩展，三个空信号处理函数。 |
 | `oldInput.cs` | ~319 | **废弃的输入处理代码** — 整文件被注释掉，是旧版输入逻辑的存档。 |
@@ -81,3 +82,4 @@
 | `tests/verify_music_manager.py` | 全局音乐管理器autoload、配置与场景接入验证 |
 | `tests/verify_event_material_points.py` | 事件资源点效果配置、状态更新、日志和溢出边界验证 |
 | `tests/verify_world_map_areas.py` | 世界地图区域按钮、区域池段、AreaOrder 与 UnlockedArea 一致性及地理落点验证 |
+| `tests/verify_area_intensity.py` | 区域战斗烈度验证：areaTimes 解析与回退、烈度初始化与消耗、归零解锁、通关流程与对白资源 |

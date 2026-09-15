@@ -166,9 +166,29 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 位置：`battlefield_.cs` `ReturnToWorldMapAfterVictory()`
 
 1. 显示结算并等待确认。
-2. 完成或跳过战后奖励。
-3. 标记区域完成并立即调用 `SceneLoader.ChangeSceneAsync()` 返回地图。
-4. `WorldMap` 复用 `BattleStateManager` 中的卡牌、事件和区域池缓存，不重复解析 INI。
+2. 消耗 1 点区域战斗烈度。
+3. 完成或跳过战后奖励。
+4. 未通关时调用 `SceneLoader.ChangeSceneAsync()` 返回地图；最后一个区域烈度归零时改走通关流程。
+5. `WorldMap` 复用 `BattleStateManager` 中的卡牌、事件和区域池缓存，不重复解析 INI。
+
+### 区域战斗烈度
+
+位置：`CardRestoration.cs` `ReadAreaIntensity()` / `EnsureAreaIntensity()` / `ConsumeAreaIntensity()` / `IsFinalArea()`，`WorldMap.cs` `OnAreaPressed()`，`ChooseMission.cs` `RefreshIntensityLabel()`。
+
+烈度来自 `AreaPool.ini` 每个分区的 `areaTimes`，缺失时为 3。
+
+1. 玩家点击区域按钮时，`EnsureAreaIntensity()` 首次把剩余烈度初始化为该区域的 `areaTimes`；已进入过的区域不会被重置。
+2. 任务选择面板的 `intensityLabel` 显示「战斗烈度：当前值」。
+3. 战斗胜利与事件完成都会调用 `ConsumeAreaIntensity()` 减 1；事件与战斗同等对待。
+4. 归零时 `ConsumeAreaIntensity()` 复用 `AdvanceArea()` 关闭当前区域并解锁下一区域。
+5. `IsFinalArea()` 以 `AreaOrder` 末项判定最后一个区域；该区域烈度归零时不解锁任何区域，而是进入通关流程。
+6. 烈度与 `UnlockedArea` 同为进程内静态状态，重启游戏后重置。
+
+### 战役通关
+
+位置：`bin/CampaignVictory.cs`，对白 `dialogues/campaign_victory.dialogue`。
+
+最后一个区域烈度归零时，战斗路径（`battlefield_`）与事件路径（`EventScene`）都会调用 `CampaignVictory.ShowAndReturnToMenu()`：先叠加暗幕（`Layer = 90`，低于对白气泡的 100），播放与副官的战斗总结对白，对白结束后返回开始菜单。
 
 ### 事件资源点效果
 

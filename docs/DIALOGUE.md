@@ -8,6 +8,7 @@
 - 表情控制：`core_ui/GameDialogueBalloon.cs`。
 - 对白内容：`dialogues/*.dialogue`。
 - 示例：`dialogues/example.dialogue`。
+- 战役通关：`dialogues/campaign_victory.dialogue`，标题 `campaign_victory`，由 `bin/CampaignVictory.cs` 在最后一个区域烈度归零时播放。
 
 开始菜单`res://bin/start_menu.tscn`禁止播放对白，其他场景均可调用。并发请求按调用顺序等待，避免多个气泡重叠。
 

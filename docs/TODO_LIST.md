@@ -143,7 +143,7 @@ dotnet build 新建游戏项目.csproj --no-restore --no-incremental
 
 ### C-14 明确并实现 `areaTimes`，避免伪配置
 
-- 状态：`[ ]`
+- 状态：`[√ 已实现为区域战斗烈度：进入区域按 areaTimes 初始化，战斗与事件各扣1，归零解锁下一区域；缺失默认3，非法值报错回退；由 tests/verify_area_intensity.py 覆盖 ]`
 - 证据：`bin/AreaPool.ini:4,9,16`；`bin/WorldMap.cs:10-47`、`bin/WorldMap.cs:253-270`。
 - 问题：`Area.areaTimes` 是私有属性，既没有从 INI 赋值，也没有读取；配置中的 `areaTimes` 目前只被过滤掉，看似生效但实际无效。
 - 建议：若无业务用途，删除配置与属性；若表示区域完成次数，则公开只读属性、严格解析，并使用明确的区域进度模型。

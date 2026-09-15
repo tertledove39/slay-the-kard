@@ -38,3 +38,15 @@ offset_right = 1405.0
 offset_bottom = 732.0
 texture_normal = ExtResource("2_r4pno")
 stretch_mode = 0
+
+[node name="intensityLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 500.0
+offset_top = 100.0
+offset_right = 1100.0
+offset_bottom = 150.0
+theme_override_colors/font_color = Color(1, 0.843137, 0, 1)
+theme_override_font_sizes/font_size = 32
+text = "战斗烈度：3"
+horizontal_alignment = 1
+vertical_alignment = 1

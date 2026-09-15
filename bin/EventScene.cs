@@ -33,17 +33,21 @@ public partial class EventScene : CanvasLayer
     {
         var scene = new EventScene { Layer = 2 };
         parent.AddChild(scene);
-        await scene.Run(eventData, areaName);
+        bool campaignCompleted = await scene.Run(eventData, areaName);
         scene.QueueFree();
         if (parent is WorldMap wm)
             wm.DismissChooseMission();
+
+        if (campaignCompleted)
+            await CampaignVictory.ShowAndReturnToMenu(parent);
     }
 
     /// <summary>
     /// 运行事件的主流程：绘制背景遮罩→左侧配图→标题栏→右侧可滚动描述→选项按钮→等待玩家选择→执行效果→标记完成→返回世界地图。
     /// 整个流程异步执行，玩家选择前场景处于等待状态。
     /// </summary>
-    private async Task Run(EventData eventData, string areaName)
+    /// <returns>true 表示本次事件使最后一个区域的烈度归零，战役通关</returns>
+    private async Task<bool> Run(EventData eventData, string areaName)
     {
         _event = eventData;
         _areaName = areaName;
@@ -133,8 +137,10 @@ public partial class EventScene : CanvasLayer
         // --- 执行效果 ---
         await ExecuteEffect(effect);
 
-        BattleStateManager.AdvanceArea(_areaName);
-        GD.Print($"[EventScene] 事件完成，已推进区域 {_areaName}");
+        // 事件与战斗同等消耗1点区域烈度；归零时解锁下一区域
+        bool areaCleared = BattleStateManager.ConsumeAreaIntensity(_areaName);
+        GD.Print($"[EventScene] 事件完成，区域 {_areaName} 剩余烈度 {BattleStateManager.ReadAreaIntensity(_areaName)}");
+        return areaCleared && BattleStateManager.IsFinalArea(_areaName);
     }
 
     private static void AnimateButton(Button button, float scale)

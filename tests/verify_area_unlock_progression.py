@@ -21,8 +21,8 @@ def main():
         check("public static void AdvanceArea(string areaName)" in state and "UnlockedArea[areaName] = 0" in state, "progression closes the current area"),
         check("UnlockedArea[AreaOrder[index + 1]] = 1" in state, "progression unlocks the next ordered area"),
         check("BattleStateManager.UnlockedArea.TryGetValue(pair.Key" in world, "WorldMap renders shared UnlockedArea values"),
-        check("BattleStateManager.AdvanceArea(BattleStateManager.SelectedArea)" in battle, "battle victory advances UnlockedArea"),
-        check("BattleStateManager.AdvanceArea(_areaName)" in event, "event completion advances UnlockedArea"),
+        check("BattleStateManager.ConsumeAreaIntensity(clearedArea)" in battle, "battle victory consumes area intensity"),
+        check("BattleStateManager.ConsumeAreaIntensity(_areaName)" in event, "event completion consumes area intensity"),
         check("foreach (string area in AreaOrder)" in state and "UnlockedArea[area] = 1" in state, "unlockall writes every UnlockedArea value"),
     ]
     failed = results.count(False)
