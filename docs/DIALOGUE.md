@@ -49,6 +49,14 @@ GetNode<GameDialogue>("/root/GameDialogue").Play(
 
 每行可使用`[normal]`、`[happy]`、`[sad]`、`[angry]`切换`assest/`下同名PNG立绘，也兼容`[expression=happy]`形式。使用`[portrait=none]`隐藏立绘。没有标签时使用`normal.png`；指定图片不存在时记录带时间和代码位置的警告并回退`normal.png`。
 
+选项块之后、缩进回到基级的行会继续接回主线，不必在每个分支里重复同一句。
+
+## 气球实现说明
+
+`core_ui/game_dialogue_balloon.tscn` 内嵌的 `ExampleBalloon` 子节点实例化的是插件自带的 `example_balloon.tscn`，其根节点挂的是 **GDScript** 实现 `example_balloon.gd`。
+
+因此 `GameDialogueBalloon.Start()` **不能**把它强制转换为 C# 的 `DialogueManagerRuntime.ExampleBalloon`（节点底层类型是 `CanvasLayer`），而是按方法名动态调用 `start(with_dialogue_resource, title, extra_game_states)`。立绘切换依赖的 `got_dialogue` 信号由 `DialogueManager` 单例发出，与内层气球用哪种语言实现无关。
+
 当前存在`happy.png`、`angry.png`、`normal.png`，尚未发现`sad.png`。补充`res://assest/sad.png`后无需修改代码。
 
 ## 战斗调用

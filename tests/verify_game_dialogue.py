@@ -27,6 +27,10 @@ def main():
         check(all(name in balloon for name in ('"happy"', '"sad"', '"angry"', '"normal"')), "all portrait expressions are supported"),
         check("using normal portrait" in balloon, "missing expressions use the normal portrait"),
         check('layer = 100' in scene, "dialogue renders above normal game UI"),
+        check("GetNode<ExampleBalloon>" not in balloon and 'balloon.Call("start"' in balloon,
+              "inner balloon is invoked dynamically instead of cast to the C# type"),
+        check("example_balloon.gd" in (ROOT / "addons" / "dialogue_manager" / "example_balloon" / "example_balloon.tscn").read_text(encoding="utf-8"),
+              "inner balloon scene ships the GDScript implementation"),
         check(all(f"~ {title}" in example for title in ("world_map_intro", "battle_warning", "missing_portrait_fallback")), "example dialogue contains reusable titles"),
         check(all((ROOT / "assest" / f"{name}.png").exists() for name in ("happy", "angry", "normal")), "available portrait assets exist"),
     ]

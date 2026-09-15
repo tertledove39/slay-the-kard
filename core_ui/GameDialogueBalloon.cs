@@ -25,7 +25,21 @@ public partial class GameDialogueBalloon : CanvasLayer
     public void Start(Resource resource, string title = "", Array<Variant> states = null)
     {
         activeResource = resource;
-        GetNode<ExampleBalloon>("ExampleBalloon").Start(resource, title, states);
+
+        // 气球场景挂的是插件自带的 GDScript 实现（example_balloon.gd），
+        // 节点底层类型是 CanvasLayer，不能强制转换成 C# 的 DialogueManagerRuntime.ExampleBalloon。
+        // 这里按方法名动态调用其 start(with_dialogue_resource, title, extra_game_states)。
+        Node balloon = GetNodeOrNull("ExampleBalloon");
+        if (balloon == null)
+        {
+            GD.PushError($"{Time.GetDatetimeStringFromSystem()} GameDialogueBalloon.cs: ExampleBalloon node not found, dialogue skipped");
+            return;
+        }
+
+        if (states == null || states.Count == 0)
+            balloon.Call("start", resource, title);
+        else
+            balloon.Call("start", resource, title, states);
     }
 
     private void OnGotDialogue(DialogueLine line)
