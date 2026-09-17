@@ -186,11 +186,15 @@ def main():
     for item in equals_prefix:
         print(f"       ADD= 前缀不会被执行，实际失效: {item}")
 
-    # --- 提示信息：未被任何区域引用的关卡 ---
-    orphans = [s for s in battles.sections() if s not in referenced_battles]
-    if orphans:
-        print(f"\n[INFO] {len(orphans)} 个关卡未被任何区域引用，游戏内不可达：")
-        print("       " + ", ".join(orphans))
+    # --- 提示信息：未被任何区域引用的内容 ---
+    orphan_battles = [s for s in battles.sections() if s not in referenced_battles]
+    orphan_events = [s for s in events.sections() if s not in referenced_events]
+    if orphan_battles:
+        print(f"\n[INFO] {len(orphan_battles)} 个关卡未被任何区域引用，游戏内不可达：")
+        print("       " + ", ".join(orphan_battles))
+    if orphan_events:
+        print(f"\n[INFO] {len(orphan_events)} 个事件未被任何区域引用，游戏内不可达：")
+        print("       " + ", ".join(orphan_events))
 
     failed = results.count(False)
     print(f"\nResult: {len(results) - failed} passed, {failed} failed")

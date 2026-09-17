@@ -59,7 +59,7 @@
 | `cards/enemyTurn.ini` | 东线历史战役行动脚本，每个section一个关卡；由`bin/AreaPool.ini`分配到area1-7 |
 | `bin/AreaPool.ini` | 区域任务池配置 |
 | `bin/deck.ini` | 玩家初始卡组配置 |
-| `bin/event.ini` | 50个平衡的历史背景事件配置 |
+| `bin/event.ini` | 剧情事件配置，每个section一个事件；由`bin/AreaPool.ini`分配到各区域 |
 | `bin/setting.ini` | 开始菜单设置项配置；每个 section 定义一个动态设置控件 |
 
 ## 测试文件
