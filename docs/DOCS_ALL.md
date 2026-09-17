@@ -15,7 +15,6 @@
 | FUNCTION_INDEX.md | 所有函数的索引目录 |
 | NOTICE.md | 修改注意事项（每次修改前必读） |
 | START_MENU.md | 开始菜单、设置配置与运行时设置访问说明 |
-| CAMPAIGN_CONTENT.md | 50个事件与50个历史战役的分配、平衡和历史取材说明 |
 | DIALOGUE.md | Dialogue Manager全局接口、对白编写与立绘标签使用指南 |
 | API.md | 项目对外API接口 |
 | TEST.md | 项目测试样例与验证范围 |

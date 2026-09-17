@@ -167,6 +167,22 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
    - 阶段1：前线无我方单位时，把敌方支援线非空军单位推到前线
     - 阶段2：攻击（优先级：能一击杀死HQ > 能杀死单位 > 攻击HQ > 随机攻击）
 
+### 敌方行动脚本键 (enemyTurn.ini)
+
+加载：`LoadEnemyActionQueue()` `battlefield_.cs` line 2189；执行：`ExecuteEnemyActionQueue()` line 2404。
+
+| 键 | 语义 |
+|---|---|
+| `tN=动作` | 第N个敌方回合执行一次 |
+| `tN=ADD:动作` | 第N回合把动作注册进永久队列，此后每个敌方回合都执行 |
+| `everyNt=动作` | 第N、2N、3N…回合各执行一次 |
+| `everyNt=ADD:动作` | 每个周期都往永久队列再追加一份同名动作 |
+| `default=动作` | 当前回合没有任何`tN`命中时执行 |
+
+前缀必须写成 `ADD:`（冒号）。写成 `ADD=` 不会被识别，会当作未知指令静默丢弃。
+
+注意 `everyNt=ADD:` 的叠加行为：它不是在永久队列里维持一份，而是每个周期追加一份，第kN回合后该效果每回合执行k次。需要周期性增长时改用固定回合的 `tN=ADD:` 或纯周期性的 `everyNt=`。
+
 ### 战斗状态串行化
 
 `CheckIfAnyUnitDiedAsync()`使用运行门闩合并重复请求，以固定点循环依次等待change list、Dead效果、移除和阵营死亡效果，不再异步递归。回合按钮使用`turnTransitionRunning`拒绝重复点击，Trait结算、死亡检查和抽牌均在同一可等待流程中完成。
@@ -231,7 +247,7 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 
 ## 历史战役难度
 
-`AreaPool.ini` 将战役和事件分配至area2-7。战役处决回合与行动密度随区域递增，使用贴膜、刷兵、随机伤害、降攻和压制构成压力。行动配置禁止 `everyNt=ADD:`，且每关必须恰有一个固定回合成长效果。战役ID对应的中文名称直接读取`enemyTurn.ini`中相应section的`name`。
+`AreaPool.ini` 将战役和事件分配至area1-7。战役ID对应的中文名称直接读取`enemyTurn.ini`中相应section的`name`，任务界面不显示section ID。行动脚本各键的语义与叠加行为见「敌方行动脚本键 (enemyTurn.ini)」。
 
 ---
 

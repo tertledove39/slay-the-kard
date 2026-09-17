@@ -111,4 +111,4 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 
 ## 敌人预设主题
 
-`cards/enemyTurn.ini` 包含50个按1941-1945时间线组织的历史战役预设。area2-9每关行动密度由9条递增至12条，处决回合由18-20提升至31-34；每关包含一个成长行动，并混合贴膜、刷兵和debuff，详细分配见 `CAMPAIGN_CONTENT.md`。
+`cards/enemyTurn.ini` 包含52个按1941-1945时间线组织的历史战役section，由 `bin/AreaPool.ini` 分配到area1-7。每个section的`name`为任务界面显示的中文名，其余`tN=`、`everyNt=`、`default=`键为敌方行动脚本，语法详见 `LOGIC.md` 的「敌方行动脚本」一节。
