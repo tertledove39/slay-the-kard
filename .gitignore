@@ -7,3 +7,6 @@ testGame.exe
 testGame.exe.truncated
 testGame.pck
 testGame.tmp
+
+# Office 打开文件时生成的临时锁文件（被占用时会导致 git add 失败）
+~$*
