@@ -64,7 +64,14 @@ def main():
             print(f"       {err}")
         return 1
 
-    card_ids = set(re.findall(r"^\[([^]]+)\]", CARD_INI.read_text(encoding="utf-8"), re.M))
+    card_text = CARD_INI.read_text(encoding="utf-8")
+    card_ids = set(re.findall(r"^\[([^]]+)\]", card_text, re.M))
+    card_names = {}
+    for block in re.split(r"^\[", card_text, flags=re.M)[1:]:
+        card_id = block.split("]", 1)[0].strip()
+        name_match = re.search(r"^name\s*=\s*(.+)$", block, re.M)
+        if name_match:
+            card_names[card_id] = name_match.group(1).strip()
     area_order = re.search(r"AreaOrder\s*=\s*\{(.*?)\}", STATE_CS.read_text(encoding="utf-8"), re.S)
 
     results = [
@@ -141,6 +148,26 @@ def main():
     )
     for item in bad_metadata[:10]:
         print(f"       缺少元数据: {item}")
+
+    # --- 部署描述必须出现卡牌在 card.ini 中的准确名字 ---
+    bad_naming = []
+    for section in battles.sections():
+        for key, value in battles[section].items():
+            if not ACTION_KEYS.match(key):
+                continue
+            desc = METADATA.search(value)
+            if not desc:
+                continue
+            text = desc.group(0)
+            for card_id in set(re.findall(r"addTo(?:Enemy)?SupportLine\(([^)]+)\)", value)):
+                card_name = card_names.get(card_id)
+                if card_name and card_name not in text:
+                    bad_naming.append(f"{section}.{key}: 部署{card_id}({card_name})，描述却是「{text[:50]}」")
+    results.append(
+        check(not bad_naming, f"部署描述使用card.ini中的单位名（不符 {len(bad_naming)} 条）")
+    )
+    for item in bad_naming:
+        print(f"       {item}")
 
     # --- 键格式 ---
     bad_keys, equals_prefix = [], []
