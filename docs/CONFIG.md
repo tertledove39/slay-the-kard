@@ -90,25 +90,42 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 
 四项音量的默认值、上下限与步长均可在此文件对应 section 中配置。用户修改结果保存到`user://settings.cfg`，不会改写项目内的默认配置。
 
-## 德军敌人卡牌清单（v2.0）
+## 德军敌人卡牌清单
 
-| ID | 名称 | 费用 | 攻/防 | 类型 | 特性 |
-|----|------|------|--------|------|------|
-| de_infantry | 德国步兵 | 1 | 2/2 | Infantry | - |
-| de_mg42 | MG42机枪组 | 2 | 3/1 | Infantry | Ambush |
-| de_panzer4 | 四号坦克 | 3 | 3/3 | Tank | Blitz |
-| de_panther | 黑豹坦克 | 4 | 4/4 | Tank | Determination |
-| de_tiger | 虎式重坦 | 6 | 6/6 | Tank | HeavyArmor |
-| de_stuka | 斯图卡 | 2 | 2/1 | Plane | Shock |
-| de_88mm | 88毫米炮 | 3 | 4/2 | Artillery | HeavyArmor,Guardian |
-| de_sturmpionier | 突击工兵 | 2 | 3/2 | Infantry | Blitz,Shock |
-| de_fallschirmjager | 伞兵 | 2 | 2/2 | Infantry | SmokeScreen |
-| de_ss_guard | 党卫军卫队 | 4 | 4/3 | Infantry | Guardian,Determination |
-| de_bunker | 混凝土碉堡 | 5 | 2/6 | Artillery | HeavyArmor,Guardian |
-| de_volksgrenadier | 国民掷弹兵 | 1 | 1/1 | Infantry | Mobilize |
+名称一列取自 `cards/card.ini` 的 `name` 字段；关卡行动描述里写单位名时必须与此一致（`tests/verify_campaign_content.py` 会校验）。
+
+| ID | 名称 | 费用 | 攻/防 | 类型 | 特性 | 效果 |
+|----|------|------|--------|------|------|------|
+| de_infantry | 第1步兵团 | 1 | 2/2 | Infantry | - | - |
+| de_mg42 | 火力小组 | 2 | 3/1 | Infantry | Ambush | 敌方回合开始时对随机敌方单位造成1点伤害 |
+| de_panzer4 | 四号坦克 | 3 | 3/3 | Tank | Blitz | - |
+| de_panther | 黑豹坦克 | 4 | 4/4 | Tank | Determination | - |
+| de_tiger | 虎式重坦 | 6 | 6/6 | Tank | HeavyArmor | - |
+| de_tigerKing | 虎王 | 12 | 10/10 | Tank | HeavyArmor | 敌方回合开始时使1个友方单位获得+2+2 |
+| de_stuka | 斯图卡 | 2 | 2/1 | Plane | Shock | 攻击时对随机敌方单位造成1点伤害 |
+| de_88mm | 88毫米炮 | 3 | 4/2 | Artillery | HeavyArmor,Guardian | - |
+| de_sturmpionier | 突击工兵 | 2 | 3/2 | Infantry | Blitz,Shock | - |
+| de_fallschirmjager | 伞兵 | 2 | 2/2 | Infantry | SmokeScreen | 敌方回合开始时获得+1+1 |
+| de_ss_guard | 党卫军卫队 | 4 | 4/3 | Infantry | Guardian,Determination | - |
+| de_bunker | 混凝土碉堡 | 5 | 2/6 | Artillery | HeavyArmor,Guardian | - |
+| de_volksgrenadier | 国民掷弹兵 | 1 | 1/1 | Infantry | Mobilize | - |
+| de_ufo | 火星飞碟 | 12 | 12/12 | Bomber | HeavyArmor | - |
+| de_karl | 卡尔臼炮 | 6 | 5/5 | Artillery | Immunity | 敌方回合开始时失去1点防御力；亡语：对敌方总部造成等同于自身攻击力的伤害 |
+| de_nebelwerfer | 涅贝尔维尔弗 | 3 | 2/2 | Artillery | - | 敌方回合开始时压制1个随机敌方单位 |
+| de_befehlspanzer | 装甲指挥车 | 3 | 1/5 | Tank | Guardian | 敌方回合开始时所有友方单位获得+1攻击力 |
+| de_brummbar | 灰熊突击炮 | 4 | 3/4 | Artillery | HeavyArmor | 受到伤害时获得+1攻击力 |
 
 所有德军敌人卡牌均使用 `res://cards/德国步兵.png` 作为图标，rarity=Unobtainable（不可获得）。
 
+描述写法的视角约定：`card.ini` 中德军卡的描述按**卡牌主人视角**写，因此玩家方在描述里是「敌方」。这与指令的绝对语义对应如下：
+
+| 描述里写 | 实际指令 |
+|---|---|
+| 友方单位 / 友方总部 | `GetAllEnemyUnits`、`GetRandomEnemyUnit`、`enemyHq` |
+| 敌方单位 / 敌方总部 | `GetAllFriendUnits`、`GetRandomFriendUnit`、`myHq` |
+
+先例：`de_tigerKing` 写「使1个友方单位获得+2+2」，代码用 `GetRandomEnemyUnit`。
+
 ## 敌人预设主题
 
-`cards/enemyTurn.ini` 包含52个按1941-1945时间线组织的历史战役section，由 `bin/AreaPool.ini` 分配到area1-7。每个section的`name`为任务界面显示的中文名，其余`tN=`、`everyNt=`、`default=`键为敌方行动脚本，语法详见 `LOGIC.md` 的「敌方行动脚本」一节。
+`cards/enemyTurn.ini` 的每个section是一关，由 `bin/AreaPool.ini` 分配到area1-7。每个section的`name`为任务界面显示的中文名，其余`tN=`、`everyNt=`、`default=`键为敌方行动脚本，语法详见 `LOGIC.md` 的「敌方行动脚本键」一节。

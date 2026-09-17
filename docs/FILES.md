@@ -55,7 +55,7 @@
 
 | 文件 | 说明 |
 |------|------|
-| `cards/card.ini` | 卡牌数据定义（苏联卡 + 德军卡共12张de_前缀卡） |
+| `cards/card.ini` | 卡牌数据定义（苏联卡 + 德军卡共16张de_前缀卡） |
 | `cards/enemyTurn.ini` | 东线历史战役行动脚本，每个section一个关卡；由`bin/AreaPool.ini`分配到area1-7 |
 | `bin/AreaPool.ini` | 区域任务池配置 |
 | `bin/deck.ini` | 玩家初始卡组配置 |

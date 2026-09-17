@@ -290,6 +290,19 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 | 动员 | - | 受到伤害后消失 |
 | 同仇 | - | 被指向时，所有友方同仇+1+1 |
 
+**免疫的作用范围**（`battlefield_.cs:1842` 与 `1898`）：免疫只把**战斗伤害**归零——
+
+```
+if (to.HasTrait(UnitTraits.Immunity)) attackDamage = 0;    // 1842，被打
+if (from.HasTrait(UnitTraits.Immunity)) counterDamage = 0;  // 1898，打人时的反击
+```
+
+因此免疫单位**仍然会死**于：`damage(n)` 效果伤害、`KillAllTargets`/`KillAllTarget`（直接调 `LoseDefence(ReadDefence())`，不走战斗伤害）、以及自身防御被削到0（例如 `EnemyTurnBegin:this|damage(1)` 的自衰减）。设计「打不动」的单位时必须同时给出其退场途径。
+
+**亡语时点**：`Dead` 触发时 `sourceCard` 就是死亡单位本身，因此 `&source.attack` 可以读到它生前的攻击力。`&source.attack` 解析到 `sourceCard.ReadAttack()`（`battlefield_.cs:1379-1381`）。范例：`de_karl` 的 `Dead:myHq|damage(&source.attack)`。
+
+**一张卡可带多个时点**：`SplitEffectString` 同时跟踪 `()` 与 `[]` 的嵌套深度，因此 `[icon=...,description=...]` 元数据里的逗号不会把两个时点切开。
+
 ---
 
 ## 四、移动系统 (Move)
