@@ -169,6 +169,52 @@ def main():
     for item in bad_naming:
         print(f"       {item}")
 
+    # --- 事件奖励不得使用研发衍生卡 ---
+    # 三条科技树（苏联/美国/皇家研发）经 Develop() 与 Choose() 逐级解锁；
+    # make* 卡是解锁包装，其 AddToHand(...) 的目标才是真卡。这些卡只能经由
+    # 研发获得，事件直接发放会绕过整条科技树。
+    # 注意 Develop/Choose 并非研发专用（赤色黎明、战略重心也在用），因此必须
+    # 从三条线的入口卡做传递遍历，不能把所有 Develop/Choose 的目标都算进来。
+    card_effects = {}
+    for block in re.split(r"^\[", card_text, flags=re.M)[1:]:
+        cid = block.split("]", 1)[0].strip()
+        eff_match = re.search(r"^effect\s*=\s*(.*)$", block, re.M)
+        card_effects[cid] = eff_match.group(1) if eff_match else ""
+
+    research_entries = ["苏联军事研发", "美国军事研发", "皇家研发"]
+    research_cards = set()
+    frontier = list(research_entries)
+    while frontier:
+        current = frontier.pop()
+        eff = card_effects.get(current, "")
+        targets = []
+        for group in re.findall(r"(?:Develop|Choose)\(([^)]*)\)", eff):
+            targets.extend(x.strip() for x in group.split(",") if x.strip())
+        if current.startswith("make"):
+            for group in re.findall(r"AddToHand\(([^)]*)\)", eff):
+                target = group.split(",")[0].strip()
+                if target:
+                    targets.append(target)
+        for target in targets:
+            if target not in research_cards:
+                research_cards.add(target)
+                frontier.append(target)
+    research_cards -= set(research_entries)
+
+    bad_research = []
+    for event in events.sections():
+        for key, value in events[event].items():
+            if not key.endswith("_effect"):
+                continue
+            for card_id in re.findall(r"replace(?:Random)?Card\(([^)]+)\)", value):
+                if card_id in research_cards:
+                    bad_research.append(f"{event}.{key}: {card_id}")
+    results.append(
+        check(not bad_research, f"事件奖励不使用研发衍生卡（违规 {len(bad_research)} 条）")
+    )
+    for item in bad_research:
+        print(f"       {item}")
+
     # --- 键格式 ---
     bad_keys, equals_prefix = [], []
     for section in battles.sections():
