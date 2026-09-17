@@ -1897,7 +1897,9 @@ InputState currentInputState = InputState.nil;
         if (from.HasTrait(UnitTraits.HeavyArmor)) counterDamage = Math.Max(0, counterDamage - 1);
         if (from.HasTrait(UnitTraits.Immunity)) counterDamage = 0;
 
-        bool ambushTriggered = !attackerHasShock && to.HasAmbushActive();
+        // 远程单位（火炮、轰炸机）攻击时不受反击，也不会触发防守方的伏击
+        bool receivesCounterAttack = from.cardType is CardTypes.Plane or CardTypes.Infantry or CardTypes.Tank;
+        bool ambushTriggered = !attackerHasShock && receivesCounterAttack && to.HasAmbushActive();
         bool attackerKilledByAmbush = false;
         SceneTreeTimer attackPresentationTimer = null;
 
@@ -1928,8 +1930,7 @@ InputState currentInputState = InputState.nil;
         if (from.HasSmokeScreenActive()) from.RemoveSmokeScreen();
 
         bool canCounterAttack = to.cardType != CardTypes.Bomber;
-        bool willReceiveCounterAttack = from.cardType is CardTypes.Plane or CardTypes.Infantry or CardTypes.Tank;
-        if (!attackerHasShock && !ambushTriggered && canCounterAttack && willReceiveCounterAttack)
+        if (!attackerHasShock && !ambushTriggered && canCounterAttack && receivesCounterAttack)
         {
             int defBefore = from.ReadDefence();
             await from.LoseDefence(counterDamage);
@@ -3236,7 +3237,8 @@ InputState currentInputState = InputState.nil;
         ForbidControl();
         var endNode = GetNodeOrNull<End>("end");
         if (endNode != null) await endNode.ShowDefeat();
-        BattleStateManager.IsCampaignMode = false;
+        // 整局结束：回主菜单前重置本局进度，避免下一局继承卡组与区域状态
+        BattleStateManager.ResetCampaignProgress();
         await SceneLoader.ChangeSceneAsync(this, "res://bin/start_menu.tscn");
     }
 

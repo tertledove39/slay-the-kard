@@ -27,6 +27,9 @@ public partial class CampaignVictory : CanvasLayer
         await overlay.PlaySummaryAsync();
         overlay.QueueFree();
 
+        // 整局结束：回主菜单前重置本局进度，避免下一局继承卡组与区域状态
+        BattleStateManager.ResetCampaignProgress();
+
         await SceneLoader.ChangeSceneAsync(parent, StartMenuPath);
     }
 

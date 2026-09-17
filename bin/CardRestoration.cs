@@ -195,6 +195,46 @@ public static class BattleStateManager
         return Array.IndexOf(AreaOrder, areaName) == AreaOrder.Length - 1;
     }
 
+    // ============================ 整局进度重置 ============================
+
+    /// <summary>
+    /// 重置整局战役进度：卡组、已解锁区域、区域烈度、物资点、上局战斗统计与商店库存，
+    /// 全部回到初始状态（仅 area1 解锁、卡组重新读取 deck.ini）。
+    /// 不重置内容缓存（card.ini / event.ini / AreaPool.ini 的解析结果），那属于配置而非本局状态。
+    /// </summary>
+    public static void ResetCampaignProgress()
+    {
+        // 卡组：清空持久 ID 并允许重新从 deck.ini 加载
+        DeckCardIds.Clear();
+        IsDeckInitialized = false;
+        Deck.Clear();
+
+        // 区域：仅第一个区域解锁
+        foreach (string area in AreaOrder)
+            UnlockedArea[area] = area == AreaOrder[0] ? 1 : 0;
+        _areaIntensity.Clear();
+
+        // 商店：库存与已售状态属于本局进度
+        StoreCardQueue.Clear();
+        StoreCurrentSlots = null;
+
+        // 资源点与上局战斗统计
+        MaterialPoints = 0;
+        LastBattleLandKilled = 0;
+        LastBattleAirKilled = 0;
+        LastBattleFriendlyDead = 0;
+        LastBattleHqDefenceLost = 0;
+        LastBattlePointsGained = 0;
+
+        // 场景选择状态与上一局的战场节点引用
+        SelectedEnemy = "berlin";
+        SelectedArea = "";
+        IsCampaignMode = false;
+        battlefield = null;
+
+        GD.Print("[BattleStateManager] 整局进度已重置");
+    }
+
     // ============================ 商店数据 ============================
 
     public class StoreSlot

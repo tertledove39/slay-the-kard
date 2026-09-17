@@ -15,13 +15,18 @@ def main():
     attack = battle[attack_start:attack_end]
 
     results = [
-        check("ambushTriggered = !attackerHasShock && to.HasAmbushActive()" in attack, "ambush triggers independently of counter type restrictions"),
+        check("bool receivesCounterAttack = from.cardType is CardTypes.Plane or CardTypes.Infantry or CardTypes.Tank;" in attack,
+              "ranged attackers (artillery/bomber) are excluded from counter and ambush"),
+        check("ambushTriggered = !attackerHasShock && receivesCounterAttack && to.HasAmbushActive()" in attack,
+              "ambush respects the ranged-attacker restriction"),
         check("attackerKilledByAmbush = from.ReadDefence() <= 0" in attack, "ambush kill is detected before attack damage"),
         check("if (!attackerKilledByAmbush)" in attack and "await to.LoseDefence(attackDamage)" in attack, "attack damage is skipped when ambush kills the attacker"),
         check("if (!attackerHasShock && !ambushTriggered" in attack, "normal counter only runs when ambush was not triggered"),
         check("to.UseAmbush()" in attack and attack.index("to.UseAmbush()") < attack.index("from.LoseDefence"), "ambush is consumed before dealing counter damage"),
         check("attackerHasShock" in attack and "from.RemoveShock()" in attack, "shock is consumed and bypasses ambush"),
         check("ambushTriggered" not in battle[battle.index("PlayBattleSound(1);", attack_start):], "no duplicate ambush check after attack resolves"),
+        check("canCounterAttack && receivesCounterAttack" in attack, "normal counter reuses the same attacker restriction"),
+        check("willReceiveCounterAttack" not in attack, "duplicate restriction variable removed"),
     ]
     failed = results.count(False)
     print(f"\nResult: {len(results) - failed} passed, {failed} failed")

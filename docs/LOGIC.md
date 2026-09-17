@@ -184,6 +184,21 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 5. `IsFinalArea()` 以 `AreaOrder` 末项判定最后一个区域；该区域烈度归零时不解锁任何区域，而是进入通关流程。
 6. 烈度与 `UnlockedArea` 同为进程内静态状态，重启游戏后重置。
 
+### 整局进度重置
+
+位置：`CardRestoration.cs` `ResetCampaignProgress()`，调用点为 `battlefield_.cs` `ReturnToStartMenuAfterDefeat()` 与 `bin/CampaignVictory.cs`。
+
+整局结束（战斗失败或战役通关）返回开始菜单时立即重置本局进度，避免下一局继承上一局状态：
+
+- 卡组：清空 `DeckCardIds`、`Deck`，并把 `IsDeckInitialized` 复位，使下一局重新读取 `deck.ini`
+- 区域：仅第一个区域（`AreaOrder[0]`）解锁，清空 `_areaIntensity`
+- 商店：清空 `StoreCardQueue`，`StoreCurrentSlots` 置空以重新生成
+- 物资点与上局战斗统计清零；`SelectedEnemy`/`SelectedArea`/`IsCampaignMode` 复位；释放上一局的 `battlefield` 节点引用
+
+**不重置** `card.ini` / `event.ini` / `AreaPool.ini` 的解析缓存（`_allCards`/`_allEvents`/`_areaPools`），它们属于配置而非本局状态。
+
+`SettingsMenu` 返回开始菜单**不**触发重置，因为它不是整局结束。
+
 ### 战役通关
 
 位置：`bin/CampaignVictory.cs`，对白 `dialogues/campaign_victory.dialogue`。
@@ -218,7 +233,7 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 7. 预计算伤害（考虑重甲-1、免疫=0）+ 溢出量
 8. Attacking / BeingAttacked 等时点效果触发
 9. **冲击判定+消耗**（攻击后失去冲击）
-10. **伏击先制**：无冲击且防守者伏击可用时，先对攻击方造成反击伤害；若攻击方死亡，跳过本次攻击伤害
+10. **伏击先制**：无冲击、且攻击方不是远程单位（火炮/轰炸机）、且防守者伏击可用时，先对攻击方造成反击伤害；若攻击方死亡，跳过本次攻击伤害
 11. **攻击伤害**：攻击方存活时才对防守方执行 `LoseDefence`；受伤后移除动员
 12. 移除烟幕（攻击后）
 13. **普通反击**：无冲击且未触发伏击时，按兵种限制执行普通反击
@@ -234,9 +249,10 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 | 特性 | 攻击方 | 被攻击方 |
 |------|--------|----------|
 | 重甲 | 使反击伤害-1 | 使攻击伤害-1 |
+| （兵种限制） | 火炮/轰炸机攻击时不受任何反击，也不触发对方伏击 | 轰炸机不能发动普通反击 |
 | 免疫 | 免疫反击伤害 | 免疫攻击伤害 |
 | 冲击 | 不受反击，攻击后失去 | - |
-| 伏击 | - | 先造成反击伤害，杀死攻方则免伤 |
+| 伏击 | - | 先造成反击伤害，杀死攻方则免伤；火炮/轰炸机攻击时不触发 |
 | 烟幕 | 攻击后失去烟幕 | 不可被选为目标 |
 | 守护 | - | 两侧有守护单位时不可被攻击 |
 | 动员 | - | 受到伤害后消失 |
