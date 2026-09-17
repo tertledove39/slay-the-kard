@@ -129,9 +129,24 @@
 
 测试脚本：`tests/verify_battle_names_in_ini.py`。
 
-- 50个敌人战斗section各自包含`name`，任务界面直接读取该名称。
+- 敌人战斗section各自包含`name`，任务界面直接读取该名称。
 - `name`不会进入敌人行动队列，缺失时记录错误并回退显示section ID。
 - 旧`HistoricalBattleNames.cs`和未使用的`EnemyDisplayNames`字典已删除。
+
+## 战役内容一致性
+
+测试脚本：`tests/verify_campaign_content.py`。
+
+只验证引擎层面的事实约束，不约束关卡的设计风格与难度取舍。
+
+- 冒烟测试：`event.ini`、`enemyTurn.ini`、`AreaPool.ini` 可解析且非空。
+- 引用完整性：区域池的`enemy*`引用可解析到关卡section，`entry*`引用可解析到事件section，关卡内`addToEnemySupportLine()`引用的卡牌ID存在。
+- 元数据完整性：每个关卡有`name`，每条行动都带`[icon=...,description=...]`；意图面板按整行读取一个icon，因此以行为单位检查。
+- 键格式：只允许`name`、`tN`、`everyNt`、`default`、`ADD`；永久前缀写成`ADD=`（等号）时不会被解释器识别，测试将其判为失效。
+- 区域一致性：`AreaPool.ini`的section与`CardRestoration.cs`的`AreaOrder`严格为area1-area7。
+- 孤立内容：未被任何区域引用的关卡以`[INFO]`列出，不计失败。
+
+`tests/verify_enemy_cards.py`的`test5`只断言预设非空，不强制每关都有脚本化处决回合；没有处决回合的关卡以`[INFO]`列出。
 
 ## 攻击与死亡动画时序
 

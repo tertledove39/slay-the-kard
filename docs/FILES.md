@@ -56,7 +56,7 @@
 | 文件 | 说明 |
 |------|------|
 | `cards/card.ini` | 卡牌数据定义（苏联卡 + 德军卡共12张de_前缀卡） |
-| `cards/enemyTurn.ini` | 50个按area2-7递进的东线历史战役行动脚本 |
+| `cards/enemyTurn.ini` | 东线历史战役行动脚本，每个section一个关卡；由`bin/AreaPool.ini`分配到area1-7 |
 | `bin/AreaPool.ini` | 区域任务池配置 |
 | `bin/deck.ini` | 玩家初始卡组配置 |
 | `bin/event.ini` | 50个平衡的历史背景事件配置 |
@@ -74,7 +74,7 @@
 | `tests/verify_store_card_feedback.py` | 商店待购卡复用手牌悬浮边框、上移反馈及售罄卡排除验证 |
 | `tests/verify_world_map_return_performance.py` | 返回地图时的配置缓存短路和无固定等待验证 |
 | `tests/verify_start_menu_settings.py` | 启动菜单入口、按钮、设置配置和动态设置界面验证 |
-| `tests/verify_campaign_content.py` | 事件、战役、区域分配、卡牌引用、难度窗口和显示名验证 |
+| `tests/verify_campaign_content.py` | 战役内容一致性验证：区域池引用可解析、卡牌ID存在、`name`与意图元数据齐全、键名格式合法、孤立关卡提示 |
 | `tests/verify_game_dialogue.py` | 全局对白接口、开始菜单限制、立绘回退和示例资源验证 |
 | `tests/verify_performance_batches_ab.py` | 战斗异步串行、箭头绘制、Tween和UI热路径性能回归验证 |
 | `tests/verify_ambush.py` | 伏击先制伤害结算顺序和冲击交互验证 |
