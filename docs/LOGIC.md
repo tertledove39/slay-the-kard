@@ -57,6 +57,22 @@
 | `GetAttack(n)` / `LoseAttack(n)` | 为所有 targets 增减攻击 |
 | `SetDefence(n)` | 设置 targets 防御力为n |
 | `addDefence(n)` | 同 Heal |
+
+**指令名拼写规则（易错，务必对照 `battlefield_.cs` 的 `ConsoleCommands` 数组）**
+
+- 比较使用 `OrdinalIgnoreCase`，所以大小写无所谓，但**拼写必须完全一致**。
+- 防御统一用**英式 `defence`**。`defense` 只是卡牌配置的键名（`defense = 5`），**不能作为指令名**。
+- **不存在 `GetDefence`**：增加防御请用 `Heal(n)` 或 `addDefence(n)`。
+- **不存在 `AddAttack`**：增加攻击请用 `GetAttack(n)`。
+- 解释器对无法识别的指令**静默忽略**，写错不会报错，只会让效果无声失效。
+
+**属性变更的结算时机不一致（写复杂效果时必须注意）**
+
+| 立即生效 | 缓存到 `ChangeList`，由 `ExecChangeLists()` 结算 |
+|---|---|
+| `LoseAttack`、`KillAllTargets`、`HealAllTargets`、`addCost`/`subCost`/`setCost` | `Heal`、`addDefence`、`damage`、`SetDefence`、`GetAttack` |
+
+变量替换是**逐条指令**进行的（`battlefield_.cs:3699`），因此 `&target.defence` 读到的是**缓存结算前**的值。若要表达「攻击力等于加防后的防御力」，必须把增量显式算进去，例如合成橡胶：`setTarget|setResult(5)|Heal(&result)|LoseAttack(&target.attack)|GetAttack(&target.defence)|GetAttack(&result)`。
 | `setResult(n)` | 设置 result 变量值 |
 | `SetMemory(name, n)` | 设置自定义内存变量 |
 | `getCount($selector)` | 计数字段上匹配selector的单位 |
