@@ -259,12 +259,15 @@ public static class BattleStateManager
         (Rarity.Legendary, 0.1),
     };
 
+    // 基准价与浮动取自原始表（5/2、10/3、20/4、30/5）分别 +100% 与 +60%。
+    // 浮动必须是整数（rnd.Next(-variance, variance + 1)），故取整。
+    // 最终售价 = 基准价 ± 浮动，下限 1。
     private static readonly Dictionary<Rarity, (int basePrice, int variance)> StorePriceTable = new()
     {
-        { Rarity.Common, (5, 2) },
-        { Rarity.Rare, (10, 3) },
-        { Rarity.Epic, (20, 4) },
-        { Rarity.Legendary, (30, 5) },
+        { Rarity.Common, (10, 3) },
+        { Rarity.Rare, (20, 5) },
+        { Rarity.Epic, (40, 6) },
+        { Rarity.Legendary, (60, 8) },
     };
 
     public static void GenerateStoreCardBatch(int count)
@@ -319,7 +322,8 @@ public static class BattleStateManager
             var cardData = GetCachedCard(cardId);
             if (cardData == null) continue;
 
-            var (basePrice, variance) = StorePriceTable.GetValueOrDefault(cardData.Rarity, (5, 2));
+            // 兜底值与 Common 保持一致（商店已过滤掉 Unobtainable，正常不会走到）
+            var (basePrice, variance) = StorePriceTable.GetValueOrDefault(cardData.Rarity, (10, 3));
             int price = basePrice + rnd.Next(-variance, variance + 1);
             if (price < 1) price = 1;
 
