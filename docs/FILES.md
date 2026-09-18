@@ -45,7 +45,8 @@
 | `PostBattleReward.cs` | ~462 | **战后奖励界面** — 战斗胜利后的奖励系统。3组卡牌选择→卡组替换（稀有度限制）。 |
 | `ChooseSomeCard.cs` | ~210 | **统一卡组选卡界面** — 事件、商店、战后奖励共用；最高层CanvasLayer叠加，浅黑遮罩拦截下层输入。 |
 | `DisplayCard.cs` | ~128 | **卡组查看器** — 显示玩家卡组，支持滚轮翻页。 |
-| `End.cs` | ~70 | **屏幕暗化效果** — 单例 CanvasLayer，用于战场结束/胜利时的画面暗化+国徽显示。 |
+| `BattleScore.cs` | ~40 | **战斗评分规则** — 物资点系数的唯一来源。`CalculateMaterialPoints()` 与结算面板共用同一组函数，保证「明细相加 = 总额」。 |
+| `End.cs` | ~150 | **战斗结束浮层**（**位于项目根目录，不在 bin/**）— CanvasLayer，负责暗幕与国徽显示，并驱动 `bin/settlement_panel.tscn` 的结算/失败两个面板。 |
 | `CampaignVictory.cs` | ~45 | **战役通关浮层** — 最后一个区域烈度归零时播放副官总结对白，结束后返回开始菜单。 |
 | `Area1.cs` | ~9 | **区域按钮桩** — `TextureButton` 扩展，空实现。 |
 | `TextureButton1.cs` | ~21 | **选择按钮桩** — `TextureButton` 扩展，三个空信号处理函数。 |

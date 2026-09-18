@@ -1,0 +1,134 @@
+[gd_scene load_steps=1 format=3]
+
+[node name="SettlementOverlay" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Settlement" type="Control" parent="."]
+visible = false
+z_index = 200
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -180.0
+offset_right = 200.0
+offset_bottom = 180.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Background" type="ColorRect" parent="Settlement"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.08, 0.08, 0.12, 0.92)
+
+[node name="Title" type="Label" parent="Settlement"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 10.0
+offset_right = 400.0
+offset_bottom = 50.0
+theme_override_colors/font_color = Color(1, 0.84, 0.2, 1)
+theme_override_font_sizes/font_size = 28
+text = "战斗结算"
+horizontal_alignment = 1
+
+[node name="LandRow" type="Label" parent="Settlement"]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 60.0
+offset_right = 370.0
+offset_bottom = 90.0
+theme_override_font_sizes/font_size = 18
+text = "消灭敌方陆军 x0    +0"
+
+[node name="AirRow" type="Label" parent="Settlement"]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 95.0
+offset_right = 370.0
+offset_bottom = 125.0
+theme_override_font_sizes/font_size = 18
+text = "消灭敌方空军 x0    +0"
+
+[node name="DeadRow" type="Label" parent="Settlement"]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 130.0
+offset_right = 370.0
+offset_bottom = 160.0
+theme_override_font_sizes/font_size = 18
+text = "己方单位损失 x0    -0"
+
+[node name="HqRow" type="Label" parent="Settlement"]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 165.0
+offset_right = 370.0
+offset_bottom = 195.0
+theme_override_font_sizes/font_size = 18
+text = "总部防御损失 0    -0"
+
+[node name="Total" type="Label" parent="Settlement"]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 210.0
+offset_right = 370.0
+offset_bottom = 250.0
+theme_override_colors/font_color = Color(1, 0.84, 0.2, 1)
+theme_override_font_sizes/font_size = 24
+text = "获得物资点: 0"
+horizontal_alignment = 1
+
+[node name="ConfirmButton" type="Button" parent="Settlement"]
+layout_mode = 0
+offset_left = 150.0
+offset_top = 270.0
+offset_right = 250.0
+offset_bottom = 306.0
+theme_override_font_sizes/font_size = 18
+text = "确认"
+
+[node name="Defeat" type="Control" parent="."]
+visible = false
+z_index = 200
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -180.0
+offset_top = 520.0
+offset_right = 180.0
+offset_bottom = 670.0
+grow_horizontal = 2
+
+[node name="Title" type="Label" parent="Defeat"]
+layout_mode = 0
+offset_right = 360.0
+offset_bottom = 50.0
+theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 1)
+theme_override_font_sizes/font_size = 32
+text = "战斗失败"
+horizontal_alignment = 1
+
+[node name="ReturnButton" type="Button" parent="Defeat"]
+layout_mode = 0
+offset_left = 90.0
+offset_top = 75.0
+offset_right = 270.0
+offset_bottom = 123.0
+theme_override_font_sizes/font_size = 20
+text = "返回主菜单"

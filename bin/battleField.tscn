@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://evqf3f0uq3ao"]
+[gd_scene load_steps=15 format=3 uid="uid://evqf3f0uq3ao"]
 
 [ext_resource type="Script" uid="uid://bddqh2hovnp6b" path="res://bin/battlefield_.cs" id="1_8yftg"]
 [ext_resource type="Texture2D" uid="uid://chj5lq5e5hl7b" path="res://assest/table.jpeg" id="2_h5p18"]
@@ -11,6 +11,7 @@
 [ext_resource type="PackedScene" uid="uid://bqw3sp6xgknb" path="res://bin/place.tscn" id="8_r58wv"]
 [ext_resource type="Script" uid="uid://ceefw2hlywr3l" path="res://bin/Cardbase.cs" id="9_uwbmh"]
 [ext_resource type="Script" uid="uid://fcjignj7pq5c" path="res://End.cs" id="11_h5p18"]
+[ext_resource type="PackedScene" path="res://bin/settlement_panel.tscn" id="12_settle"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_ai4ba"]
 font = ExtResource("4_bmei2")
@@ -156,6 +157,8 @@ position = Vector2(804, 437)
 
 [node name="end" type="CanvasLayer" parent="."]
 script = ExtResource("11_h5p18")
+
+[node name="SettlementOverlay" parent="end" instance=ExtResource("12_settle")]
 
 [node name="img" type="Sprite2D" parent="end"]
 

@@ -207,3 +207,16 @@
 - 基本验证：`RemoveCard` 不含任何阵亡/战果计数；`ProcessDeadUnitAsync` 含全部三个计数。
 - 边界白盒测试：计数受 `deadUnit.isHq != HQ.hq` 守卫，总部不计入；友方分支保留显式的 `IsFriend.friend` 判断，不能写成裸 `else`（`IsFriend` 另有 `neutral` 与 `enemyNeutral`）。
 - 回归验证：`CardDiscardAndRemove` 与 `ShowCardChoice` 仍会调用 `RemoveCard`，即该约束确有防范对象；`RemoveCard` 仍负责从 `cardInPlaces` 移除节点。
+
+## 战斗结算面板
+
+测试脚本：`tests/verify_settlement_panel.py`。
+
+结算面板原先用代码绘制（`End.cs` 的 `ShowSettlement`），并且把物资点的评分系数又写了一遍——陆军 `*4`、空军 `*5`、总部 `/3`——而 `CalculateMaterialPoints()` 里早已改成 `*3`、`*4`、`/2`。结果是面板四行明细相加不等于底部显示的总额。现在系数集中在 `bin/BattleScore.cs`，面板搬到 `bin/settlement_panel.tscn`。
+
+- 冒烟测试：场景文件存在且可解析出所需节点。
+- 基本验证：`battleField.tscn` 以实例方式把面板挂在 `end` 节点下；`End.cs` 按名引用全部节点；两个面板默认隐藏。
+- 回归验证：`End.cs` 与 `battlefield_.cs` 都不得出现评分系数的原始算术（`landKilled *`、`_battleEnemyLandKilled *`、`hqLost /` 等），必须调用 `BattleScore`。
+- 边界白盒测试：三个系数以具名常量定义在 `BattleScore.cs`，且不在别处重复定义；手写场景不写 uid（沿用 `settings_menu.tscn` 等先例，避免与现有资源撞车）。
+
+`tests/verify_hq_defeat_flow.py` 中「失败面板文案」的断言已改为读 `bin/settlement_panel.tscn`——文案移入场景后，C# 里不再有 `Text = "战斗失败"` 这类字面量。

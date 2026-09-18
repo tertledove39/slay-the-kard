@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+"""战斗结算面板验证
+
+背景：结算面板原先用代码绘制（End.cs 的 ShowSettlement），并且把物资点的
+评分系数又写了一遍——陆军 *4、空军 *5、总部 /3——而 CalculateMaterialPoints
+里早已改成 *3、*4、/2 过。结果是面板四行明细相加不等于底部显示的总额。
+
+现在系数集中在 bin/BattleScore.cs，计算与显示共用同一组函数；面板本身
+搬到 bin/settlement_panel.tscn，End.cs 只负责填数值与等待确认。
+
+覆盖：
+- 冒烟：场景文件存在且能解析出所需节点
+- 基本：battleField.tscn 确实挂载了该场景；End.cs 按名取到各节点
+- 回归：计算与显示都不再自己写系数算术，只调用 BattleScore
+- 边界：系数常量只在 BattleScore.cs 定义一处
+"""
+from pathlib import Path
+import re
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+SCENE = ROOT / "bin" / "settlement_panel.tscn"
+END_CS = ROOT / "End.cs"
+BATTLE_CS = ROOT / "bin" / "battlefield_.cs"
+SCORE_CS = ROOT / "bin" / "BattleScore.cs"
+BATTLE_SCENE = ROOT / "bin" / "battleField.tscn"
+
+# 面板需要 End.cs 按名取得的节点
+REQUIRED_NODES = [
+    "Settlement", "Defeat",
+    "LandRow", "AirRow", "DeadRow", "HqRow",
+    "Total", "ConfirmButton", "ReturnButton",
+]
+
+# 原始系数算术的写法（出现即说明又绕过了 BattleScore）
+RAW_ARITHMETIC = {
+    "End.cs": [r"landKilled\s*\*", r"airKilled\s*\*", r"hqDefenceLost\s*/"],
+    "battlefield_.cs": [r"_battleEnemyLandKilled\s*\*", r"_battleEnemyAirKilled\s*\*", r"hqLost\s*/"],
+}
+
+
+def check(condition, message):
+    print(f"[{'PASS' if condition else 'FAIL'}] {message}")
+    return condition
+
+
+def main():
+    missing = [p.name for p in (SCENE, END_CS, BATTLE_CS, SCORE_CS, BATTLE_SCENE) if not p.exists()]
+    if missing:
+        print(f"[FAIL] 冒烟测试：缺少文件 {missing}")
+        return 1
+
+    scene = SCENE.read_text(encoding="utf-8")
+    end = END_CS.read_text(encoding="utf-8")
+    battle = BATTLE_CS.read_text(encoding="utf-8")
+    score = SCORE_CS.read_text(encoding="utf-8")
+    battle_scene = BATTLE_SCENE.read_text(encoding="utf-8")
+
+    node_names = re.findall(r'^\[node name="([^"]+)"', scene, re.M)
+    results = [
+        check(len(node_names) > 0, f"冒烟：场景解析出 {len(node_names)} 个节点"),
+    ]
+
+    # --- 场景结构 ---
+    absent = [n for n in REQUIRED_NODES if n not in node_names]
+    results.append(check(not absent, f"场景包含全部所需节点（缺 {absent}）"))
+
+    results.append(
+        check("res://bin/settlement_panel.tscn" in battle_scene,
+              "battleField.tscn 挂载了结算面板场景")
+    )
+    results.append(
+        check('instance=ExtResource' in battle_scene and 'name="SettlementOverlay"' in battle_scene,
+              "面板以实例方式挂在 end 节点下，根节点名为 SettlementOverlay")
+    )
+    results.append(
+        check(scene.count("visible = false") >= 2,
+              "两个面板默认隐藏，由代码控制显示时机")
+    )
+    results.append(
+        check("uid://" not in scene,
+              "手写场景不写 uid（沿用 settings_menu.tscn 等先例，避免与现有资源撞车）")
+    )
+
+    # --- End.cs 取节点 ---
+    resolved = [n for n in REQUIRED_NODES if f'"/{n}"' in end or f'"{n}"' in end]
+    results.append(
+        check(len(resolved) == len(REQUIRED_NODES),
+              f"End.cs 按名引用全部节点（未引用 {sorted(set(REQUIRED_NODES) - set(resolved))}）")
+    )
+
+    # --- 回归：不再自己写系数 ---
+    for filename, patterns in RAW_ARITHMETIC.items():
+        source = end if filename == "End.cs" else battle
+        hits = [p for p in patterns if re.search(p, source)]
+        results.append(
+            check(not hits,
+                  f"{filename} 不含评分系数的原始算术（命中 {hits}）——系数应只来自 BattleScore")
+        )
+
+    results.append(
+        check("BattleScore.Total(" in battle,
+              "CalculateMaterialPoints 通过 BattleScore.Total 计算总额")
+    )
+    results.append(
+        check(len(re.findall(r"BattleScore\.\w+\(", end)) >= 4,
+              "结算面板四行明细各自调用 BattleScore 的分量函数")
+    )
+
+    # --- 边界：系数只定义一处 ---
+    for const in ("LandKillPoints", "AirKillPoints", "HqDefencePerPenalty"):
+        results.append(
+            check(f"public const int {const}" in score,
+                  f"BattleScore 以具名常量定义 {const}")
+        )
+
+    other_files_with_const = [
+        name for name, src in (("End.cs", end), ("battlefield_.cs", battle))
+        if "LandKillPoints" in src or "AirKillPoints" in src
+    ]
+    results.append(
+        check(not other_files_with_const,
+              f"系数常量不在别处重复定义（重复于 {other_files_with_const}）")
+    )
+
+    failed = results.count(False)
+    print(f"\nResult: {len(results) - failed} passed, {failed} failed")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

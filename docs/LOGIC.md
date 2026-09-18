@@ -197,7 +197,7 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 
 位置：`battlefield_.cs` `ReturnToWorldMapAfterVictory()`
 
-1. 显示结算并等待确认。
+1. 显示结算并等待确认。面板是 `bin/settlement_panel.tscn`，由 `End.cs` 填入数值；四个分量的分值来自 `bin/BattleScore.cs`，与 `CalculateMaterialPoints()` 同源，因此明细相加恒等于总额。调整物资点平衡只需改 `BattleScore` 的常量。
 2. 消耗 1 点区域战斗烈度。
 3. 完成或跳过战后奖励。
 4. 未通关时调用 `SceneLoader.ChangeSceneAsync()` 返回地图；最后一个区域烈度归零时改走通关流程。

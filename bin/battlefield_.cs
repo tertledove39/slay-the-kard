@@ -3256,11 +3256,9 @@ InputState currentInputState = InputState.nil;
         int hqLost = _battleHqDefenceStart - hqCurrentDef;
         if (hqLost < 0) hqLost = 0;
 
-        int gained = _battleEnemyLandKilled * 3 
-                   + _battleEnemyAirKilled * 4
-                   - _battleFriendlyDead
-                   - hqLost / 2;
-        if (gained < 0) gained = 0;
+        // 系数集中在 BattleScore，结算面板用同一组函数渲染明细，
+        // 避免两处各写一遍导致明细与总额对不上
+        int gained = BattleScore.Total(_battleEnemyLandKilled, _battleEnemyAirKilled, _battleFriendlyDead, hqLost);
 
         BattleStateManager.MaterialPoints += gained;
         BattleStateManager.LastBattleLandKilled = _battleEnemyLandKilled;

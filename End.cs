@@ -2,36 +2,82 @@ using Godot;
 using System;
 using System.Threading.Tasks;
 
+/// <summary>
+/// 战斗结束浮层：负责暗幕、国徽，以及挂在 <c>end</c> 节点下的
+/// <c>SettlementOverlay</c> 场景（战斗结算面板 / 战斗失败面板）。
+///
+/// 面板的布局、字号与配色都在 <c>bin/settlement_panel.tscn</c> 里，
+/// 本类只负责填入数值与等待玩家确认。物资点的每行明细调用
+/// <see cref="BattleScore"/>，与 <c>battlefield_.CalculateMaterialPoints()</c>
+/// 共用同一组系数，保证明细相加等于总额。
+/// </summary>
 public partial class End : CanvasLayer
 {
-    private ColorRect _overlay;
-    private Tween _tween;
+    /// <summary>面板场景实例的根节点名（在 battleField.tscn 的 end 节点下）</summary>
+    private const string OverlayPath = "SettlementOverlay";
+    private const string SettlementPath = OverlayPath + "/Settlement";
+    private const string DefeatPath = OverlayPath + "/Defeat";
 
-    // 单例实例（方便全局调用）
-    private static End _instance;
-    public static End Instance => _instance;
+    private ColorRect _overlay;
+
+    private Control _settlement;
+    private Label _landRow;
+    private Label _airRow;
+    private Label _deadRow;
+    private Label _hqRow;
+    private Label _total;
+    private Button _confirmButton;
+
+    private Control _defeat;
+    private Button _returnButton;
+
+    private Tween _tween;
 
     public override void _Ready()
     {
-        _instance = this;
-
         // 1. 创建黑色矩形
         _overlay = new ColorRect();
-        
+
         // 2. 设置矩形铺满整个屏幕 (Godot 4 写法)
         _overlay.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         _overlay.GrowHorizontal = Control.GrowDirection.Both;
         _overlay.GrowVertical = Control.GrowDirection.Both;
-        
+
         // 3. 设置初始颜色为黑色，透明度为 0 (完全透明)
         _overlay.Color = new Color(0, 0, 0, 0);
-        
+
         // 4. 设置鼠标过滤：
         // MouseFilterEnum.Stop = 阻挡点击 (变暗时通常不希望玩家操作)
         // MouseFilterEnum.Ignore = 穿透点击 (仅视觉变暗)
-        _overlay.MouseFilter = Control.MouseFilterEnum.Stop; 
+        _overlay.MouseFilter = Control.MouseFilterEnum.Stop;
         GetNode<Sprite2D>("img").Visible = false;
         AddChild(_overlay);
+
+        CachePanelNodes();
+    }
+
+    /// <summary>
+    /// 缓存面板节点。场景缺失时只记一次错误，后续调用安全返回。
+    /// </summary>
+    private void CachePanelNodes()
+    {
+        _settlement = GetNodeOrNull<Control>(SettlementPath);
+        _defeat = GetNodeOrNull<Control>(DefeatPath);
+
+        if (_settlement == null || _defeat == null)
+        {
+            GD.PushError($"{Time.GetDatetimeStringFromSystem()} End.cs: 未找到 {OverlayPath}，结算与失败面板不可用");
+            return;
+        }
+
+        _landRow = GetNodeOrNull<Label>(SettlementPath + "/LandRow");
+        _airRow = GetNodeOrNull<Label>(SettlementPath + "/AirRow");
+        _deadRow = GetNodeOrNull<Label>(SettlementPath + "/DeadRow");
+        _hqRow = GetNodeOrNull<Label>(SettlementPath + "/HqRow");
+        _total = GetNodeOrNull<Label>(SettlementPath + "/Total");
+        _confirmButton = GetNodeOrNull<Button>(SettlementPath + "/ConfirmButton");
+
+        _returnButton = GetNodeOrNull<Button>(DefeatPath + "/ReturnButton");
     }
 
     /// <summary>
@@ -62,119 +108,51 @@ public partial class End : CanvasLayer
         var img = GetNode<Sprite2D>("img");
         img.Modulate = new Color(0.35f, 0.35f, 0.35f, 1f);
 
-        var viewSize = GetViewport().GetVisibleRect().Size;
-        var panel = new Control
+        if (_defeat == null || _returnButton == null)
         {
-            Size = new Vector2(360, 150),
-            Position = new Vector2((viewSize.X - 360) / 2, 520),
-            ZIndex = 200
-        };
-        AddChild(panel);
+            GD.PushError($"{Time.GetDatetimeStringFromSystem()} End.cs: 失败面板缺失，无法等待玩家返回");
+            return;
+        }
 
-        var title = new Label
-        {
-            Text = "战斗失败",
-            Size = new Vector2(360, 50),
-            HorizontalAlignment = HorizontalAlignment.Center
-        };
-        title.AddThemeFontSizeOverride("font_size", 32);
-        title.AddThemeColorOverride("font_color", new Color(0.75f, 0.75f, 0.75f));
-        panel.AddChild(title);
-
-        var returnButton = new Button
-        {
-            Text = "返回主菜单",
-            Position = new Vector2(90, 75),
-            Size = new Vector2(180, 48)
-        };
-        returnButton.AddThemeFontSizeOverride("font_size", 20);
-        panel.AddChild(returnButton);
+        _defeat.Visible = true;
 
         var completion = new TaskCompletionSource<bool>();
-        returnButton.Pressed += () => completion.TrySetResult(true);
+        void OnReturnPressed() => completion.TrySetResult(true);
+        _returnButton.Pressed += OnReturnPressed;
+
         await completion.Task;
-        panel.QueueFree();
+
+        _returnButton.Pressed -= OnReturnPressed;
+        _defeat.Visible = false;
     }
 
     /// <summary>
-    /// 恢复明亮
+    /// 显示战斗结算明细并等待玩家确认。
+    /// 每行的分值来自 <see cref="BattleScore"/>，与总额同源。
     /// </summary>
-    /// <param name="duration">过渡时间 (秒)</param>
-    public void Brighten(float duration = 0.5f)
-    {
-        if (_tween != null) _tween.Kill();
-
-        _tween = CreateTween();
-        _tween.TweenProperty(_overlay, "color", new Color(0, 0, 0, 0), duration);
-    }
-
     public async System.Threading.Tasks.Task ShowSettlement(int landKilled, int airKilled, int friendlyDead, int hqDefenceLost, int pointsGained)
     {
-        var viewSize = GetViewport().GetVisibleRect().Size;
-
-        var panel = new Control();
-        panel.Size = new Vector2(400, 360);
-        panel.Position = new Vector2((viewSize.X - 400) / 2, (viewSize.Y - 360) / 2);
-        panel.ZIndex = 200;
-        AddChild(panel);
-
-        var bg = new ColorRect();
-        bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        bg.Color = new Color(0.08f, 0.08f, 0.12f, 0.92f);
-        bg.MouseFilter = Control.MouseFilterEnum.Ignore;
-        panel.AddChild(bg);
-
-        var title = new Label();
-        title.Text = "战斗结算";
-        title.Position = new Vector2(0, 10);
-        title.Size = new Vector2(400, 40);
-        title.HorizontalAlignment = HorizontalAlignment.Center;
-        title.AddThemeFontSizeOverride("font_size", 28);
-        title.AddThemeColorOverride("font_color", Colors.Gold);
-        panel.AddChild(title);
-
-        int y = 60;
-        var lines = new[]
+        if (_settlement == null || _confirmButton == null)
         {
-            $"消灭敌方陆军 x{landKilled}    +{landKilled * 4}",
-            $"消灭敌方空军 x{airKilled}    +{airKilled * 5}",
-            $"己方单位损失 x{friendlyDead}    -{friendlyDead}",
-            $"总部防御损失 {hqDefenceLost}    -{hqDefenceLost / 3}",
-        };
-        foreach (var line in lines)
-        {
-            var lbl = new Label();
-            lbl.Text = line;
-            lbl.Position = new Vector2(30, y);
-            lbl.Size = new Vector2(340, 30);
-            lbl.AddThemeFontSizeOverride("font_size", 18);
-            lbl.AddThemeColorOverride("font_color", Colors.White);
-            panel.AddChild(lbl);
-            y += 35;
+            GD.PushError($"{Time.GetDatetimeStringFromSystem()} End.cs: 结算面板缺失，跳过结算显示");
+            return;
         }
 
-        var totalLabel = new Label();
-        totalLabel.Text = $"获得物资点: {pointsGained}";
-        totalLabel.Position = new Vector2(30, y + 10);
-        totalLabel.Size = new Vector2(340, 40);
-        totalLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        totalLabel.AddThemeFontSizeOverride("font_size", 24);
-        totalLabel.AddThemeColorOverride("font_color", Colors.Gold);
-        panel.AddChild(totalLabel);
+        _landRow.Text = $"消灭敌方陆军 x{landKilled}    +{BattleScore.LandPoints(landKilled)}";
+        _airRow.Text = $"消灭敌方空军 x{airKilled}    +{BattleScore.AirPoints(airKilled)}";
+        _deadRow.Text = $"己方单位损失 x{friendlyDead}    -{BattleScore.DeadPenalty(friendlyDead)}";
+        _hqRow.Text = $"总部防御损失 {hqDefenceLost}    -{BattleScore.HqPenalty(hqDefenceLost)}";
+        _total.Text = $"获得物资点: {pointsGained}";
 
-        var confirmBtn = new Button();
-        confirmBtn.Text = "确认";
-        confirmBtn.Position = new Vector2(150, y + 60);
-        confirmBtn.Size = new Vector2(100, 36);
-        confirmBtn.AddThemeFontSizeOverride("font_size", 18);
-        panel.AddChild(confirmBtn);
+        _settlement.Visible = true;
 
-        var tcs = new System.Threading.Tasks.TaskCompletionSource<bool>();
-        confirmBtn.Pressed += () =>
-        {
-            panel.QueueFree();
-            tcs.TrySetResult(true);
-        };
-        await tcs.Task;
+        var completion = new System.Threading.Tasks.TaskCompletionSource<bool>();
+        void OnConfirmPressed() => completion.TrySetResult(true);
+        _confirmButton.Pressed += OnConfirmPressed;
+
+        await completion.Task;
+
+        _confirmButton.Pressed -= OnConfirmPressed;
+        _settlement.Visible = false;
     }
 }
