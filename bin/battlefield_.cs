@@ -3256,10 +3256,10 @@ InputState currentInputState = InputState.nil;
         int hqLost = _battleHqDefenceStart - hqCurrentDef;
         if (hqLost < 0) hqLost = 0;
 
-        int gained = _battleEnemyLandKilled * 4
-                   + _battleEnemyAirKilled * 5
+        int gained = _battleEnemyLandKilled * 3 
+                   + _battleEnemyAirKilled * 4
                    - _battleFriendlyDead
-                   - hqLost / 3;
+                   - hqLost / 2;
         if (gained < 0) gained = 0;
 
         BattleStateManager.MaterialPoints += gained;
@@ -5533,10 +5533,14 @@ public class Player
     public void AddPoint(int i = 1)
     {
         int oldPoint = point;
-        if(point + i >= pointMax) {point = pointMax;}
+        // 上限取 pointMaxMaxMax 而非 pointMax：AddPoint 表达的是"获得指挥点"，
+        // 效果来源（喀秋莎攻击、近卫步兵第4团抽牌、无产者联合起来弃牌）需要能
+        // 把点数攒到本回合上限之上；若封顶在 pointMax，而回合开始又会 RefreshPoint
+        // 刷满，这些效果就永远无效。逐回合的预算约束由 RefreshPoint 提供。
+        if(point + i >= pointMaxMaxMax) {point = pointMaxMaxMax;}
         else if(point+i<=0) point=0;
         else point += i;
-        
+
         _ = pointLabel.AnimateTo(point);
     }
 

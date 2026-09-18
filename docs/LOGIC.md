@@ -105,7 +105,7 @@
 | `GetRandomNumber(min, max)` | 随机整数存入result |
 | `GetFriendHq` / `GetEnemyHq` | targets设为友方/敌方总部 |
 | `GetPoint()` / `GetPointMax()` | 读取指挥点/最大点存入result |
-| `AddPoint(n)` / `AddPointMax(n)` | 增加指挥点/最大点；`AddPointMax` 不会重复执行 `AddPoint`，当前点数上限为当前最大点数 |
+| `AddPoint(n)` / `AddPointMax(n)` | 增加指挥点/最大点；`AddPointMax` 不会重复执行 `AddPoint`。`AddPoint` 的天花板是 `pointMaxMaxMax`(24) 而非当前上限 `pointMax`，即可把点数攒到本回合上限之上；逐回合的预算约束由回合开始的 `RefreshPoint()` 刷满提供 |
 | `losePointAtNextTurnBegin(n)` | 下回合开始时失去n点指挥点（不足则清零） |
 | `DiscardRandomly(n)` | 随机弃n张手牌 |
 | `DiscardWithName(pattern, n)` | 弃ID含pattern的n张手牌 |

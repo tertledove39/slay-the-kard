@@ -16,8 +16,10 @@ def main():
     results = [
         check('&& !instruction.StartsWith("AddPointMax", StringComparison.OrdinalIgnoreCase)' in battlefield,
               "AddPointMax effects do not also execute AddPoint"),
-        check("if(point + i >= pointMax) {point = pointMax;}" in battlefield,
-              "current command points are capped at the current maximum"),
+        check("if(point + i >= pointMaxMaxMax) {point = pointMaxMaxMax;}" in battlefield,
+              "AddPoint 可超过当前上限，天花板为 pointMaxMaxMax"),
+        check("if(point + i >= pointMax) {point = pointMax;}" not in battlefield,
+              "AddPoint 不再封顶在 pointMax（否则满点时效果恒为空操作）"),
         check("player1.AddPoint(-pendingLoss);" in battlefield,
               "pending next-turn point loss uses the Player point update path"),
     ]

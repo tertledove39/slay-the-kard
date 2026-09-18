@@ -91,7 +91,7 @@
 |------|------|
 | 手牌管理 | `GetCardsInHand()`/`AddCardToHand()`/`RemoveFromHand()` |
 | 卡组管理 | `DrawCard()`/`AddCardToDeck()`/`ShuffleDeck()` |
-| 指挥点 | `ReadPoint()`/`UsePoint()`/`AddPoint()`/`AddPointMax()`/`AddPointMaxNatural()`；当前点数始终不高于当前上限 |
+| 指挥点 | `ReadPoint()`/`UsePoint()`/`AddPoint()`/`AddPointMax()`/`AddPointMaxNatural()`；`AddPoint` 可把当前点数推高到当前上限之上（天花板 `pointMaxMaxMax`=24），回合开始时由 `AddPointMaxNatural()` 刷满 |
 | 手牌布局 | `RefreshMyHand()` — 弧形排列、悬停浮起推旁、旋转倾斜缩放动画 |
 | 卡组初始化 | `InitializeDeckFromIni()` 从 deck.ini 或持久化ID加载 |
 
