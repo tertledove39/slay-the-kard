@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""全局背景音乐管理器验证：多曲目槽位随机播放、战斗专属BGM与回退。"""
+"""全局背景音乐管理器验证：多曲目槽位随机播放、战斗专属BGM与回退、切换场景不掐断当前曲目。"""
 import re
 from pathlib import Path
 import sys
@@ -24,6 +24,11 @@ def main():
     world = read("bin/WorldMap.cs")
     battle = read("bin/battlefield_.cs")
     state = read("bin/CardRestoration.cs")
+
+    # 供白盒检查用的方法体切片
+    playslot_body = music.split('public void PlaySlot(string slot)')[1].split('/// <summary>立刻起播')[0]
+    startslot_body = music.split('private void StartSlot(string slot)')[1].split('/// <summary>曲目自然播完')[0]
+    finished_body = music.split('private void OnTrackFinished()')[1].split('/// <summary>')[0]
 
     # ------------------------------ 冒烟测试 ------------------------------
     print("--- 冒烟测试 ---")
@@ -83,6 +88,52 @@ def main():
         check(state.count('"berlin"') == 1, "berlin 字面量只在常量定义处出现一次"),
     ]
 
+    # --------------------- 基本验证：切换场景不掐断当前曲目 ---------------------
+    print("\n--- 基本验证：播完再切 ---")
+    switch = [
+        check('player.Finished += OnTrackFinished;' in music,
+              "订阅 AudioStreamPlayer.Finished，能在曲末那一刻动作"),
+        check('private string pendingSlot = "";' in music, "以 pendingSlot 记录待切换槽位"),
+        check('private void OnTrackFinished()' in music, "提供曲末回调"),
+    ]
+
+    # PlaySlot 只排队，绝不自己起播：真正换曲只发生在 StartSlot
+    switch += [
+        check('player.Play()' not in playslot_body,
+              "PlaySlot 体内没有任何起播调用，换曲时机完全交给曲末回调"),
+        check('pendingSlot = slot;' in playslot_body, "不同槽位只记入待切换队列"),
+        check('if (!player.Playing)' in playslot_body and 'StartSlot(slot);' in playslot_body,
+              "当前无曲目在播时立即起播，不必等待"),
+        check('if (currentSlot == slot)' in playslot_body and 'pendingSlot = "";' in playslot_body,
+              "切回正在播放的槽位时撤销排队，继续把这首放完"),
+    ]
+
+    # 曲末：有待切换就切过去，否则留在当前槽位续播；两者都清空队列
+    switch += [
+        check('!string.IsNullOrEmpty(pendingSlot) ? pendingSlot : currentSlot' in finished_body,
+              "曲末优先切到待切换槽位，没有则留在当前槽位续播"),
+        check('pendingSlot = "";' in finished_body, "曲末消费掉待切换队列，避免重复触发"),
+        check('StartSlot(slot);' in finished_body, "曲末由 StartSlot 真正起播"),
+    ]
+
+    # 内建循环必须关掉，否则曲目永不结束、Finished 永不触发
+    switch += [
+        check('private static void DisableBuiltinLoop(AudioStream stream)' in music,
+              "抽出 DisableBuiltinLoop 统一处理内建循环"),
+        check('case AudioStreamMP3 mp3: mp3.Loop = false;' in music, "MP3 关闭内建循环"),
+        check('case AudioStreamOggVorbis ogg: ogg.Loop = false;' in music, "OGG 关闭内建循环"),
+        check('AudioStreamWav wav: wav.LoopMode = AudioStreamWav.LoopModeEnum.Disabled;' in music,
+              "WAV 关闭内建循环（Godot 4.5 类名为 AudioStreamWav）"),
+        check('DisableBuiltinLoop(stream);' in startslot_body, "起播前关闭内建循环"),
+        check('Loop = true' not in music and 'LoopModeEnum.Forward' not in music,
+              "源码中不再有任何开启内建循环的写法"),
+    ]
+
+    switch += [
+        check('pendingSlot = "";' in music.split('public void StopMusic()')[1].split('public void SetVolumeDb')[0],
+              "StopMusic 一并清空待切换队列"),
+    ]
+
     # --------------------------- 边界情况白盒测试 ---------------------------
     print("\n--- 边界白盒测试 ---")
     edge = [
@@ -90,25 +141,16 @@ def main():
               "槽位名忽略大小写，写错大小写不会静默失效"),
         check('if (paths.Length > 0) slotPaths[key] = paths;' in music,
               "空值槽位不进入槽位表，HasSlot 返回 false 而非空路径"),
-    ]
-
-    # 同一槽位重复进入不重新抽曲：该判断必须早于随机抽取
-    same_slot_at = music.find('if (currentSlot == slot && player.Playing) return;')
-    pick_call_at = music.find('string path = PickPath(paths);')
-    edge.append(check(0 <= same_slot_at < pick_call_at,
-                      "同槽位重入的提前返回早于随机抽取，重复进场景不会换曲"))
-
-    edge += [
-        check('if (currentPath == path && player.Playing)' in music,
+        check('if (path == currentPath && player.Playing)' in startslot_body,
               "换槽位抽到同一首时保持连续，不从头重播"),
         check('GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} MusicManager.cs: failed to load {path}");' in music,
-              "资源加载失败记录带时间与代码位置的警告并返回"),
+              "资源加载失败记录带时间与代码位置的警告"),
+        check('if (!string.IsNullOrEmpty(currentSlot) && currentSlot != slot) StartSlot(currentSlot);' in startslot_body,
+              "载入失败时退回当前槽位续播，避免一个坏路径让整局静音"),
+        check('currentSlot != slot' in startslot_body,
+              "载入失败的退回带槽位相等判断，递归深度最多两层"),
         check('GD.Print($"{Time.GetDatetimeStringFromSystem()} MusicManager.cs: PlaySlot({slot}) -> {path}");' in music,
               "播放记录带时间与代码位置的日志"),
-        check('if (stream is AudioStreamMP3 mp3) mp3.Loop = true;' in music,
-              "MP3 背景音乐循环播放"),
-        check('AudioStreamOggVorbis.Loop' in music and 'AudioStreamWAV.LoopMode' in music,
-              "源码注明非 MP3 格式需补的循环设置，避免后续改用 ogg/wav 时静音"),
     ]
 
     # 注释符陷阱：iniHandler 只认 ';'，含 = 的 '#' 行会被当成键
@@ -134,7 +176,6 @@ def main():
     regression = [
         check('MusicManager.Instance?.PlaySlot("start_menu")' in start, "StartMenu 请求菜单音乐"),
         check('MusicManager.Instance?.PlaySlot("world_map")' in world, "WorldMap 请求地图音乐"),
-        check(config.count('res://assest/music/配乐1.mp3') == 3, "三个基础槽位仍指向同一首，跨场景不重播"),
         check('battleBGM' not in load_body,
               "battleBGM_ 由通用键解析自动成为槽位，LoadConfig 无专用分支"),
     ]
@@ -148,7 +189,14 @@ def main():
     else:
         info(f"尚无战斗配置专属BGM（enemyTurn.ini 共 {len(presets)} 个预设），全部回退到通用 battle 槽位")
 
-    results = smoke + basic + edge + regression
+    # 多曲槽位的曲目数，用于确认「曲末续播」确有实际意义
+    for ln in live_lines:
+        key, val = ln.split("=", 1)
+        n = len([x for x in val.split(",") if x.strip()])
+        if n > 1:
+            info(f"槽位 {key.strip()} 配了 {n} 首，曲末会随机续播同槽位的另一首")
+
+    results = smoke + basic + switch + edge + regression
     failed = results.count(False)
     print(f"\nResult: {len(results) - failed} passed, {failed} failed")
     return 1 if failed else 0

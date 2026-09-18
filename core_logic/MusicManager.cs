@@ -6,6 +6,7 @@ using System.Collections.Generic;
 /// 全局背景音乐管理器。
 /// 槽位配置见 configs/music.ini 的 [music] 段：每个键是一个槽位，值可以写多首曲目（逗号分隔），
 /// 播放时从中随机抽取一首。battleBGM_&lt;敌人预设名&gt; 形式的键会自动成为战斗专属BGM槽位。
+/// 场景切换不会掐断当前曲目：新槽位先排队，等当前曲目自然播完再切。
 /// </summary>
 public partial class MusicManager : Node
 {
@@ -27,12 +28,17 @@ public partial class MusicManager : Node
     private AudioStreamPlayer player;
     private string currentSlot = "";
     private string currentPath = "";
+    /// <summary>当前曲目播完后要切过去的槽位；为空表示留在当前槽位继续放。</summary>
+    private string pendingSlot = "";
 
     public override void _Ready()
     {
         Instance = this;
         SettingsManager.Initialize();
         player = new AudioStreamPlayer { Bus = "Music" };
+        // 内建循环会让曲目永不结束，Finished 也就不触发，「播完再切」无从谈起。
+        // 因此统一关掉内建循环（见 DisableBuiltinLoop），改由 OnTrackFinished 在曲末决定续播还是换曲。
+        player.Finished += OnTrackFinished;
         AddChild(player);
         LoadConfig();
     }
@@ -59,17 +65,42 @@ public partial class MusicManager : Node
         PlaySlot(HasSlot(specific) ? specific : BattleSlot);
     }
 
+    /// <summary>
+    /// 请求播放某个槽位。若当前有曲目在播，请求只入队，等这首自然播完再切，
+    /// 不会把正在响的曲子拦腰截断。
+    /// </summary>
     public void PlaySlot(string slot)
     {
         if (string.IsNullOrWhiteSpace(slot)) return;
         if (!slotPaths.TryGetValue(slot, out string[] paths) || paths.Length == 0) return;
-        // 已在同一槽位播放时不重新抽取，避免反复进入同一场景就换曲
-        if (currentSlot == slot && player.Playing) return;
 
+        // 当前没有在播（首次进入、或已停止）时立即起播，没有可等待的曲目
+        if (!player.Playing)
+        {
+            pendingSlot = "";
+            StartSlot(slot);
+            return;
+        }
+
+        // 已经在这个槽位上：撤销排队，继续把当前这首放完
+        if (currentSlot == slot)
+        {
+            pendingSlot = "";
+            return;
+        }
+
+        // 正在播别的槽位：排队。连续切换时后者覆盖前者，只需记住最后一次请求
+        pendingSlot = slot;
+    }
+
+    /// <summary>立刻起播指定槽位：随机取一首，若正是当前这首则原地续用不重播。</summary>
+    private void StartSlot(string slot)
+    {
+        if (!slotPaths.TryGetValue(slot, out string[] paths) || paths.Length == 0) return;
         string path = PickPath(paths);
 
-        // 换了槽位但抽到正在播放的同一首时不重播，保持跨场景音乐连续
-        if (currentPath == path && player.Playing)
+        // 换槽位但抽到正在播放的同一首时不重播，保持音乐连续
+        if (path == currentPath && player.Playing)
         {
             currentSlot = slot;
             return;
@@ -79,15 +110,42 @@ public partial class MusicManager : Node
         if (stream == null)
         {
             GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} MusicManager.cs: failed to load {path}");
+            // 载入失败时退回当前槽位续播，避免一个坏路径让整局都没有音乐（递归深度最多两层）
+            if (!string.IsNullOrEmpty(currentSlot) && currentSlot != slot) StartSlot(currentSlot);
             return;
         }
-        // 循环目前只覆盖MP3；改用ogg/wav需在此补 AudioStreamOggVorbis.Loop 与 AudioStreamWAV.LoopMode
-        if (stream is AudioStreamMP3 mp3) mp3.Loop = true;
+
+        DisableBuiltinLoop(stream);
         currentSlot = slot;
         currentPath = path;
         player.Stream = stream;
         player.Play();
         GD.Print($"{Time.GetDatetimeStringFromSystem()} MusicManager.cs: PlaySlot({slot}) -> {path}");
+    }
+
+    /// <summary>曲目自然播完：有待切换的槽位就切过去，否则从当前槽位再取一首续播。</summary>
+    private void OnTrackFinished()
+    {
+        string slot = !string.IsNullOrEmpty(pendingSlot) ? pendingSlot : currentSlot;
+        pendingSlot = "";
+        if (string.IsNullOrEmpty(slot)) return;
+        StartSlot(slot);
+    }
+
+    /// <summary>
+    /// 关闭音频流的内建循环。内建循环下曲目永不结束、Finished 不触发，
+    /// 就无法做到「当前曲目播完再切槽位」。循环改由 OnTrackFinished 在曲末重新起播实现，
+    /// 三种格式统一处理，不再出现 ogg/wav 播完即静音的情况。
+    /// </summary>
+    private static void DisableBuiltinLoop(AudioStream stream)
+    {
+        switch (stream)
+        {
+            case AudioStreamMP3 mp3: mp3.Loop = false; break;
+            case AudioStreamOggVorbis ogg: ogg.Loop = false; break;
+            // Godot 4.5 起类名为 AudioStreamWav（旧的 AudioStreamWAV 已废弃）
+            case AudioStreamWav wav: wav.LoopMode = AudioStreamWav.LoopModeEnum.Disabled; break;
+        }
     }
 
     /// <summary>从槽位曲目中随机取一首；多首时避开正在播放的那首，避免连续重复。</summary>
@@ -104,6 +162,7 @@ public partial class MusicManager : Node
     {
         currentSlot = "";
         currentPath = "";
+        pendingSlot = "";
         player.Stop();
     }
 

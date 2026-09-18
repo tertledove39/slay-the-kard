@@ -17,7 +17,7 @@
 
 | API | 返回值 | 说明 |
 |-----|--------|------|
-| `PlaySlot(string slot)` | `void` | 按`configs/music.ini`中的槽位名播放背景音乐；槽位可配多首曲目（逗号分隔），随机抽取并避开正在播放的那首；相同槽位重复请求不会重播 |
+| `PlaySlot(string slot)` | `void` | 请求按`configs/music.ini`中的槽位名播放背景音乐。**不会掐断当前曲目**：正在播放时只入队，等这首自然播完再切；相同槽位重复请求会撤销排队 |
 | `PlayBattleSlot(string enemyPreset)` | `void` | 战斗BGM入口：优先`battleBGM_<预设名>`槽位，未配置时回退到`BattleSlot`（`"battle"`） |
 | `HasSlot(string slot)` | `bool` | 槽位是否配置了至少一首曲目 |
 | `StopMusic()` | `void` | 停止当前BGM |

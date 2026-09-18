@@ -4,6 +4,8 @@
 
 项目使用autoload的`MusicManager`实现全局不间断背景音乐。`MusicManager`常驻一个`AudioStreamPlayer`，场景切换不会中断播放。
 
+**切换场景不会掐断当前曲目**：请求新槽位时只入队，等当前曲目自然播完再切。详见下节。
+
 ## 文件
 
 - `core_logic/MusicManager.cs`：全局音乐管理器。
@@ -29,6 +31,25 @@ battle=res://path/to/battle.mp3,res://path/to/battle_alt.mp3
 | 空值 | 留空（或只有空白）的槽位不进入槽位表，`HasSlot()`对其返回false |
 | 槽位名 | 忽略大小写，`battleBGM_DonBend`与`battleBGM_donbend`等价 |
 | 注释符 | **只能用分号`;`**。`bin/iniHandler.cs`的解析器只把`;`开头当注释，含`=`的`#`行会被当成一个键名 |
+
+## 切换时机：播完再切
+
+`PlaySlot()`**不会立即换曲**。当前有曲目在播时，新槽位只记入`pendingSlot`，真正换曲发生在曲末：
+
+| 情形 | 行为 |
+|------|------|
+| 当前无曲目在播（首次进场景、已停止） | 立即起播，不排队 |
+| 请求的槽位就是正在播的那个 | 撤销排队，继续把这首放完 |
+| 请求别的槽位 | 排队；连续切换时后者覆盖前者，记住最后一次请求 |
+| 曲末，队列非空 | 切到排队的槽位 |
+| 曲末，队列为空 | 从**当前槽位**再随机取一首续播（单曲槽位即等于原来的循环） |
+
+实现要点：
+
+- 订阅`AudioStreamPlayer.Finished`驱动曲末判断。该信号只在流**非循环**时触发。
+- 因此`DisableBuiltinLoop()`在起播前关掉三种格式的内建循环（`AudioStreamMP3.Loop`、`AudioStreamOggVorbis.Loop`、`AudioStreamWav.LoopMode`），循环改由曲末回调重新起播实现。这同时修掉了旧版"只有MP3设了循环、ogg/wav播完即静音"的问题。
+- 关掉内建循环意味着曲末重新起播处会有一个极短的接缝，这是换取"能在曲末精确切槽位"的代价。
+- 槽位的曲目因此被当作播放列表使用：`battle`槽位配了 12 首，曲末会在其中随机续播，而不是把同一首放到底。
 
 ### 战斗专属BGM
 
@@ -65,7 +86,8 @@ battleBGM_berlin_final_battle=res://assest/music/配乐3.mp3,res://assest/music/
 ## 已知限制
 
 - **同时只能播放一首**：只有一个`AudioStreamPlayer`，不支持BGM叠加环境音。
-- **循环只覆盖MP3**：源码中为`if (stream is AudioStreamMP3 mp3) mp3.Loop = true;`。改用`.ogg`或`.wav`需同时补上`AudioStreamOggVorbis.Loop`与`AudioStreamWAV.LoopMode`，否则播完即静音。
+- **切换有等待**：进入战斗后可能要等世界地图的曲子放完才会响战斗曲，最长等于一首曲子的时长。这是"不掐断当前曲目"的直接代价。
+- **切点无淡入淡出**：换曲发生在曲末的自然边界，但边界处仍是硬切，没有交叉淡化。
 
 ## 音量分类
 

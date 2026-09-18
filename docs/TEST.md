@@ -62,7 +62,9 @@
 - 冒烟测试：`MusicManager`已注册为autoload并暴露`Instance`、`PlaySlot`、`StopMusic`、`SetVolumeDb`；`configs/music.ini`含`start_menu`、`world_map`、`battle`三个基础槽位。
 - 基本验证（一槽多曲）：槽位值以`string[]`存储，逗号分隔且忽略空项与两侧空格；随机源为常驻`Random`实例。`PickPath`在单曲时直接返回、多曲时随机抽取，抽中正在播放的那首时用非零随机偏移绕开。
 - 基本验证（战斗专属BGM）：`battleBGM_`前缀与`battle`回退槽位为具名常量；`PlayBattleSlot`在专属槽位未配置时回退；`battlefield_`以`BattleStateManager.ResolveEnemyPreset()`请求BGM且不再写死`PlaySlot("battle")`；`berlin`字面量只在`DefaultEnemyPreset`常量定义处出现一次。
-- 边界白盒测试：槽位名忽略大小写；空值槽位不进入槽位表；同槽位重入的提前返回必须早于随机抽取（重复进场景不换曲）；换槽位抽到同一首不重播；资源加载失败记录带时间与代码位置的警告并返回；播放日志含时间与代码位置；MP3循环且源码注明ogg/wav需补的循环设置。
+- 基本验证（播完再切）：`_Ready`订阅`AudioStreamPlayer.Finished`；`PlaySlot`体内**不得出现任何`player.Play()`**，换曲时机完全交给曲末回调；不同槽位只记入`pendingSlot`；当前无曲目在播时立即起播；切回正在播放的槽位时撤销排队。曲末回调优先切到排队槽位、无排队则留在当前槽位续播，并消费掉队列。
+- 基本验证（内建循环）：`DisableBuiltinLoop`对MP3/OGG/WAV三种格式关闭内建循环并在起播前调用；源码中不得再出现任何开启内建循环的写法——内建循环下曲目永不结束，`Finished`不触发，「播完再切」就无从实现。
+- 边界白盒测试：槽位名忽略大小写；空值槽位不进入槽位表；换槽位抽到同一首不重播；资源加载失败记录带时间与代码位置的警告并退回当前槽位续播（退回带槽位相等判断，递归深度最多两层）；播放日志含时间与代码位置；`StopMusic`一并清空排队。
 - 配置陷阱：`music.ini`不得出现含`=`的`#`注释行——`bin/iniHandler.cs`只把`;`当注释，此类行会成为垃圾槽位；实际生效的槽位引用的音频资源必须存在于磁盘。
 - 回归验证：`StartMenu`、`WorldMap`仍请求各自槽位；三个基础槽位指向同一首以保证跨场景不重播；`battleBGM_`由`[music]`段通用键解析自动产生，`LoadConfig`中无专用分支。
 - `Store`、`ChooseMission`、`EventScene`和`PostBattleReward`不主动切歌，继承当前音乐。

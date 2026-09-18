@@ -119,13 +119,15 @@
 
 | 成员 | 说明 |
 |------|------|
-| `PlaySlot(slot)` | 播放槽位；槽位可配多首曲目，随机抽取并避开正在播放的那首 |
+| `PlaySlot(slot)` | 请求槽位。**不立即换曲**：有曲目在播时只记入`pendingSlot`排队，等曲末再切 |
 | `PlayBattleSlot(enemyPreset)` | 战斗BGM入口：优先`battleBGM_<预设名>`槽位，未配置回退`BattleSlot` |
 | `HasSlot(slot)` | 槽位是否配置了至少一首曲目 |
-| `StopMusic()` / `SetVolumeDb(db)` | 停止播放 / 设置音量 |
+| `StopMusic()` / `SetVolumeDb(db)` | 停止播放（并清空排队）/ 设置音量 |
 | `BattleBgmPrefix` / `BattleSlot` | 常量`"battleBGM_"`与`"battle"`，避免调用方写死字符串 |
 
-槽位表为`Dictionary<string, string[]>`并按忽略大小写比较；同槽位重复请求不重新抽曲，换槽位抽到同一首也不重播，保证场景切换时音乐连续。
+内部成员：`StartSlot()`是唯一真正起播的地方；`OnTrackFinished()`由`AudioStreamPlayer.Finished`驱动，曲末切到排队槽位、无排队则从当前槽位续播下一首；`DisableBuiltinLoop()`关掉三种格式的内建循环，否则曲目永不结束、`Finished`不触发。
+
+槽位表为`Dictionary<string, string[]>`并按忽略大小写比较；同槽位重复请求撤销排队，换槽位抽到同一首也不重播。详见`docs/MUSIC.md`。
 
 ### `GameDialogueBalloon` : CanvasLayer (core_ui/GameDialogueBalloon.cs)
 
