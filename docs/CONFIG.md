@@ -67,13 +67,21 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 
 ### configs/music.ini
 
-全局背景音乐槽位配置，供`MusicManager`读取：
+全局背景音乐槽位配置，供`MusicManager`读取。`[music]`段下**每个键都是一个槽位**，`LoadConfig()`遍历全部键，新增槽位无需改代码。
 
 - `start_menu`：开始菜单BGM
 - `world_map`：世界地图BGM
-- `battle`：战斗场景BGM
+- `battle`：战斗场景BGM（通用）
+- `battleBGM_<敌人预设名>`：某场战斗的专属BGM，预设名为`cards/enemyTurn.ini`的section名。未配置时自动回退到`battle`
 
-对应值为`res://`音频资源路径；留空表示该槽位当前不播放音乐。
+| 约定 | 说明 |
+|------|------|
+| 值格式 | `res://`音频资源路径；多首曲目用英文逗号分隔，播放时随机抽取一首 |
+| 空值 | 留空表示该槽位当前不播放音乐 |
+| 大小写 | 槽位名忽略大小写 |
+| 注释 | 只能用分号`;`；`iniHandler`不把`#`当注释，含`=`的`#`行会成为垃圾键 |
+
+完整说明见`docs/MUSIC.md`。
 
 ### bin/setting.ini
 定义开始菜单中“设置”场景展示的设置项。每个 section 是一个设置项，支持布尔开关和数值滑块：

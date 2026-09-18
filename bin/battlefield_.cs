@@ -403,7 +403,8 @@ private bool defeatTransitionStarted;
 /// </summary>
     public override void _Ready()
     {
-        MusicManager.Instance?.PlaySlot("battle");
+        // 战斗专属BGM优先：music.ini 中配置了 battleBGM_<敌人预设名> 就用它，否则回退到通用 battle 槽位
+        MusicManager.Instance?.PlayBattleSlot(BattleStateManager.ResolveEnemyPreset());
         GD.Print("_Ready method called");
 
         // 资源管理器：缓存纹理/场景并维护空卡牌池（同步初始化，一次性完成）
@@ -499,9 +500,7 @@ private bool defeatTransitionStarted;
         AddCardToPlace(enemyHq,enemySupprotLine[2]);
         
         // 加载敌方行动队列（战役模式从BattleStateManager读取，否则默认berlin）
-        string enemyPreset = BattleStateManager.IsCampaignMode
-            ? BattleStateManager.SelectedEnemy
-            : "berlin";
+        string enemyPreset = BattleStateManager.ResolveEnemyPreset();
         LoadEnemyActionQueue(enemyPreset);
         GD.Print($"Loaded enemy preset: {enemyPreset}");
         CreateEnemyIntentPanel();

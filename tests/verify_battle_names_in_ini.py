@@ -27,7 +27,13 @@ def main():
         check("GD.PushError" in world and "enemyName = id" in world, "missing names report an error and fall back to section ID"),
         check('if (key == "name") continue;' in battle, "battlefield excludes name metadata from action queues"),
         check("EnemyDisplayNames" not in state, "legacy enemy display-name dictionary is removed"),
-        check(': "berlin";' in battle, "noncampaign berlin fallback remains unchanged"),
+        # 非战役模式回退 berlin 的行为不变，但已从 battlefield_ 的内联三元式收敛到 BattleStateManager，
+        # 战斗脚本加载与战斗专属BGM共用同一个解析入口，故断言改在其当前位置。
+        check('public const string DefaultEnemyPreset = "berlin";' in state
+              and 'return IsCampaignMode ? SelectedEnemy : DefaultEnemyPreset;' in state,
+              "noncampaign berlin fallback remains unchanged"),
+        check("BattleStateManager.ResolveEnemyPreset()" in battle and ': "berlin";' not in battle,
+              "battlefield resolves the preset through BattleStateManager instead of inlining it"),
     ]
     failed = results.count(False)
     print(f"\nResult: {len(results) - failed} passed, {failed} failed")

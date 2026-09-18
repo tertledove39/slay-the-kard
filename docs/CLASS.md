@@ -117,6 +117,16 @@
 
 全局autoload背景音乐管理器。读取`configs/music.ini`中的槽位配置，维护单一常驻`AudioStreamPlayer`，确保StartMenu、WorldMap和battlefield_在场景切换时不会因节点销毁而中断音乐。
 
+| 成员 | 说明 |
+|------|------|
+| `PlaySlot(slot)` | 播放槽位；槽位可配多首曲目，随机抽取并避开正在播放的那首 |
+| `PlayBattleSlot(enemyPreset)` | 战斗BGM入口：优先`battleBGM_<预设名>`槽位，未配置回退`BattleSlot` |
+| `HasSlot(slot)` | 槽位是否配置了至少一首曲目 |
+| `StopMusic()` / `SetVolumeDb(db)` | 停止播放 / 设置音量 |
+| `BattleBgmPrefix` / `BattleSlot` | 常量`"battleBGM_"`与`"battle"`，避免调用方写死字符串 |
+
+槽位表为`Dictionary<string, string[]>`并按忽略大小写比较；同槽位重复请求不重新抽曲，换槽位抽到同一首也不重播，保证场景切换时音乐连续。
+
 ### `GameDialogueBalloon` : CanvasLayer (core_ui/GameDialogueBalloon.cs)
 
 项目Galgame对白气泡控制器。组合Dialogue Manager官方C#气泡，根据行标签切换`happy`、`sad`、`angry`、`normal`立绘，缺失素材回退normal。

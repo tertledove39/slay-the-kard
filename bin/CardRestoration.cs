@@ -12,8 +12,11 @@ public static class BattleStateManager
     public static string PlayerDeckId { get; set; } = "default_deck";
     public static battlefield_ battlefield { get; set; }
 
+    /// <summary>非战役模式（直接运行战场场景调试）时使用的敌人预设</summary>
+    public const string DefaultEnemyPreset = "berlin";
+
     // 战役模式：选中的敌人预设名
-    public static string SelectedEnemy { get; set; } = "berlin";
+    public static string SelectedEnemy { get; set; } = DefaultEnemyPreset;
     // 战役模式：当前选中的区域名
     public static string SelectedArea { get; set; } = "";
     // 是否处于战役模式
@@ -42,6 +45,17 @@ public static class BattleStateManager
     /// 每完成一场战斗或事件减1，归零时解锁下一区域。尚未进入过的区域不在此字典中。
     /// </summary>
     private static readonly Dictionary<string, int> _areaIntensity = new();
+
+    // ============================ 敌人预设 ============================
+
+    /// <summary>
+    /// 当前战斗应加载的敌人预设名：战役模式取任务界面所选关卡，否则用默认预设。
+    /// 战斗脚本加载与战斗专属BGM（battleBGM_&lt;预设名&gt;）都以此为准，保证听到的曲子与实际敌人一致。
+    /// </summary>
+    public static string ResolveEnemyPreset()
+    {
+        return IsCampaignMode ? SelectedEnemy : DefaultEnemyPreset;
+    }
 
     // ============================ 卡组持久化 ============================
 
@@ -229,7 +243,7 @@ public static class BattleStateManager
         LastBattlePointsGained = 0;
 
         // 场景选择状态与上一局的战场节点引用
-        SelectedEnemy = "berlin";
+        SelectedEnemy = DefaultEnemyPreset;
         SelectedArea = "";
         IsCampaignMode = false;
         battlefield = null;
