@@ -2294,12 +2294,25 @@ InputState currentInputState = InputState.nil;
         bg.MouseFilter = Control.MouseFilterEnum.Ignore;
         panel.AddChild(bg);
 
+        // 面板高度固定，但 ADD: 队列只增不减（马马耶夫岗峰值 13 行，柏林 11 行），
+        // 直接挂 VBoxContainer 时超出的行会画到面板底色之外、叠在战场上。
+        // 套一层 ScrollContainer 把它们收进面板内滚动。
+        var scroll = new ScrollContainer();
+        scroll.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        scroll.OffsetLeft = 6;
+        scroll.OffsetTop = 6;
+        scroll.OffsetRight = -6;
+        scroll.OffsetBottom = -6;
+        scroll.HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled;
+        panel.AddChild(scroll);
+
         _enemyIntentContainer = new VBoxContainer();
-        _enemyIntentContainer.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        _enemyIntentContainer.Position = new Vector2(6, 6);
+        // 子节点撑满滚动区宽度，否则行宽会塌成内容宽度
+        _enemyIntentContainer.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         _enemyIntentContainer.AddThemeConstantOverride("separation", 6);
+        // 必须是 Ignore：行若拦截鼠标事件，滚轮就传不到 ScrollContainer
         _enemyIntentContainer.MouseFilter = Control.MouseFilterEnum.Ignore;
-        panel.AddChild(_enemyIntentContainer);
+        scroll.AddChild(_enemyIntentContainer);
 
         AddChild(panel);
     }

@@ -130,7 +130,19 @@
 - 意图面板按每条行动的`icon`元数据加载`normalUnit`、`bigUnit`、`heal`、`damage`或`upgrade`。
 - 图标缺失或名称未知时回退到`boss`，不再为所有行动硬编码同一图标。
 - **一行多行动各自成行**：渲染时按顶层逗号拆开行动行（复用`SplitEffectString`），每个带`description`的段各出一行、各用各的图标。旧实现在整行上做`LastIndexOf('[')`，只认最后一个元数据块——布良斯克`t1`的「部署第1步兵团」就是这样被静默吞掉的，界面上看不出敌人还部署了单位。断言覆盖：渲染路径不得再出现`LastIndexOf`；对`enemyTurn.ini`全部行动行做行为验证，确认没有任何描述被丢掉、且单块行不会重复出行。
-- 面板固定 300×400（约 5 行可见），而`ADD:`队列会随回合无限累积，`MamayevKurgan`与`berlin_final_battle`的峰值分别达到 13 行与 11 行，超出部分没有面板底色。这是既有问题，测试暂未约束。
+- 面板高度固定 300×400（约 5 行可见），而`ADD:`队列会随回合无限累积——`MamayevKurgan`与`berlin_final_battle`的峰值分别达到 13 行与 11 行，超出部分原本会画到面板底色之外、叠在战场上。行动列表现挂在`ScrollContainer`下（横向滚动禁用、列表`SizeFlagsHorizontal=ExpandFill`撑满宽度、列表`MouseFilter=Ignore`以保证滚轮能传到滚动容器），超出部分收进面板内纵向滚动。
+
+## 总部效果指令
+
+测试脚本：`tests/verify_hq_instructions.py`。
+
+HQ 的「血」是`defence`，`attack`恒为 0 且总部不会攻击，因此对 HQ 施加增减攻击力的指令没有任何可观察效果。步兵第845团原写作`TakingDamage: myHq|GetAttack(&lastDamage)`，卡面描述却是「受到伤害时友方总部恢复等量的防御力」——加的是攻击力，总部防御力纹丝不动，表现为「无法给总部加血」。现改为`Heal`（实现为`ChangeType.GetDefence`）。
+
+- 冒烟测试：`card.ini`与`enemyTurn.ini`可解析且非空。
+- 基本验证：全库不得有任何效果对 HQ 使用`GetAttack`/`LoseAttack`；总部指令确实存在（56 处），且使用了`heal`/`damage`/`addDefence`/`SetDefence`等防御类写法。
+- 定点回归：步兵第845团对总部使用`Heal(&lastDamage)`，卡面描述仍为「恢复等量的防御力」，两者一致。
+- 触发链完整性：`lastDamage`的赋值（`battlefield_.cs`的`Attack()`）必须早于`TakingDamage`的触发，否则`&lastDamage`取不到数值；该时点只在`attackDamage > 0`时触发；`myhq`解析为玩家总部。
+- 边界：规则不得过宽——对**友方单位**使用`GetAttack`仍被允许（`GetAllFriendUnits|GetAttack(...)`）。
 
 ## 战斗名称配置
 

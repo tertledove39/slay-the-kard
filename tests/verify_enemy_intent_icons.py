@@ -122,6 +122,25 @@ def main():
               "拆段循环内对每个带描述的段各调一次 AddEnemyIntentRow"),
     ]
 
+    # ---- 滚动容器：ADD 队列只增不减，行数会超过面板高度 ----
+    create = battle.split("void CreateEnemyIntentPanel()")[1].split("void RefreshEnemyIntentPanel()")[0]
+    results += [
+        check("var scroll = new ScrollContainer();" in create,
+              "意图面板套了 ScrollContainer"),
+        check("scroll.AddChild(_enemyIntentContainer);" in create
+              and "panel.AddChild(_enemyIntentContainer);" not in create,
+              "行动列表挂在 ScrollContainer 下，而不是直接挂面板"),
+        check("scroll.HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled;" in create,
+              "禁用横向滚动，只纵向滚"),
+        check("_enemyIntentContainer.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;" in create,
+              "行动列表撑满滚动区宽度，行宽不会塌成内容宽度"),
+        check("_enemyIntentContainer.MouseFilter = Control.MouseFilterEnum.Ignore;" in create,
+              "行动列表忽略鼠标事件，滚轮才能传到 ScrollContainer"),
+        check("scroll.SetAnchorsPreset(Control.LayoutPreset.FullRect);" in create
+              and "scroll.OffsetRight = -6;" in create and "scroll.OffsetBottom = -6;" in create,
+              "滚动区按 FullRect 锚定并内缩 6px，不压住面板边框"),
+    ]
+
     # ---- 行为验证：对每个战斗的每一行行动，新写法不得少显示任何一条描述 ----
     battles = load_battles()
     lost = []
