@@ -16,6 +16,7 @@
 | 效果执行 | `ParseAndExecuteEffect()` 效果脚本解释器（~1176行） |
 | 战斗系统 | `Attack()` 完整战斗流程；`Move()` 移动逻辑 |
 | 敌方AI | `EnemyPerformActionsAsync()` 敌方行动AI；`EnemyTurnAsync()` 敌方回合 |
+| 敌人意图 | `LoadEnemyActionQueue()` 读取预设；`GetNextTurnActions()` 汇总下回合行动；`RefreshEnemyIntentPanel()` 按顶层逗号拆开行动行、每个带描述的段各出一行（`AddEnemyIntentRow()`）；`ParseActionMetadata()` 解析`[icon=,description=]` |
 | 选择UI | `ShowCardChoice()`/`HandleChoiceCardClick()` 卡牌选择界面 |
 | 控制台 | `ToggleConsole()`/`CreateConsole()` 内建调试控制台 |
 

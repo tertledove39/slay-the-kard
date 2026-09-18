@@ -2316,32 +2316,43 @@ InputState currentInputState = InputState.nil;
 
         foreach (var action in actions)
         {
-            var metadata = ParseActionMetadata(action);
-            string desc = metadata.description;
-            if (string.IsNullOrEmpty(desc)) continue;
-
-            var row = new HBoxContainer();
-            row.MouseFilter = Control.MouseFilterEnum.Ignore;
-
-            var icon = new TextureRect();
-            icon.Texture = IconCache.GetIcon(metadata.icon) ?? IconCache.GetIcon("boss");
-            icon.CustomMinimumSize = new Vector2(64, 64);
-            icon.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
-            icon.StretchMode = TextureRect.StretchModeEnum.KeepAspect;
-            icon.MouseFilter = Control.MouseFilterEnum.Ignore;
-            row.AddChild(icon);
-
-            var label = new Label();
-            label.Text = desc;
-            label.AddThemeFontSizeOverride("font_size", 14);
-            label.AddThemeColorOverride("font_color", Colors.White);
-            label.VerticalAlignment = VerticalAlignment.Center;
-            label.CustomMinimumSize = new Vector2(220, 64);
-            label.MouseFilter = Control.MouseFilterEnum.Ignore;
-            row.AddChild(label);
-
-            _enemyIntentContainer.AddChild(row);
+            // 一行可由顶层逗号分隔的多个行动组成，每个自带元数据的行动各占一行。
+            // 若整行只取末尾一个元数据块（旧写法用 LastIndexOf('[')），
+            // “部署第1步兵团[icon=...],敌方总部获得5点防御力[icon=...]” 这类写法
+            // 会把前一个行动的描述整个吞掉，界面上看不出敌人还部署了单位。
+            foreach (string segment in SplitEffectString(action, ','))
+            {
+                var metadata = ParseActionMetadata(segment);
+                if (string.IsNullOrEmpty(metadata.description)) continue;
+                AddEnemyIntentRow(metadata.icon, metadata.description);
+            }
         }
+    }
+
+    /// <summary>往意图面板追加一行：左侧图标，右侧描述。</summary>
+    void AddEnemyIntentRow(string iconName, string description)
+    {
+        var row = new HBoxContainer();
+        row.MouseFilter = Control.MouseFilterEnum.Ignore;
+
+        var icon = new TextureRect();
+        icon.Texture = IconCache.GetIcon(iconName) ?? IconCache.GetIcon("boss");
+        icon.CustomMinimumSize = new Vector2(64, 64);
+        icon.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
+        icon.StretchMode = TextureRect.StretchModeEnum.KeepAspect;
+        icon.MouseFilter = Control.MouseFilterEnum.Ignore;
+        row.AddChild(icon);
+
+        var label = new Label();
+        label.Text = description;
+        label.AddThemeFontSizeOverride("font_size", 14);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.VerticalAlignment = VerticalAlignment.Center;
+        label.CustomMinimumSize = new Vector2(220, 64);
+        label.MouseFilter = Control.MouseFilterEnum.Ignore;
+        row.AddChild(label);
+
+        _enemyIntentContainer.AddChild(row);
     }
 
     List<string> GetNextTurnActions(int nextTurn)
