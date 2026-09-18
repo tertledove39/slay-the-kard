@@ -13,7 +13,7 @@
 | choice-ui-hints.md | 选择界面函数说明与最佳实践 |
 | BUGS.md | 已发现的代码逻辑问题汇总（非修改，仅收集） |
 | FUNCTION_INDEX.md | 所有函数的索引目录 |
-| NOTICE.md | 核心逻辑修改注意事项（每次修改前必读）：卡牌生命周期、SetMyPlace、特性同步点、效果指令系统、枚举位置、异步规范、已知陷阱。不含流程与风格约定 |
+| NOTICE.md | 修改注意事项（每次修改前必读）：卡牌生命周期、SetMyPlace、特性同步点、效果指令系统、数据配置原则、枚举位置、异步规范、已知陷阱、Git规范 |
 | START_MENU.md | 开始菜单、设置配置与运行时设置访问说明 |
 | DIALOGUE.md | Dialogue Manager全局接口、对白编写与立绘标签使用指南 |
 | API.md | 项目对外API接口 |

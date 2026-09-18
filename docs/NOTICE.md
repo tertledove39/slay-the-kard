@@ -66,14 +66,33 @@
 
 ---
 
-## 五、枚举类型位置
+## 五、数据配置原则
+
+### 禁止魔鬼数字
+- 所有数字/字符串应配入配置文件（cards/card.ini、bin/AreaPool.ini 等）
+- 同一数据只能在一处配置，禁止多处硬编码
+
+### 配置项位置
+| 配置 | 文件 |
+|------|------|
+| 卡牌属性 | `cards/card.ini` |
+| 敌方行动预设 | `cards/enemyTurn.ini` |
+| 区域池 | `bin/AreaPool.ini` |
+| 玩家初始卡组 | `bin/deck.ini` |
+| 事件 | `bin/event.ini` |
+| 背景音乐槽位 | `configs/music.ini` |
+| 设置项与音量滑块 | `bin/setting.ini` |
+
+---
+
+## 六、枚举类型位置
 
 所有枚举定义在 `cardBase_.cs` 文件末尾（line 1695-1948）：
 - `HQ`、`CardTypes`、`UnitTraits`、`Rarity`、`Stage`、`CardState`、`Times`、`IsFriend`、`ChangeType`、`TargetType`
 
 ---
 
-## 六、异步函数规范
+## 七、异步函数规范
 
 - 所有涉及动画/等待的函数必须使用 `async Task`，**禁止**使用 `async void`
 - `async void` 异常无法被捕获，会导致静默崩溃
@@ -82,7 +101,7 @@
 
 ---
 
-## 七、已知陷阱
+## 八、已知陷阱
 
 | 陷阱 | 说明 |
 |------|------|
@@ -91,3 +110,13 @@
 | `AttackInf` 是空桩 | 步兵攻击动画未实现 |
 | `GetCardMaganer` 拼写错误 | 多处使用此方法名（少了一个'a'），新增调用时保持一致性 |
 | `MouceEntered`/`MouceExited` 拼写错误 | 方法名拼写错误但 Godot 信号连接可能依赖此名称，不要轻易改名 |
+
+---
+
+## 九、Git 规范
+
+- 每次需求完成后进行一次 git 提交推送
+- 严禁修改 `.gitignore` 中的文件
+- 提交前检查 `git status` 和 `git diff`
+- 远端为 `origin`（`tertledove39/slay-the-kard`），当前工作分支为 `rebuild`
+- `tests/__pycache__/*.pyc` 已被跟踪（11 个），新跑测试产生的 `.pyc` 会以未跟踪状态出现。不要为了把它们一并提交而修改 `.gitignore`
