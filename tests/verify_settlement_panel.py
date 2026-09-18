@@ -93,6 +93,19 @@ def main():
               f"End.cs 按名引用全部节点（未引用 {sorted(set(REQUIRED_NODES) - set(resolved))}）")
     )
 
+    # --- 输入可达性 ---
+    # Godot 的 GUI 拾取按树序、后加入者优先，不读 z_index（z_index 只管绘制）。
+    # 全屏遮罩是 MouseFilter.Stop 且在 _Ready 中才 AddChild，若面板排在它之前，
+    # 按钮永远收不到点击。
+    results.append(
+        check("MoveChild(panelRoot, GetChildCount() - 1)" in end,
+              "面板在 _Ready 中被移到全屏遮罩之后，否则按钮收不到点击")
+    )
+    results.append(
+        check('_overlay.MouseFilter = Control.MouseFilterEnum.Stop' in end,
+              "遮罩保持 Stop（变暗时拦住对战场操作），故必须靠树序让面板优先拾取")
+    )
+
     # --- 回归：不再自己写系数 ---
     for filename, patterns in RAW_ARITHMETIC.items():
         source = end if filename == "End.cs" else battle

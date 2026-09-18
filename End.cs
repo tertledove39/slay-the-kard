@@ -53,6 +53,16 @@ public partial class End : CanvasLayer
         GetNode<Sprite2D>("img").Visible = false;
         AddChild(_overlay);
 
+        // 面板必须排在遮罩之后。Godot 的 GUI 拾取按树序、后加入者优先，
+        // 不读 z_index——z_index 只影响绘制。遮罩是全屏 MouseFilter.Stop，
+        // 若面板排在它之前，面板上的按钮永远收不到点击。
+        // 顺序最终为：img(0) → _overlay(1) → SettlementOverlay(2)。
+        var panelRoot = GetNodeOrNull<Control>(OverlayPath);
+        if (panelRoot != null)
+        {
+            MoveChild(panelRoot, GetChildCount() - 1);
+        }
+
         CachePanelNodes();
     }
 
