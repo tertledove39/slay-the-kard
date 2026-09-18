@@ -197,7 +197,9 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 
 位置：`battlefield_.cs` `ReturnToWorldMapAfterVictory()`
 
-1. 显示结算并等待确认。面板是 `bin/settlement_panel.tscn`，由 `End.cs` 填入数值；四个分量的分值来自 `bin/BattleScore.cs`，与 `CalculateMaterialPoints()` 同源，因此明细相加恒等于总额。调整物资点平衡只需改 `BattleScore` 的常量。
+1. 显示结算并等待确认。面板是 `bin/settlement_panel.tscn`，由 `End.cs` 填入数值；五个分量的分值来自 `bin/BattleScore.cs`，与 `CalculateMaterialPoints()` 同源，因此明细相加恒等于总额。调整物资点平衡只需改 `BattleScore` 的常量。
+
+**对敌方总部的伤害**是其中一项得分来源，取自卡牌自身的 `totalDefenceLost`——只在 `cardBase_.LoseDefence()` 累加，而治疗走 `GetDefence`/`AddDefence` 另一条路，因此回血不会抵消它。这一点是必要的：没有该项时击杀是唯一得分来源，「敌方不派兵、只不断加固总部」的关卡（如加里宁）无论打得多好都必然结算为 0，玩家实际要打穿的是总部防御加上它每回合回的血。
 2. 消耗 1 点区域战斗烈度。
 3. 完成或跳过战后奖励。
 4. 未通关时调用 `SceneLoader.ChangeSceneAsync()` 返回地图；最后一个区域烈度归零时改走通关流程。

@@ -3256,18 +3256,23 @@ InputState currentInputState = InputState.nil;
         int hqLost = _battleHqDefenceStart - hqCurrentDef;
         if (hqLost < 0) hqLost = 0;
 
+        // 对敌方总部累计造成的伤害。取自卡牌自身的 LoseDefence 累计值，
+        // 治疗不会抵消它——加里宁那种"边打边回血"的关卡才能如实计入。
+        int enemyHqDamage = enemyHq != null ? enemyHq.ReadTotalDefenceLost() : 0;
+
         // 系数集中在 BattleScore，结算面板用同一组函数渲染明细，
         // 避免两处各写一遍导致明细与总额对不上
-        int gained = BattleScore.Total(_battleEnemyLandKilled, _battleEnemyAirKilled, _battleFriendlyDead, hqLost);
+        int gained = BattleScore.Total(_battleEnemyLandKilled, _battleEnemyAirKilled, _battleFriendlyDead, hqLost, enemyHqDamage);
 
         BattleStateManager.MaterialPoints += gained;
         BattleStateManager.LastBattleLandKilled = _battleEnemyLandKilled;
         BattleStateManager.LastBattleAirKilled = _battleEnemyAirKilled;
         BattleStateManager.LastBattleFriendlyDead = _battleFriendlyDead;
         BattleStateManager.LastBattleHqDefenceLost = hqLost;
+        BattleStateManager.LastBattleEnemyHqDamage = enemyHqDamage;
         BattleStateManager.LastBattlePointsGained = gained;
 
-        GD.Print($"[MaterialPoints] land={_battleEnemyLandKilled} air={_battleEnemyAirKilled} dead={_battleFriendlyDead} hqLost={hqLost} gained={gained} total={BattleStateManager.MaterialPoints}");
+        GD.Print($"[MaterialPoints] land={_battleEnemyLandKilled} air={_battleEnemyAirKilled} dead={_battleFriendlyDead} hqLost={hqLost} enemyHqDmg={enemyHqDamage} gained={gained} total={BattleStateManager.MaterialPoints}");
     }
 
     /// <summary>
@@ -3282,6 +3287,7 @@ InputState currentInputState = InputState.nil;
                 BattleStateManager.LastBattleAirKilled,
                 BattleStateManager.LastBattleFriendlyDead,
                 BattleStateManager.LastBattleHqDefenceLost,
+                BattleStateManager.LastBattleEnemyHqDamage,
                 BattleStateManager.LastBattlePointsGained);
 
         // 战斗胜利消耗1点区域烈度；归零时解锁下一区域

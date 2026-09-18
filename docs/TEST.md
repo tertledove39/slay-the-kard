@@ -218,5 +218,7 @@
 - 基本验证：`battleField.tscn` 以实例方式把面板挂在 `end` 节点下；`End.cs` 按名引用全部节点；两个面板默认隐藏。
 - 回归验证：`End.cs` 与 `battlefield_.cs` 都不得出现评分系数的原始算术（`landKilled *`、`_battleEnemyLandKilled *`、`hqLost /` 等），必须调用 `BattleScore`。
 - 边界白盒测试：三个系数以具名常量定义在 `BattleScore.cs`，且不在别处重复定义；手写场景不写 uid（沿用 `settings_menu.tscn` 等先例，避免与现有资源撞车）。
+- 输入可达性：面板必须在 `_Ready` 中被移到全屏遮罩之后——Godot 的 GUI 拾取按树序、后加入者优先，不读 `z_index`，遮罩是 `MouseFilter.Stop` 且在 `_Ready` 中才 `AddChild`，面板排在它之前时按钮收不到点击。
+- 对敌方总部的伤害：`LoseDefence` 是唯一累加点，`ReadTotalDefenceLost` 供结算读取；`CalculateMaterialPoints` 读取后写入 `LastBattleEnemyHqDamage`，整局重置时清零。该项存在的原因是击杀曾是唯一得分来源，「敌方不派兵、只加固总部」的关卡（加里宁）必然结算为 0。
 
 `tests/verify_hq_defeat_flow.py` 中「失败面板文案」的断言已改为读 `bin/settlement_panel.tscn`——文案移入场景后，C# 里不再有 `Text = "战斗失败"` 这类字面量。

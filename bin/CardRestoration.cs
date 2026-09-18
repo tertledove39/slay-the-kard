@@ -23,6 +23,7 @@ public static class BattleStateManager
     public static int LastBattleAirKilled { get; set; } = 0;
     public static int LastBattleFriendlyDead { get; set; } = 0;
     public static int LastBattleHqDefenceLost { get; set; } = 0;
+    public static int LastBattleEnemyHqDamage { get; set; } = 0;
     public static int LastBattlePointsGained { get; set; } = 0;
     private static readonly string[] AreaOrder = { "area1", "area2", "area3", "area4", "area5", "area6", "area7" };
     public static Dictionary<string, int> UnlockedArea { get; } = new()
@@ -224,6 +225,7 @@ public static class BattleStateManager
         LastBattleAirKilled = 0;
         LastBattleFriendlyDead = 0;
         LastBattleHqDefenceLost = 0;
+        LastBattleEnemyHqDamage = 0;
         LastBattlePointsGained = 0;
 
         // 场景选择状态与上一局的战场节点引用

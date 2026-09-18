@@ -30,6 +30,11 @@ public partial class cardBase_ : Control
     private int minHistoryCost = 1;     // 历史最小价格
     private Tween currentFlashTween;    // 当前闪烁动画
 
+    // 累计实际损失的防御力。用于结算"对敌方总部造成的伤害"——
+    // 只在 LoseDefence 累加，因此治疗（走 GetDefence/AddDefence）不会抵消它，
+    // 加里宁那种"边打边回血"的关卡也能如实计入玩家打出的总量。
+    private int totalDefenceLost = 0;
+
     // 悬停高亮和缩放效果
     private Tween hoverTween;
     private Tween moveTween;
@@ -562,11 +567,18 @@ public partial class cardBase_ : Control
 /// <param name="n"></param>
     public async Task LoseDefence(int n)
     {
+        // 只累计真正扣掉的部分，避免溢出伤害（残血吃大伤害）虚增统计
+        if (n > 0) totalDefenceLost += Math.Min(n, Math.Max(0, defence));
         defence -= n;
         // 触发闪烁效果
         if(defence > 0 )FlashAttributeWithColor("defence", defence, initialDefence, maxHistoryDefence, isInverted: false);
         RefreshState();
     }
+
+    /// <summary>
+    /// 本场战斗累计实际损失的防御力。结算"对敌方总部造成的伤害"时读取。
+    /// </summary>
+    public int ReadTotalDefenceLost() => totalDefenceLost;
 
 /// <summary>
 /// 增加攻击力

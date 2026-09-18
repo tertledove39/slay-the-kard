@@ -28,11 +28,12 @@ END_CS = ROOT / "End.cs"
 BATTLE_CS = ROOT / "bin" / "battlefield_.cs"
 SCORE_CS = ROOT / "bin" / "BattleScore.cs"
 BATTLE_SCENE = ROOT / "bin" / "battleField.tscn"
+CARD_BASE_CS = ROOT / "bin" / "cardBase_.cs"
 
 # 面板需要 End.cs 按名取得的节点
 REQUIRED_NODES = [
     "Settlement", "Defeat",
-    "LandRow", "AirRow", "DeadRow", "HqRow",
+    "LandRow", "AirRow", "DeadRow", "HqRow", "EnemyHqRow",
     "Total", "ConfirmButton", "ReturnButton",
 ]
 
@@ -46,6 +47,25 @@ RAW_ARITHMETIC = {
 def check(condition, message):
     print(f"[{'PASS' if condition else 'FAIL'}] {message}")
     return condition
+
+
+def extract_method(source, signature):
+    """按大括号配对截取方法体，找不到时返回空串。"""
+    start = source.find(signature)
+    if start < 0:
+        return ""
+    brace = source.find("{", start)
+    if brace < 0:
+        return ""
+    depth = 0
+    for index in range(brace, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[brace : index + 1]
+    return ""
 
 
 def main():
@@ -120,8 +140,36 @@ def main():
               "CalculateMaterialPoints 通过 BattleScore.Total 计算总额")
     )
     results.append(
-        check(len(re.findall(r"BattleScore\.\w+\(", end)) >= 4,
-              "结算面板四行明细各自调用 BattleScore 的分量函数")
+        check(len(re.findall(r"BattleScore\.\w+\(", end)) >= 5,
+              "结算面板每行明细各自调用 BattleScore 的分量函数")
+    )
+
+    # --- 对敌方总部的伤害 ---
+    # 击杀曾是唯一的得分来源，于是「敌方不派兵、只加固总部」的关卡（加里宁）
+    # 无论打得多好都结算为 0。此分量取自卡牌自身的 LoseDefence 累计值，
+    # 治疗不会抵消，因此能如实反映"边打边回血"的关卡里玩家打出的总量。
+    card = CARD_BASE_CS.read_text(encoding="utf-8")
+    lose_defence = extract_method(card, "public async Task LoseDefence(int n)")
+    results.append(
+        check(bool(lose_defence) and "totalDefenceLost" in lose_defence,
+              "LoseDefence 累加 totalDefenceLost（伤害统计的唯一累加点）")
+    )
+    results.append(
+        check("ReadTotalDefenceLost" in card,
+              "卡牌暴露 ReadTotalDefenceLost 供结算读取")
+    )
+    results.append(
+        check("EnemyHqDamagePerPoint" in score and "EnemyHqDamagePoints" in score,
+              "BattleScore 提供对敌方总部伤害的分值换算")
+    )
+    results.append(
+        check("ReadTotalDefenceLost()" in battle and "LastBattleEnemyHqDamage" in battle,
+              "CalculateMaterialPoints 读取该累计值并写入结算字段")
+    )
+    results.append(
+        check("LastBattleEnemyHqDamage = 0" in
+              (ROOT / "bin" / "CardRestoration.cs").read_text(encoding="utf-8"),
+              "整局重置时清零该字段")
     )
 
     # --- 边界：系数只定义一处 ---

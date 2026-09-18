@@ -57,7 +57,8 @@ def main():
         check(
             all(f"{field} = 0" in reset for field in (
                 "LastBattleLandKilled", "LastBattleAirKilled", "LastBattleFriendlyDead",
-                "LastBattleHqDefenceLost", "LastBattlePointsGained")),
+                "LastBattleHqDefenceLost", "LastBattleEnemyHqDamage",
+                "LastBattlePointsGained")),
             "重置清零上局战斗统计",
         ),
         check("StoreCardQueue.Clear()" in reset and "StoreCurrentSlots = null" in reset, "重置清空商店库存与槽位"),

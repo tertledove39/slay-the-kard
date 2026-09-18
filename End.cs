@@ -25,6 +25,7 @@ public partial class End : CanvasLayer
     private Label _airRow;
     private Label _deadRow;
     private Label _hqRow;
+    private Label _enemyHqRow;
     private Label _total;
     private Button _confirmButton;
 
@@ -84,6 +85,7 @@ public partial class End : CanvasLayer
         _airRow = GetNodeOrNull<Label>(SettlementPath + "/AirRow");
         _deadRow = GetNodeOrNull<Label>(SettlementPath + "/DeadRow");
         _hqRow = GetNodeOrNull<Label>(SettlementPath + "/HqRow");
+        _enemyHqRow = GetNodeOrNull<Label>(SettlementPath + "/EnemyHqRow");
         _total = GetNodeOrNull<Label>(SettlementPath + "/Total");
         _confirmButton = GetNodeOrNull<Button>(SettlementPath + "/ConfirmButton");
 
@@ -140,7 +142,7 @@ public partial class End : CanvasLayer
     /// 显示战斗结算明细并等待玩家确认。
     /// 每行的分值来自 <see cref="BattleScore"/>，与总额同源。
     /// </summary>
-    public async System.Threading.Tasks.Task ShowSettlement(int landKilled, int airKilled, int friendlyDead, int hqDefenceLost, int pointsGained)
+    public async System.Threading.Tasks.Task ShowSettlement(int landKilled, int airKilled, int friendlyDead, int hqDefenceLost, int enemyHqDamage, int pointsGained)
     {
         if (_settlement == null || _confirmButton == null)
         {
@@ -152,6 +154,7 @@ public partial class End : CanvasLayer
         _airRow.Text = $"消灭敌方空军 x{airKilled}    +{BattleScore.AirPoints(airKilled)}";
         _deadRow.Text = $"己方单位损失 x{friendlyDead}    -{BattleScore.DeadPenalty(friendlyDead)}";
         _hqRow.Text = $"总部防御损失 {hqDefenceLost}    -{BattleScore.HqPenalty(hqDefenceLost)}";
+        _enemyHqRow.Text = $"对敌方总部造成伤害 {enemyHqDamage}    +{BattleScore.EnemyHqDamagePoints(enemyHqDamage)}";
         _total.Text = $"获得物资点: {pointsGained}";
 
         _settlement.Visible = true;
