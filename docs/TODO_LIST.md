@@ -163,7 +163,7 @@ dotnet build 新建游戏项目.csproj --no-restore --no-incremental
 
 - 状态：`[ ]`
 - 证据：`bin/battlefield_.cs` 6226 行、`bin/cardBase_.cs` 2060 行、`bin/WorldMap.cs` 645 行、`bin/iniHandler.cs` 805 行；`ParseAndExecuteEffect()` 超过千行。
-- 问题：远超 `docs/NOTICE.md` 的 300 行文件红线和 50 行函数红线；输入、AI、战斗、配置、UI、状态和脚本解释互相穿插。
+- 问题：远超 300 行文件红线和 50 行函数红线（红线本身由需求实现规范约束，`docs/NOTICE.md` 已不再复述）；输入、AI、战斗、配置、UI、状态和脚本解释互相穿插。
 - 建议：优先抽出 `TurnCoordinator`、`CombatResolver`、`EffectInterpreter`、`EnemyActionScheduler`、`CardRuntimeState`、`CampaignRepository`；小步提取，不再往巨型文件新增功能。
 - 验收：核心领域服务可脱离场景节点测试，新功能不再要求修改千行解释器。
 
