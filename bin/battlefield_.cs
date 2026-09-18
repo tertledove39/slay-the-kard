@@ -2980,6 +2980,24 @@ InputState currentInputState = InputState.nil;
 
     private async Task ProcessDeadUnitAsync(cardBase_ deadUnit)
     {
+        // 阵亡统计的唯一入口。上游 ProcessDeadUnitsOnceAsync 已用 IsDeadPlacedUnit
+        // (state == placed 且防御 <= 0) 筛选过，因此这里出现的才是真正阵亡的单位。
+        // 总部不计入战果/阵亡，其结算在 RemoveCard 中另行处理。
+        if (deadUnit.isHq != HQ.hq)
+        {
+            if (deadUnit.GetIsFriend() == IsFriend.enemy)
+            {
+                if (deadUnit.cardType == CardTypes.Plane || deadUnit.cardType == CardTypes.Bomber)
+                    _battleEnemyAirKilled++;
+                else
+                    _battleEnemyLandKilled++;
+            }
+            else if (deadUnit.GetIsFriend() == IsFriend.friend)
+            {
+                _battleFriendlyDead++;
+            }
+        }
+
         if (deadUnit.GetIsFriend() == IsFriend.friend &&
             deadUnit.cardType is CardTypes.Infantry or CardTypes.Tank or CardTypes.Artillery)
         {
@@ -3211,20 +3229,10 @@ InputState currentInputState = InputState.nil;
             }
         }
 
-        if (card != null && card.isHq != HQ.hq)
-        {
-            if (card.GetIsFriend() == IsFriend.enemy)
-            {
-                if (card.cardType == CardTypes.Plane || card.cardType == CardTypes.Bomber)
-                    _battleEnemyAirKilled++;
-                else
-                    _battleEnemyLandKilled++;
-            }
-            else if (card.GetIsFriend() == IsFriend.friend)
-            {
-                _battleFriendlyDead++;
-            }
-        }
+        // 阵亡统计不在此处进行：RemoveCard 是通用的卡牌移除函数，弃牌、指令卡
+        // 结算、ShowCardChoice 清理选项卡、手牌溢出等路径都会调用它。若在此计数，
+        // 这些非阵亡的移除会被一并算作战果/阵亡，并连带影响 CalculateMaterialPoints。
+        // 真正的计数在 ProcessDeadUnitAsync（死亡流程的唯一入口）。
 
         cardInPlaces.Remove(card);
         card.Dead();

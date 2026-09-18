@@ -196,3 +196,14 @@
 - 基本验证：`areaTimes` 被识别为元数据而不进入任务池；进入区域时按 `areaTimes` 初始化烈度；归零时才调用 `AdvanceArea()` 解锁下一区域。
 - 边界白盒测试：缺失时回退默认值 3；非法值记录错误并回退；`EnsureAreaIntensity()` 不重置已进入过的区域；`IsFinalArea()` 以 `AreaOrder` 末项判定；通关浮层层级低于对白气泡。
 - 接入验证：任务面板文本为「战斗烈度：当前值」；战斗与事件两条路径都消耗烈度且不再直接调用 `AdvanceArea()`；最后一个区域归零时进入通关流程并返回开始菜单。
+
+## 阵亡统计
+
+测试脚本：`tests/verify_friendly_death_count.py`。
+
+阵亡/战果计数原先写在 `RemoveCard()` 内，而该函数是通用的卡牌移除函数——弃牌、指令卡结算、`ShowCardChoice` 清理选项卡、手牌溢出都会调用它，计数又没有 state 判断，导致非阵亡的移除被一并算作阵亡，并连带扣减 `CalculateMaterialPoints` 的物资点。现计数已移至 `ProcessDeadUnitAsync`。
+
+- 冒烟测试：可从 `battlefield_.cs` 提取 `RemoveCard` 与 `ProcessDeadUnitAsync` 两个方法体。
+- 基本验证：`RemoveCard` 不含任何阵亡/战果计数；`ProcessDeadUnitAsync` 含全部三个计数。
+- 边界白盒测试：计数受 `deadUnit.isHq != HQ.hq` 守卫，总部不计入；友方分支保留显式的 `IsFriend.friend` 判断，不能写成裸 `else`（`IsFriend` 另有 `neutral` 与 `enemyNeutral`）。
+- 回归验证：`CardDiscardAndRemove` 与 `ShowCardChoice` 仍会调用 `RemoveCard`，即该约束确有防范对象；`RemoveCard` 仍负责从 `cardInPlaces` 移除节点。

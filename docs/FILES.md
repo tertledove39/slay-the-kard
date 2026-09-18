@@ -84,3 +84,4 @@
 | `tests/verify_world_map_areas.py` | 世界地图区域按钮、区域池段、AreaOrder 与 UnlockedArea 一致性及地理落点验证 |
 | `tests/verify_area_intensity.py` | 区域战斗烈度验证：areaTimes 解析与回退、烈度初始化与消耗、归零解锁、通关流程与对白资源 |
 | `tests/verify_campaign_reset.py` | 整局进度重置验证：卡组清空、区域与烈度复位、商店与统计清零、两个结束入口接入 |
+| `tests/verify_friendly_death_count.py` | 阵亡统计验证：计数只出现在 `ProcessDeadUnitAsync`，`RemoveCard` 不再计数 |
