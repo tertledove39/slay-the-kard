@@ -21,6 +21,12 @@ public partial class battlefield_ : Control
     int allowControl = 0;
 
     /// <summary>
+    /// 控制锁的嵌套层数。ForbidControl / AllowControl 会嵌套调用
+    /// （敌方回合内的每次 Attack 都是一层），内层解除不得推翻外层的禁止。
+    /// </summary>
+    int controlLockDepth = 0;
+
+    /// <summary>
     /// 是否暂停死亡检查 0 不暂停 1 暂停
     /// </summary>
     int pauseDeathCheck = 0;
@@ -29,19 +35,28 @@ public partial class battlefield_ : Control
     private bool turnTransitionRunning = false;
 
     /// <summary>
-    /// 允许控制输入
+    /// 允许控制输入。只在最外层解除时才真正解锁。
+    /// 内层调用必须被忽略：Attack() 结尾会无条件调用本函数，而敌方回合里
+    /// 每次 Attack 都嵌套在 EnemyTurnAsync / OnNextTurnButtonPressed 的禁止之下，
+    /// 若直接解锁，Next 按钮会在每一次敌方行动后闪一下可点击状态。
     /// </summary>
     void AllowControl()
     {
+        if (controlLockDepth > 0)
+            controlLockDepth--;
+        if (controlLockDepth > 0)
+            return;
+
         allowControl = 0;
         buttonNextTurn.Disabled = false;
     }
-    
+
     /// <summary>
     /// 禁止控制输入
     /// </summary>
     void ForbidControl()
     {
+        controlLockDepth++;
         allowControl = 1;
         buttonNextTurn.Disabled = true;
     }

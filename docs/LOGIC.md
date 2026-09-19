@@ -207,6 +207,8 @@ null 后不作处理），过滤条件凭空消失、结果集比预期大。写
 
 `CheckIfAnyUnitDiedAsync()`使用运行门闩合并重复请求，以固定点循环依次等待change list、Dead效果、移除和阵营死亡效果，不再异步递归。回合按钮使用`turnTransitionRunning`拒绝重复点击，Trait结算、死亡检查和抽牌均在同一可等待流程中完成。
 
+`ForbidControl()` / `AllowControl()` 是**嵌套感知的控制锁**（按 `controlLockDepth` 计数），只有最外层 `AllowControl()` 才真正解锁、恢复 Next 按钮可点击。必须如此的原因：`Attack()` 结尾**无条件**调用 `AllowControl()`，而敌方回合里每一次 `Attack` 都嵌套在 `EnemyTurnAsync` 与 `OnNextTurnButtonPressed` 的禁止之下。若把它当成扁平标志，最内层的解锁会在每次敌方行动后把按钮置回可点击、下一次行动又立刻禁用，表现为**Next 按钮在敌方回合闪烁**。新增调用点时不必关心自己所处的嵌套层级，`Forbid` / `Allow` 配对调用即可；未配对的 `AllowControl()`（计数已为 0）行为与从前一致。
+
 ### 交互热路径
 
 瞄准箭头复用曲线与多边形数组，并将箭身合并为一次多边形绘制；鼠标位置未变化时不重绘。卡牌和商店悬停移动会取消旧Tween。商店价格颜色只在点数或槽位状态变化时更新，属性Tooltip通过局部`_GuiInput`处理并缓存当前图标。

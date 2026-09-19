@@ -303,3 +303,19 @@ HQ 的「血」是`defence`，`attack`恒为 0 且总部不会攻击，因此对
 - 前提校验：全项目零处 `MouseButton.Right`——这是「忽略右键不会破坏任何功能」的依据。
 - 成因链校验：断言 `CardState.caught`、`cardNowChoose` 与 `RefreshMyHand` 中的 `isDragging → continue` 仍然存在，证明本测试守的是真实风险。
 - 断言有效性：把两处守卫还原成 `if (mouseButton.Pressed)` / `if (mouseButton.Pressed==false)` 后，脚本立即报出 5 个 FAIL（两处锚点断言 + 全项目扫描 + 两条回归断言）。
+
+## Next 按钮在敌方回合闪烁的回归
+
+测试脚本：`tests/verify_control_lock_nesting.py`。
+
+`ForbidControl()` / `AllowControl()` 原是一对**扁平标志**（`allowControl` 只是个 `int`，没有计数），但调用点是**嵌套**的：`Attack()` 结尾无条件调用 `AllowControl()`，而敌方回合里每一次 `Attack` 都嵌套在 `EnemyTurnAsync` 与 `OnNextTurnButtonPressed` 的禁止之下。最内层的解锁直接推翻外层的禁止，于是每执行完一次敌方行动按钮就被置回 Enabled、下一次行动又立刻禁用——**敌方行动几次就闪几次**。闪烁期间按钮看起来可点，功能上被 `turnTransitionRunning` 挡住，属纯视觉问题。
+
+修法：改为**嵌套感知**的控制锁，按 `controlLockDepth` 计数，只有最外层 `AllowControl()` 才真正解锁。`Attack()` 结尾那句 `AllowControl()` 必须保留（我方回合单独攻击要靠它解锁），由计数而非删除来保护。所有既有调用点一行未改。
+
+- 冒烟测试：两个函数存在；`controlLockDepth` 字段已引入。
+- 基本验证：`ForbidControl` 自增计数；`AllowControl` 递减，且计数仍大于 0 时提前返回；嵌套判断必须位于解锁语句之前（顺序颠倒会先解锁再判断）。
+- 行为模拟（核心）：用 Python 复刻计数器语义，按敌方回合的真实嵌套顺序（2 层 Forbid + 3 组「Forbid/Allow」攻击对 + 2 层收尾 Allow）走一遍，断言按钮在整个敌方回合期间**一次都没有**变成 Enabled，且回合真正结束时才恢复可点击。
+- 对照实验：用旧语义跑同一序列，断言它**确实会闪烁 4 次**——证明该断言不是空转。
+- 边界白盒测试：我方回合单独一次攻击（深度 1→0）照常解锁，原有效果未变；计数为 0 时未配对的 `AllowControl()` 行为与从前一致；多次未配对调用不会让计数变负或卡死；深度 2 时内层一次解除后仍保持禁用。
+- 调用点审查：`Attack()` 只在开头 `ForbidControl` 一次，并以 `AllowControl()` 作为最后一条语句收尾。
+- 断言有效性：把实现还原成扁平标志后立即报出 3 个 FAIL。
