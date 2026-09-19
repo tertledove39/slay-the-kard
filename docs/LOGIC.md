@@ -405,6 +405,17 @@ if (from.HasTrait(UnitTraits.Immunity)) counterDamage = 0;  // 1898，打人时�
 | BeingAddedToField | 单位被加入战场时 |
 | BePicked | 被指向（被选为目标时） |
 
+**前缀必须与上表逐字一致（含大小写）。** `TriggerUnitEffects` 的判定是：
+
+```csharp
+var prefix = segment.Split(":")[0].Trim();
+if (prefix != triggerPoint) continue;      // 区分大小写的精确比较
+```
+
+写错时**不报任何错**，只是该段效果永远不执行。`[i1005]` 的亡记曾写成 `dead:`（小写），而死亡触发点传的是 `Dead:`，于是整段效果一次都没跑过；`[雅克9]` 同样如此。上面 `Times` 枚举里的成员名是小写，但它**从未被使用**，不构成命名依据——权威写法就是本表的 PascalCase。
+
+`tests/verify_timing_prefixes.py` 会把三个配置文件里所有时点前缀与代码中实际使用的触发点逐一比对，大小写不符或名字未知都会报错。
+
 ---
 
 ## 八、同仇特性 (SharedHatred)
