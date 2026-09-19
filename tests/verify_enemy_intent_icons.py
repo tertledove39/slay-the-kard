@@ -4,6 +4,10 @@ import re
 from pathlib import Path
 import sys
 
+# 与项目其他测试一致：Windows 控制台默认按本地代码页输出，中文会乱码
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -132,6 +136,11 @@ def main():
               "行动列表挂在 ScrollContainer 下，而不是直接挂面板"),
         check("scroll.HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled;" in create,
               "禁用横向滚动，只纵向滚"),
+        check("scroll.VerticalScrollMode = ScrollContainer.ScrollMode.ShowNever;" in create,
+              "纵向滚动条不显示（ShowNever），但滚轮仍可滚动"),
+        check("scroll.VerticalScrollMode = ScrollContainer.ScrollMode.Disabled;" not in create,
+              "纵向不得改用 Disabled——那会连滚动一并禁掉，"
+              "高行数关卡（马马耶夫岗 13 行）的行会画到面板外"),
         check("_enemyIntentContainer.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;" in create,
               "行动列表撑满滚动区宽度，行宽不会塌成内容宽度"),
         check("_enemyIntentContainer.MouseFilter = Control.MouseFilterEnum.Ignore;" in create,

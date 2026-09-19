@@ -131,6 +131,7 @@
 - 图标缺失或名称未知时回退到`boss`，不再为所有行动硬编码同一图标。
 - **一行多行动各自成行**：渲染时按顶层逗号拆开行动行（复用`SplitEffectString`），每个带`description`的段各出一行、各用各的图标。旧实现在整行上做`LastIndexOf('[')`，只认最后一个元数据块——布良斯克`t1`的「部署第1步兵团」就是这样被静默吞掉的，界面上看不出敌人还部署了单位。断言覆盖：渲染路径不得再出现`LastIndexOf`；对`enemyTurn.ini`全部行动行做行为验证，确认没有任何描述被丢掉、且单块行不会重复出行。
 - 面板高度固定 300×400（约 5 行可见），而`ADD:`队列会随回合无限累积——`MamayevKurgan`与`berlin_final_battle`的峰值分别达到 13 行与 11 行，超出部分原本会画到面板底色之外、叠在战场上。行动列表现挂在`ScrollContainer`下（横向滚动禁用、列表`SizeFlagsHorizontal=ExpandFill`撑满宽度、列表`MouseFilter=Ignore`以保证滚轮能传到滚动容器），超出部分收进面板内纵向滚动。
+- **纵向不显示滚动条**：纵向 `ScrollMode` 取 `ShowNever`，不是 `Disabled`。两者都能让滚动条消失，但 `Disabled` 会**连滚动一并禁掉**，高行数关卡的行会重新画到面板外——所以测试除了断言取值为 `ShowNever`，还额外断言纵向**不得**为 `Disabled`。`ShowNever` 保留滚轮滚动，同时收回滚动条占去的约 12px 宽度给 220px 的描述文本。
 
 ## 卡牌效果脚本静态校验
 

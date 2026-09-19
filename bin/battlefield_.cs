@@ -2337,6 +2337,9 @@ InputState currentInputState = InputState.nil;
         scroll.OffsetRight = -6;
         scroll.OffsetBottom = -6;
         scroll.HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled;
+        // 纵向用 ShowNever 而非 Disabled：滚轮滚动必须保留（高行数关卡靠它收纳
+        // 溢出行动行），只是不绘制滚动条——滚动条既在战场上显得杂乱，又占去约 12px 宽度
+        scroll.VerticalScrollMode = ScrollContainer.ScrollMode.ShowNever;
         panel.AddChild(scroll);
 
         _enemyIntentContainer = new VBoxContainer();
