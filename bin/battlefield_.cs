@@ -5567,6 +5567,13 @@ public class Player
     private float hoverScale = 1.1f;            // 悬停时缩放倍数
 
     int maxHandSize = 9;
+
+    /// <summary>
+    /// 牌库里待抽卡牌的停放位置：屏幕外的固定点。
+    /// 牌库中的卡靠"停在屏幕外"来隐藏，而不是靠 Visible=false
+    /// ——后者一旦设上就没有任何路径会恢复，会导致抽到手上却是空位。
+    /// </summary>
+    public static readonly Godot.Vector2 DeckParkPosition = new(-2000, 800);
     IsFriend isFriend;
     MeterLabel pointLabel;
     MeterLabel pointMaxLabel;
@@ -6007,7 +6014,10 @@ public class Player
                 _ = battlefield.CardDiscardAndRemove(card);
                 return;
             }
-            card.SetPosition(new Godot.Vector2(-2000, 800));
+            card.SetPosition(DeckParkPosition);
+            // 进手牌的卡必须可见：牌库中的卡靠停在屏幕外隐藏，
+            // 但别处（如换牌界面）可能把 Visible 设成 false，这里统一兜底恢复。
+            card.Visible = true;
             await AddCardToHand(card);
             SetLastDrawnCards(new List<cardBase_> { card });
             battlefield.TriggerFriendlyCardDrawn(card);
@@ -6117,7 +6127,7 @@ public class Player
                 }
                 else
                 {
-                    card.SetPosition(new Godot.Vector2(-2000, 800));
+                    card.SetPosition(DeckParkPosition);
                     await AddCardToHand(card);
                     lastDrawnCards.Add(card);
                 }
@@ -6147,7 +6157,7 @@ public class Player
                     }
                     else
                     {
-                        card.SetPosition(new Godot.Vector2(-2000, 800));
+                        card.SetPosition(DeckParkPosition);
                         await AddCardToHand(card);
                         lastDrawnCards.Add(card);
                     }
@@ -6178,7 +6188,7 @@ public class Player
                 }
                 else
                 {
-                    card.SetPosition(new Godot.Vector2(-2000, 800));
+                    card.SetPosition(DeckParkPosition);
                     await AddCardToHand(card);
                     lastDrawnCards.Add(card);
                 }

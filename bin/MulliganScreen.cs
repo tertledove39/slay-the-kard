@@ -227,7 +227,9 @@ public partial class MulliganScreen : Control
         foreach (var card in returned)
         {
             slots.Add(_cards.IndexOf(card));
-            card.Visible = false;
+            // 用「停到屏幕外的牌库位置」隐藏，不能设 Visible=false：
+            // 那样没有任何路径会把它恢复，日后抽到手上就是一个空位。
+            card.SetPosition(Player.DeckParkPosition);
         }
         ClearMarkers();
 
@@ -238,6 +240,8 @@ public partial class MulliganScreen : Control
         {
             if (card == null || !IsInstanceValid(card)) continue;
             card.Scale = Vector2.One;
+            card.Rotation = 0f;
+            card.SetPosition(Player.DeckParkPosition);
             if (card.GetParent() != _field) card.Reparent(_field);
         }
 

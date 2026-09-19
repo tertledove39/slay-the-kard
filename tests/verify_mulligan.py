@@ -129,6 +129,24 @@ def main():
     ownership.append(check(not unguarded,
                            f"battlefield_ 中每处 MoveChild 都先校验了父子关系（未校验的行号：{unguarded}）"))
 
+    # ---- 关键回归：换掉的牌不能靠 Visible=false 隐藏 ----
+    # 牌库中的卡靠"停在屏幕外"隐藏。若改用 Visible=false，没有任何路径会恢复它，
+    # 日后抽到手上就是一个空位——不报错、能被抽到、但看不见。
+    park = [
+        check("public static readonly Godot.Vector2 DeckParkPosition = new(-2000, 800);" in battle,
+              "牌库停放位置收敛为具名常量 DeckParkPosition"),
+        check(battle.count("-2000") == 1,
+              "屏幕外停牌位置只在常量定义处出现一次，不再多处硬编码"),
+        check("card.SetPosition(DeckParkPosition);" in battle, "抽牌与建卡统一使用该常量停放"),
+        check("card.Visible = true;" in battle.split("public async Task DrawCard()")[1].split("public async Task DrawCard(int number)")[0],
+              "抽牌时兜底恢复 Visible，进手牌的卡必定可见"),
+        check("card.Visible = false" not in mulligan_start,
+              "换牌界面不再用 Visible=false 隐藏被换掉的牌"),
+        check("card.SetPosition(Player.DeckParkPosition);" in mulligan_start,
+              "换牌界面改用停到屏幕外的牌库位置"),
+    ]
+    ownership += park
+
     # --------------------------- 健壮性 ---------------------------
     print("\n--- 健壮性 ---")
     robust = [
