@@ -1096,7 +1096,9 @@ InputState currentInputState = InputState.nil;
 
             
             var mousePosition = GetGlobalMousePosition();
-            if (mouseButton.Pressed)
+            // 必须限定左键：拖拽期间右键按下会误入此分支，
+            // 把 currentInputState 冲成 nil，导致随后的左键释放无法落位
+            if (mouseButton.Pressed && mouseButton.ButtonIndex == MouseButton.Left)
         {
             var card = CheckCardClick(mousePosition);
             if(currentInputState != InputState.waitingForChoosingTarget) cardNowChoose = card;
@@ -1176,10 +1178,12 @@ InputState currentInputState = InputState.nil;
             }
         } 
 
-        if (mouseButton.Pressed==false)
+        // 必须限定左键：右键抬起会误入此分支，走 switch(nil) 跳过全部落位逻辑，
+        // 使卡牌永久停留在 caught 状态（RefreshMyHand 会跳过拖拽中的卡，不再归位）
+        if (mouseButton.Pressed == false && mouseButton.ButtonIndex == MouseButton.Left)
             {
-                
-                
+
+
                 if(cardNowChoose== null ) return; // 没有卡牌被拖动，不处理
                 var result = GetPlaceWithPosition(mousePosition);
                 

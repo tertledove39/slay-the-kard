@@ -286,3 +286,19 @@ HQ 的「血」是`defence`，`attack`恒为 0 且总部不会攻击，因此对
 - 对敌方总部的伤害：`LoseDefence` 是唯一累加点，`ReadTotalDefenceLost` 供结算读取；`CalculateMaterialPoints` 读取后写入 `LastBattleEnemyHqDamage`，整局重置时清零。该项存在的原因是击杀曾是唯一得分来源，「敌方不派兵、只加固总部」的关卡（加里宁）必然结算为 0。
 
 `tests/verify_hq_defeat_flow.py` 中「失败面板文案」的断言已改为读 `bin/settlement_panel.tscn`——文案移入场景后，C# 里不再有 `Text = "战斗失败"` 这类字面量。
+
+## 拖拽期间右键导致卡牌卡在场上的回归
+
+测试脚本：`tests/verify_drag_right_click.py`。
+
+`battlefield_.cs` 的 `_Input` 把 `InputEventMouseButton` 拆成「按下」「抬起」两个兄弟分支，两条原本都没校验 `ButtonIndex`，右键因此会完整走一遍左键流程：右键**按下**时 `CheckCardClick` 返回正被拖起的卡，其状态是 `caught`，不匹配 `inHand` / `placed` 任何分支，于是落到 `else` 把 `currentInputState` 冲成 `nil`（原 `P_InHandUnit` 丢失）；右键**抬起**时 `switch (InputState.nil)` 无匹配分支，落位/归位逻辑整段跳过；此后松开左键依然走 `nil`，卡牌永久停在 `caught`——而 `RefreshMyHand()` 对 `isDragging` 的卡 `continue` 跳过（"拖动状态下，不让自动布局移动该卡"），不会把它拉回手牌位，于是**卡在场上**。附带伤害是 `cardNowChoose` 始终非 null，`_Process` 因此对全部手牌关闭悬停（`UpdateHover(-9999,-9999)`）。场上单位拖拽（`P_InPlaceUnit` / `inplaceAndCaught`）走同一段代码，同样会卡住。
+
+右键在本项目中无任何既定功能（全项目零处 `MouseButton.Right`），故修法是给两条分支都加左键限定，拖拽期间彻底忽略右键——不新增取消逻辑、不动状态机。
+
+- 冒烟测试：`bin/battlefield_.cs` 存在且含 `_Input` 入口。
+- 基本验证：以拖拽分支内部的语句为锚点（按下分支用 `var card = CheckCardClick(mousePosition);`，抬起分支用 `// 没有卡牌被拖动，不处理`）向前回溯，各自最近的 `mouseButton.Pressed` 判断必须带 `ButtonIndex == MouseButton.Left`。**不用字符串计数**——选择界面守卫（`isShowingChoiceUI`）与拖拽按下分支的守卫文本完全相同，计数会把 2 误判成 1。
+- 回归验证：不得残留裸 `if (mouseButton.Pressed)` 与 `if (mouseButton.Pressed==false)`。
+- 边界白盒测试：全项目扫描每个 `InputEventMouseButton` 处理点，凡测试 `.Pressed` 的行都必须提到 `ButtonIndex`；只处理滚轮的 `DisplayCard.cs` 豁免，且断言它确实同时含 `WheelUp` 与 `WheelDown`（豁免名单不是空转）。
+- 前提校验：全项目零处 `MouseButton.Right`——这是「忽略右键不会破坏任何功能」的依据。
+- 成因链校验：断言 `CardState.caught`、`cardNowChoose` 与 `RefreshMyHand` 中的 `isDragging → continue` 仍然存在，证明本测试守的是真实风险。
+- 断言有效性：把两处守卫还原成 `if (mouseButton.Pressed)` / `if (mouseButton.Pressed==false)` 后，脚本立即报出 5 个 FAIL（两处锚点断言 + 全项目扫描 + 两条回归断言）。

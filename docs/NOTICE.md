@@ -110,6 +110,7 @@
 | `AttackInf` 是空桩 | 步兵攻击动画未实现 |
 | `GetCardMaganer` 拼写错误 | 多处使用此方法名（少了一个'a'），新增调用时保持一致性 |
 | `MouceEntered`/`MouceExited` 拼写错误 | 方法名拼写错误但 Godot 信号连接可能依赖此名称，不要轻易改名 |
+| 输入事件漏校验 `ButtonIndex` | `_Input` 处理 `InputEventMouseButton` 时，「按下」与「抬起」是两个**兄弟分支**，任一分支的 `Pressed` 判断漏掉 `ButtonIndex == MouseButton.Left`，右键就会完整走进左键流程。战斗拖拽中后果尤其严重：`currentInputState` 被冲成 `nil` 后卡牌永久停在 `caught`，而 `RefreshMyHand()` 对拖拽中的卡 `continue` 跳过、不再归位，表现为**卡牌卡在场上**，且全部手牌悬停同时失效。正确写法参考 `Store.cs`、`MulliganScreen.cs`、`ChooseSomeCard.cs`；回归测试见 `tests/verify_drag_right_click.py` |
 
 ---
 
