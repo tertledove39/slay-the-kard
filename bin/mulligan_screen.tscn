@@ -1,0 +1,59 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://bin/MulliganScreen.cs" id="1"]
+
+[node name="MulliganScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Dim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.82)
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 0
+offset_top = 46.0
+offset_right = 1600.0
+offset_bottom = 90.0
+theme_override_colors/font_color = Color(1, 0.84, 0.2, 1)
+theme_override_font_sizes/font_size = 30
+text = "选择要换掉的起手牌"
+horizontal_alignment = 1
+
+[node name="CountLabel" type="Label" parent="."]
+layout_mode = 0
+offset_top = 96.0
+offset_right = 1600.0
+offset_bottom = 128.0
+theme_override_font_sizes/font_size = 20
+text = "已选 0 张"
+horizontal_alignment = 1
+
+[node name="CardLayer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="ConfirmButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 690.0
+offset_top = 780.0
+offset_right = 910.0
+offset_bottom = 828.0
+theme_override_font_sizes/font_size = 22
+text = "换牌并开局"

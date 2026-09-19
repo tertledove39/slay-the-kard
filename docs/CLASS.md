@@ -92,6 +92,7 @@
 |------|------|
 | 手牌管理 | `GetCardsInHand()`/`AddCardToHand()`/`RemoveFromHand()` |
 | 卡组管理 | `DrawCard()`/`AddCardToDeck()`/`ShuffleDeck()` |
+| 起手换牌 | `MulliganAsync(returned)` — 把选中的手牌洗回牌库再补抽等量张，返回新抽到的牌 |
 | 指挥点 | `ReadPoint()`/`UsePoint()`/`AddPoint()`/`AddPointMax()`/`AddPointMaxNatural()`；`AddPoint` 可把当前点数推高到当前上限之上（天花板 `pointMaxMaxMax`=24），回合开始时由 `AddPointMaxNatural()` 刷满 |
 | 手牌布局 | `RefreshMyHand()` — 弧形排列、悬停浮起推旁、旋转倾斜缩放动画 |
 | 卡组初始化 | `InitializeDeckFromIni()` 从 deck.ini 或持久化ID加载 |
@@ -195,6 +196,7 @@
 | `CampaignVictory` : CanvasLayer | bin/CampaignVictory.cs | 战役通关浮层。最后一个区域烈度归零时由战斗或事件路径调用，叠加暗幕（Layer=90，低于对白气泡）播放 `campaign_victory` 对白，结束后返回开始菜单。 |
 | `Store` : Control | Store.cs | 商店界面。CanvasLayer叠加于WorldMap上方。7张卡按稀有度加权随机生成，价格按稀有度生成（`CardRestoration.StorePriceTable`：普通 15±5、稀有 30±8、史诗 60±9、传奇 90±12，下限 1），随机打折；待购卡复用手牌式金色边框、放大、置顶和上移反馈。点击购买→扣物资点→ChooseSomeCard选1张替换。refresh消耗5物资点重新生成7张卡。 |
 | `ChooseSomeCard` : Control | ChooseSomeCard.cs | 统一卡组选卡替换UI。静态Show(parent, pickCount, title)返回选中卡ID；通过SceneTree.Root上的最高层CanvasLayer覆盖当前界面，场景内最底层为浅黑遮罩；使用五列大卡网格、悬浮缩放与高对比选中框，并延迟启用卡牌输入以隔离打开界面的点击。被PostBattleReward/EventScene/Store复用。 |
+| `MulliganScreen` : Control | bin/MulliganScreen.cs | 起手换牌界面。静态`ShowAsync(field, player)`走完整个流程：把真实手牌reparent进覆盖层平铺在屏幕前，点击层切换选中并显示X标记，确认后调用`Player.MulliganAsync()`洗回补抽，新牌在原位展示后随全部手牌归位。可换任意张（含一张不换或全换），只有一次换牌机会。 |
 | `StartMenu` : Control | bin/StartMenu.cs | 游戏启动界面。显示全屏底图和继续、开始、设置、鸣谢入口；按钮带悬浮缩放。 |
 | `SettingsMenu` : Control | bin/SettingsMenu.cs | 设置场景。按 `SettingsManager.Items` 动态生成布尔设置开关。 |
 

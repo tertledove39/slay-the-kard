@@ -398,6 +398,9 @@ AudioStreamPlayer deadSound;
 TextureButton buttonNextTurn;
 private bool defeatTransitionStarted;
 
+/// <summary>起手抽牌张数，也是换牌阶段平铺在屏幕前的牌数</summary>
+private const int OpeningHandSize = 5;
+
 /// <summary>
 /// 初始化
 /// </summary>
@@ -511,10 +514,30 @@ private bool defeatTransitionStarted;
         
         GetNode<End>("end").Visible = false;
 
-        player1.DrawCard(5);
+        _ = StartOpeningHandAsync();
 
         // 右上角"查看卡组"按钮
         CreateDeckViewButton();
+    }
+
+    /// <summary>
+    /// 开局流程：抽起手牌 → 换牌界面 → 解锁操作。
+    /// _Ready 是同步的，所以这里自行把整条异步链接起来；
+    /// 全程锁住操作，避免换牌期间点到底下的战场。
+    /// </summary>
+    private async Task StartOpeningHandAsync()
+    {
+        ForbidControl();
+        try
+        {
+            await player1.DrawCard(OpeningHandSize);
+            await MulliganScreen.ShowAsync(this, player1);
+        }
+        finally
+        {
+            // 无论换牌流程是否出问题，都必须解锁，否则玩家永远动不了
+            AllowControl();
+        }
     }
 
     /// <summary>
@@ -5891,6 +5914,11 @@ public class Player
 
             Vector2 target = new Vector2(baseX + i * spacing + sidePush, initPos.Y + arcOffset + hoverOffset);
 
+            // 跳过已临时Reparent到其他节点的卡（如换牌界面期间）。
+            // 补抽会触发本方法，若不跳过，屏幕上正在展示的起手牌会被拉回手牌区。
+            if (cardsInHand[i].GetParent() != battlefield)
+                continue;
+
             bool isHovered = (i == hoveredHandIndex);
             bool isDragging = cardsInHand[i].getState() == CardState.caught || cardsInHand[i].getState() == CardState.inplaceAndCaught;
 
@@ -5993,6 +6021,34 @@ public class Player
         {
             await DrawCard();
         }
+    }
+
+    /// <summary>
+    /// 起手换牌：把选中的手牌洗回牌库，再补抽等量张。
+    /// 按炉石做法先整副洗牌再抽，因此理论上可能抽回刚换掉的牌。
+    /// 返回新抽到的牌，供换牌界面在原位展示。
+    /// </summary>
+    public async Task<List<cardBase_>> MulliganAsync(List<cardBase_> returned)
+    {
+        var drawn = new List<cardBase_>();
+        if (returned == null || returned.Count == 0) return drawn;
+
+        int count = 0;
+        foreach (var card in returned)
+        {
+            if (card == null || !cardsInHand.Remove(card)) continue;
+            deck.Add(card);
+            count++;
+        }
+        if (count == 0) return drawn;
+
+        ShuffleDeck();
+
+        var before = new HashSet<cardBase_>(cardsInHand);
+        await DrawCard(count);
+        foreach (var card in cardsInHand)
+            if (!before.Contains(card)) drawn.Add(card);
+        return drawn;
     }
 
     /// <summary>
