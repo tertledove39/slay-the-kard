@@ -143,7 +143,16 @@
 
 Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 - 首段：`allTargets` = 所有场上+HQ的卡 / `allCardInHand` = 所有手牌
-- 后续段：`unit`=非HQ / `hq`=总部 / `friend`=友方 / `enemy`=敌方 / 类型名=CardTypes过滤
+- 后续段：`unit`=非HQ / `hq`=总部 / `friend`=友方 / `enemy`=敌方 / `land`=陆军 / `air`=空军 / `damaged`=防御力低于历史最大值 / 类型名=CardTypes过滤
+
+**必须写成 `${...}`，花括号不能省。** `setTargets` 用的是正则
+`\$\{([^}]*)\}`，只认带花括号的形式；写成 `$(...)` 或裸 `$xxx` 时正则不匹配，
+`targets` 不会被赋值，后续指令遍历空列表——**整张卡毫无效果，且不报任何错**。
+`[第227号命令]`、`[血洒长空]` 都曾栽在这里。
+
+同理，选择器里**不认识的片段会被静默忽略**（走 `ParseCardTypeFromName` 返回
+null 后不作处理），过滤条件凭空消失、结果集比预期大。写错片段同样不报错。
+这两类问题由 `tests/verify_card_scripts.py` 静态守住。
 
 ---
 

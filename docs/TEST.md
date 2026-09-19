@@ -132,6 +132,18 @@
 - **一行多行动各自成行**：渲染时按顶层逗号拆开行动行（复用`SplitEffectString`），每个带`description`的段各出一行、各用各的图标。旧实现在整行上做`LastIndexOf('[')`，只认最后一个元数据块——布良斯克`t1`的「部署第1步兵团」就是这样被静默吞掉的，界面上看不出敌人还部署了单位。断言覆盖：渲染路径不得再出现`LastIndexOf`；对`enemyTurn.ini`全部行动行做行为验证，确认没有任何描述被丢掉、且单块行不会重复出行。
 - 面板高度固定 300×400（约 5 行可见），而`ADD:`队列会随回合无限累积——`MamayevKurgan`与`berlin_final_battle`的峰值分别达到 13 行与 11 行，超出部分原本会画到面板底色之外、叠在战场上。行动列表现挂在`ScrollContainer`下（横向滚动禁用、列表`SizeFlagsHorizontal=ExpandFill`撑满宽度、列表`MouseFilter=Ignore`以保证滚轮能传到滚动容器），超出部分收进面板内纵向滚动。
 
+## 卡牌效果脚本静态校验
+
+测试脚本：`tests/verify_card_scripts.py`。
+
+专查「写错了也不报错、只是静默不生效」的三类问题：
+
+- **选择器语法**：`setTargets` 的正则是 `\$\{([^}]*)\}`，**只认 `${...}`**。写成 `$(...)` 或裸 `$xxx` 时正则不匹配，`targets` 不被赋值，后续指令遍历空列表——整张卡毫无效果且不报错。`[第227号命令]`（`setTargets($allTargets.unit.friend.damaged)`）与`[血洒长空]`（`$allTargets.unit.friend.air`）都栽在这里，现均已补上花括号。断言覆盖三个 INI 文件：不得出现裸 `$xxx`、不得出现 `$(...)`，且确有 `${...}` 在使用（规则不是空转）。
+- **选择器片段**：`GetTargetsFromSelector` 对不认识的片段走`ParseCardTypeFromName`，返回null时**静默忽略**，过滤条件凭空消失。断言 `${...}` 内每个片段都属关键字集合或卡牌类型名。
+- **跳转标签**：`if(条件)标签&` 在`labels`中找不到`标签`时**不跳转**，条件形同虚设、效果体无条件执行。断言每处跳转都有对应标签。
+
+解析按`battlefield_.cs`的`ParseAndExecuteEffect`/`GetTargetsFromSelector`复刻，`SplitEffectString`需同时跟踪**引号**、圆括号与方括号；去时点前缀时**只认引号外的第一个冒号**——否则`GetEffect("FriendlyTurnBegin: ...")`这类写法会被截错位置，误报标签缺失（校验脚本自身踩过这个坑）。
+
 ## 总部效果指令
 
 测试脚本：`tests/verify_hq_instructions.py`。
