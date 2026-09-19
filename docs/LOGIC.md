@@ -13,7 +13,7 @@
 | `&sourceAttack` / `&source.attack` | sourceCard的攻击力 |
 | `&sourceDefence` / `&source.defence` | sourceCard的防御力 |
 | `&sourceCost` / `&source.cost` | sourceCard的费用 |
-| `&lifeTime` | 目标单位存活回合数（优先targets[0]，否则sourceCard） |
+| `&lifeTime` | 目标单位存活回合数（优先targets[0]，否则sourceCard）。取值含义见下方「`&lifeTime` 的计数约定」 |
 | `&attackCountThisTurn` | 本回合该卡作为攻击方的战斗次数 |
 | `&overflow` | 上次攻击溢出的伤害值 (lastOverflowDamage) |
 | `&lastDamage` | 上次战斗攻击方造成的伤害值 |
@@ -30,6 +30,17 @@
 | `&friendDeckRemainingCount` | 友方卡组剩余数量 |
 | `&theNumberOfSkirmisher` | 场上轻步兵单位的数量 |
 | `&任意名称` | 自定义内存变量（通过 `SetMemory()` 设置） |
+
+#### `&lifeTime` 的计数约定
+
+`lifeTime` 在 `SetCardInformation()` 中初始化为 0，之后**每轮在时点触发之后**由 `RunTurnTransitionAsync()` 各加一次（敌方单位在敌方回合开始后、友方单位在友方回合开始后）。因此**时点里读到的值 = 该单位已经在场度过的完整回合数**：
+
+| 时点 | 单位创建当回合 | 下个回合 | 再下个回合 |
+|------|---------------|---------|-----------|
+| `FriendlyTurnEnd` | 0 | 1 | 2 |
+| `FriendlyTurnBegin` | 0 | 1 | 2 |
+
+即**「第 N 个回合」对应 `&lifeTime == N-1`**。写卡时按此换算，例如「存活的第三个回合开始时」应写 `if(&lifeTime!=2)skip&`（见 `[i38]`）、「下个友方回合结束时消灭自身」写 `if(&lifeTime==0)Jump`（见 `[t70_机动防御]`）。
 
 ### 效果脚本解析 (ParseAndExecuteEffect)
 
