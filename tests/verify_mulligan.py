@@ -111,6 +111,24 @@ def main():
     ownership.append(check("if (cardsInHand[i].GetParent() != battlefield)" in refresh,
                            "RefreshMyHand 跳过已 reparent 的卡（补抽不会打断屏幕展示）"))
 
+    # RefreshAllCardDisplayOrder 每帧从 _Process 调用，同样必须跳过已 reparent 的卡。
+    # 该函数里的手牌循环原先没有守卫，换牌期间会报
+    # "Child is not a child of this node"（scene/main/node.cpp:487 move_child）。
+    display_order = battle.split("void RefreshAllCardDisplayOrder()")[1].split("Boolean CheckIfThePlaceIsOccupied")[0]
+    hand_loop = display_order.split("var handCards = player1.GetCardsInHand();")[1]
+    hand_loop = hand_loop[:hand_loop.index("MoveChild(")]
+    ownership.append(check("GetParent() != this" in hand_loop,
+                           "手牌顺序刷新对已 reparent 的卡有守卫（否则换牌期间每帧报错）"))
+
+    # 通用约束：本文件每一处 MoveChild 之前都必须先确认父子关系
+    unguarded = []
+    for m in re.finditer(r"MoveChild\(", battle):
+        if "GetParent()" not in battle[max(0, m.start() - 400):m.start()]:
+            line_no = battle[:m.start()].count("\n") + 1
+            unguarded.append(line_no)
+    ownership.append(check(not unguarded,
+                           f"battlefield_ 中每处 MoveChild 都先校验了父子关系（未校验的行号：{unguarded}）"))
+
     # --------------------------- 健壮性 ---------------------------
     print("\n--- 健壮性 ---")
     robust = [

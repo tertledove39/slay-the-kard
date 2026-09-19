@@ -229,6 +229,7 @@ HQ 的「血」是`defence`，`attack`恒为 0 且总部不会攻击，因此对
 - 一次收束：确认后禁用按钮；一张不选时不做任何换牌直接开局。
 - 关键回归（卡牌所有权）：结束时必须把牌还给战场，否则会随覆盖层一起被销毁；被换掉的牌已进牌库、不在手牌里，需要单独还回；本界面加到卡牌上的子节点用`_overlays`显式记录后逐个释放——**不能按类型遍历卡牌子节点删除，卡牌自身的美术资源也是`TextureRect`**。
 - 关键回归（手牌刷新）：`RefreshMyHand()`必须跳过已reparent的卡。补抽会触发该方法，若不跳过，屏幕上正在展示的起手牌会被拉回手牌区。该守卫与`battlefield_.cs`中既有的「跳过已临时Reparent到其他节点的卡」写法一致。
+- 关键回归（显示顺序刷新）：`RefreshAllCardDisplayOrder()`由`_Process`每帧调用，其中的**手牌循环原先没有父子守卫**——`cardInPlaces`循环有、手牌循环没有。换牌期间手牌仍在`cardsInHand`里但父节点已变成覆盖层，于是每帧报`Child is not a child of this node`（`scene/main/node.cpp:487 move_child`）。已补上同样的守卫，并加了两条断言：手牌循环在`MoveChild`之前必须有`GetParent()`校验；`battlefield_.cs`中**每一处**`MoveChild`之前都必须先确认父子关系（撤掉守卫会立即报出违规行号）。
 - 健壮性：换牌期间`ForbidControl()`锁住战场操作，并用`finally`解锁，流程出异常也不会把玩家卡死；点击层延迟启用，避免打开界面那一次点击被立刻吃掉。
 
 ## 任务抽取规则

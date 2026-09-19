@@ -212,7 +212,7 @@ public partial class battlefield_ : Control
 
         cardInPlaces = SortCardList(cardInPlaces).AsEnumerable().Reverse().ToList();
 
-        if (cardNowChoose != null)
+        if (cardNowChoose != null && cardNowChoose.GetParent() == this)
         {
             // 移到子节点末尾确保渲染在最上层
             MoveChild(cardNowChoose, GetChildCount() - 1);
@@ -254,6 +254,12 @@ public partial class battlefield_ : Control
         int hoveredIdx = player1.GetHoveredHandIndex();
         for (int i = 0; i < handCards.Count; i++)
         {
+            // 跳过已临时Reparent到其他节点的卡（如起手换牌界面期间）。
+            // 手牌仍在 cardsInHand 里但父节点已不是本节点，直接 MoveChild 会报
+            // "Child is not a child of this node"。上面的 cardInPlaces 循环有同样守卫。
+            if (handCards[i] == null || handCards[i].GetParent() != this)
+                continue;
+
             MoveChild(handCards[i], 1);
             handCards[i].ZIndex = (i == hoveredIdx) ? 30 : 20;
         }
