@@ -29,10 +29,34 @@ public class Area
     /// </summary>
     int areaTimes = DefaultAreaTimes;
 
+    /// <summary>
+    /// 该区域的 boss 战斗预设名（AreaPool.ini 的 boss 键），空表示没有 boss。
+    /// 有 boss 时：烈度不为1则它不参与抽取，烈度为1则只提供它这一场。
+    /// </summary>
+    string bossName = "";
+
     public Area(string id)
     {
         entrysName = [];
         areaID = id;
+    }
+
+/// <summary>
+/// 读取该区域的 boss 预设名，没有则为空串
+/// </summary>
+/// <returns></returns>
+    public string ReadBoss()
+    {
+        return bossName;
+    }
+
+/// <summary>
+/// 设置该区域的 boss 预设名
+/// </summary>
+/// <param name="value"></param>
+    public void SetBoss(string value)
+    {
+        bossName = value ?? "";
     }
 
 /// <summary>
@@ -299,6 +323,14 @@ public partial class WorldMap : Control
                     continue;
                 }
 
+                //boss 是区域元数据：指定该区域的终局战斗，不直接进入可抽取条目列表。
+                //它是否出现由 MissionDrawer 按当前烈度决定。
+                if (key.Equals("boss", StringComparison.OrdinalIgnoreCase))
+                {
+                    area.SetBoss(val);
+                    continue;
+                }
+
                 //只有entry enemy开头的key可以被识别为任务条目
                 if (!string.IsNullOrEmpty(val) && (key.StartsWith("entry")||key.StartsWith("enemy")))
                     area.AddAnEntry(val);
@@ -439,8 +471,10 @@ public partial class WorldMap : Control
         // 首次进入该区域时按 AreaPool.ini 的 areaTimes 初始化战斗烈度
         BattleStateManager.EnsureAreaIntensity(areaName, pool.ReadAreaTimes());
 
+        // 抽取规则集中在 MissionDrawer：按当前烈度处理 boss，并保证 2战斗+1事件
         var candidates = pool.ReadEntrys();
-        var selectedIds = PickRandomEntries(candidates, 3);
+        int intensity = BattleStateManager.ReadAreaIntensity(areaName);
+        var selectedIds = MissionDrawer.Draw(candidates, pool.ReadBoss(), intensity);
 
         if (selectedIds.Count < 1)
         {
@@ -483,17 +517,25 @@ public partial class WorldMap : Control
         RefreshMaterialPoint();
     }
 
+    /// <summary>
+    /// 抽取阶段事件按钮上统一显示的文字。刻意不取 event.ini 的 title
+    /// （形如 &lt;事件&gt;征召预备役），避免在玩家做出选择前就透露是哪个事件。
+    /// </summary>
+    private const string EventMaskLabel = "<事件>";
+
     /// <summary>将池中的ID字符串解析为MissionEntry（"event:xxx"为事件，其余为敌人）</summary>
     private MissionEntry ParseEntry(string id)
     {
-        if (id.StartsWith("event:"))
+        if (id.StartsWith(MissionDrawer.EventPrefix, StringComparison.Ordinal))
         {
-            var eventId = id["event:".Length..];
-            var ev = BattleStateManager.GetEvent(eventId);
+            var eventId = id[MissionDrawer.EventPrefix.Length..];
+            // 配置写错时仍然报错，但按钮文字保持脱敏，不把事件名带出去
+            if (BattleStateManager.GetEvent(eventId) == null)
+                GD.PushError($"[WorldMap] 事件配置不存在: {eventId}");
             return new MissionEntry
             {
                 Id = eventId,
-                DisplayName = ev != null ? ev.Title : eventId,
+                DisplayName = EventMaskLabel,
                 Type = MissionType.Event
             };
         }
@@ -527,18 +569,7 @@ public partial class WorldMap : Control
         }
     }
 
-    /// <summary>从候选列表中随机抽取count个互不相同的条目</summary>
-    private static List<string> PickRandomEntries(List<string> pool, int count)
-    {
-        var shuffled = new List<string>(pool);
-        var rng = new Random();
-        for (int i = shuffled.Count - 1; i > 0; i--)
-        {
-            int j = rng.Next(i + 1);
-            (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
-        }
-        return shuffled.Take(Math.Min(count, shuffled.Count)).ToList();
-    }
+    // 抽取规则已移至 MissionDrawer（boss 分流 + 2战斗+1事件），避免本文件继续膨胀
 
 
     // ============================================================

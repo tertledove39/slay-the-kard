@@ -53,6 +53,15 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 
 `areaTimes` 是该区域的**战斗烈度**：进入区域时任务选择面板显示该值，每完成一场战斗或一个事件减 1，归零时解锁下一区域。缺失时使用默认值 3（`Area.DefaultAreaTimes`）；非正整数会被记录错误并回退默认值。该键是区域元数据，不会被当作可抽取任务。
 
+`boss` 指定该区域的**终局战斗**，值为 `enemyTurn.ini` 的 section 名（如 `boss=Kalinin`），每区域至多一个：
+
+- 烈度**不为 1** 时，boss 不参与抽取，玩家抽不到它；
+- 烈度**为 1** 时，任务面板只提供这一场，玩家没有别的选择。
+
+该键同样是区域元数据，不进入可抽取条目列表；boss 是否已写在 `enemyN` 里都可以，两种写法结果一致。规则的唯一实现在 `bin/MissionDrawer.cs`。
+
+抽取组成固定为 **2 战斗 + 1 事件**（`MissionDrawer.BattleCount` / `EventCount`），可选项不足 3 个时用剩余战斗补位，因此事件永远不超过 1 个。
+
 ### bin/event.ini
 定义50个历史背景事件。每个事件包含2至3个选项，效果支持 `none`、`materialPoints(n)`、`replaceCard(id)` 和 `replaceRandomCard(id)`，多个效果使用逗号连接。
 

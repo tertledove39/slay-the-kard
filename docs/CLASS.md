@@ -184,7 +184,8 @@
 
 | 类 | 文件 | 说明 |
 |----|------|------|
-| `WorldMap` : Control | bin/WorldMap.cs | 世界地图主界面。7个区域按钮随进度解锁，按钮按墨卡托投影落在对应历史城市。含调试控制台；卡牌、事件与区域池配置首次解析后跨场景复用。 |
+| `WorldMap` : Control | bin/WorldMap.cs | 世界地图主界面。7个区域按钮随进度解锁，按钮按墨卡托投影落在对应历史城市。含调试控制台；卡牌、事件与区域池配置首次解析后跨场景复用。内置`Area`类（区域池、`areaTimes`烈度、`boss`预设名）。任务抽取委托给`MissionDrawer`。 |
+| `MissionDrawer` : static | bin/MissionDrawer.cs | 任务抽取规则的唯一实现，纯计算不依赖场景节点。按当前烈度处理`boss`（不为1则不参与抽取，为1则只提供它），其余组成`2战斗+1事件`，不足时只用剩余战斗补位。见`docs/CONFIG.md`的`AreaPool.ini`一节。 |
 | `ChooseMission` : Control | bin/ChooseMission.cs | 任务选择面板。3个任务按钮（战斗或事件）。 |
 | `EventScene` : CanvasLayer | bin/EventScene.cs | 剧情事件界面。配图+描述+选项，支持获得战役资源点和卡牌替换效果。 |
 | `EventMaterialPoints` : static | bin/EventMaterialPoints.cs | 解析事件 `materialPoints(n)` 效果，并以 `int.MaxValue` 为上限执行安全加法。 |

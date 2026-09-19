@@ -216,6 +216,20 @@ HQ 的「血」是`defence`，`attack`恒为 0 且总部不会攻击，因此对
 - 边界白盒测试：缺失时回退默认值 3；非法值记录错误并回退；`EnsureAreaIntensity()` 不重置已进入过的区域；`IsFinalArea()` 以 `AreaOrder` 末项判定；通关浮层层级低于对白气泡。
 - 接入验证：任务面板文本为「战斗烈度：当前值」；战斗与事件两条路径都消耗烈度且不再直接调用 `AdvanceArea()`；最后一个区域归零时进入通关流程并返回开始菜单。
 
+## 任务抽取规则
+
+测试脚本：`tests/verify_mission_draw.py`。
+
+抽取规则集中在`bin/MissionDrawer.cs`（`WorldMap`原先的`PickRandomEntries`已移入并替换，避免同一功能两处实现）。
+
+- 冒烟测试：`MissionDrawer.cs`存在；`AreaPool.ini`可解析且至少一个区域配了`boss`；`WorldMap`调用`MissionDrawer.Draw(candidates, pool.ReadBoss(), intensity)`。
+- 规则一（boss 按烈度分流）：`Draw`接收 boss 与烈度；烈度为 1 时只返回 boss 一条；烈度不为 1 时 boss 被排除出战斗池；`AreaPool.ini`的`boss`键被识别为区域元数据而不进入可抽取条目；`Area`提供`ReadBoss()`，未配置时为空串。
+- 规则二（事件脱敏）：定义常量`EventMaskLabel = "<事件>"`；事件条目一律使用该文案；不再把`event.ini`的`title`直接当按钮文字；事件配置缺失时仍记录错误但不影响脱敏。
+- 规则三（2战斗+1事件）：`BattleCount = 2`、`EventCount = 1`为具名常量；事件按常量上限截取；兜底补位只从剩余战斗取。
+- 数据层验证：用真实的`bin/AreaPool.ini`把`Draw`的行为复算一遍，每个区域 × 烈度 3/2/1 各跑 200 次，断言事件数恒不超过 1、烈度不为 1 时抽不到 boss、烈度为 1 时固定只有 boss。当前实际产出：`area1`在烈度 1 下固定只有`Kalinin`、烈度 2/3 下恒为 3 个按钮且恰好 1 个事件；`area7`因只有 1 个战斗 0 个事件而降级为 1 个按钮。
+
+> 数据层验证是在 Python 中复算同一算法，能证明真实配置下的产出符合规则，但不能替代对 C# 实现的运行验证。
+
 ## 阵亡统计
 
 测试脚本：`tests/verify_friendly_death_count.py`。
