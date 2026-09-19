@@ -192,11 +192,33 @@ def main():
             all(a1["boss"] not in c for c in combos_hi),
             f"area1 在烈度 2 下抽不到 boss（{a1['boss']}）"))
 
-    # area7 只有 1 个战斗、0 个事件，应优雅降级为 1 个按钮
-    a7 = outcomes.get(("area7", 2), [])
-    if a7:
-        results.append(check(all(len(c) == 1 for c in a7),
-                             "area7 条目不足时降级为 1 个按钮，不会凭空造出事件"))
+    # 条目不足时必须优雅降级：按钮数绝不超过池中实际可用条目数，也不会凭空造出事件。
+    # 断言写成与具体配置无关的形式——各区域的池子会随内容调整而变化。
+    oversized = []
+    for (name, intensity), combos in outcomes.items():
+        area = areas[name]
+        boss_locked = bool(area["boss"]) and intensity == 1
+        available = 1 if boss_locked else len(
+            [i for i in area["pool"] if i and not (area["boss"] and i == area["boss"])])
+        for combo in combos:
+            if len(combo) > available:
+                oversized.append(f"{name}@{intensity} 出了 {len(combo)} 条，池里只有 {available} 条")
+    results.append(check(not oversized,
+                         f"按钮数不超过池中可用条目数，不凭空造条目（异常：{oversized[:3]}）"))
+
+    # 池中既有战斗又有事件的区域，必须凑满 3 个按钮
+    thin = []
+    for (name, intensity), combos in outcomes.items():
+        area = areas[name]
+        if bool(area["boss"]) and intensity == 1:
+            continue
+        battles = [i for i in area["pool"] if i and not i.startswith(EVENT_PREFIX)
+                   and not (area["boss"] and i == area["boss"])]
+        if len(battles) >= 2 and len(area["pool"]) >= 3:
+            for combo in combos:
+                if len(combo) != 3:
+                    thin.append(f"{name}@{intensity} 只出了 {len(combo)} 条")
+    results.append(check(not thin, f"战斗充足时恒定凑满 3 个按钮（异常：{thin[:3]}）"))
 
     info(f"共 {len(areas)} 个区域；配了 boss 的："
          f"{[n for n, a in areas.items() if a['boss']] or '无'}")

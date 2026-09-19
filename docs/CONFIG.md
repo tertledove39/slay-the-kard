@@ -60,7 +60,23 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 
 该键同样是区域元数据，不进入可抽取条目列表；boss 是否已写在 `enemyN` 里都可以，两种写法结果一致。规则的唯一实现在 `bin/MissionDrawer.cs`。
 
-抽取组成固定为 **2 战斗 + 1 事件**（`MissionDrawer.BattleCount` / `EventCount`），可选项不足 3 个时用剩余战斗补位，因此事件永远不超过 1 个。
+抽取组成固定为 **2 战斗 + 1 事件**（`MissionDrawer.BattleCount` / `EventCount`），可选项不足 3 个时用剩余战斗补位，因此事件永远不超过 1 个。**补位只用战斗**，所以只有事件、没有战斗的区域每次只出 1 个按钮。
+
+### 事件分配
+
+区域按地理位置命名、按历史时序推进，`entryN` 的事件按各自的历史时点归入对应区域：
+
+| 区域 | 城市 | 时期 | 事件数 |
+|------|------|------|--------|
+| area1 | 莫斯科 | 1941 秋 – 1942 初 | 14 |
+| area2 | 斯大林格勒 | 1942 夏 – 1943 初 | 10 |
+| area3 | 斯摩棱斯克 | 1943 秋 | 6 |
+| area4 | 哈尔科夫 | 1943 春 | 6 |
+| area5 | 库尔斯克 | 1943 夏 | 5 |
+| area6 | 明斯克 | 1944 夏 | 6 |
+| area7 | 柏林 | 1945 春 | 5 |
+
+同一事件可出现在多个区域（`event.ini` 共 25 个事件均已分配，无遗漏、无重复引用）。全程性事件跨越多个区域：`strange_command`（1941–42 通信混乱）、`tank_crew_replacement`（1941–42 乘员补充）、`deep_battle_doctrine`（纵深作战条令）、`guards_title`（近卫称号）、`snowstorm`（冬季）。专属时点的事件只归一个区域，如 `citadel_intelligence`(1943 春 → 库尔斯克)、`maskirovka_bagration`(1944 夏 → 明斯克)、`reichstag_banner`(1945 → 柏林)、`order_227` 与 `operation_uranus`(1942 → 斯大林格勒)。
 
 ### bin/event.ini
 定义50个历史背景事件。每个事件包含2至3个选项，效果支持 `none`、`materialPoints(n)`、`replaceCard(id)` 和 `replaceRandomCard(id)`，多个效果使用逗号连接。
