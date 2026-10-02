@@ -4946,6 +4946,11 @@ InputState currentInputState = InputState.nil;
                         cardsToShow = candidateCards;
                     }
 
+                    // 候选卡来自牌堆/手牌/场上的真实对象：既不能改动它们的状态，
+                    // 也不能把原对象交给选择界面与手牌（否则同一个对象会同时存在于两处）。
+                    // 故一律先复制成独立对象，用复制品去显示与入手牌——原卡原封不动。
+                    cardsToShow = cardsToShow.Select(c => Copy(c)).Where(c => c != null).ToList();
+
                     if (cardsToShow.Count > 0)
                     {
                         // 显示选择界面
@@ -5164,6 +5169,37 @@ InputState currentInputState = InputState.nil;
         await Task.Delay(100);
 
         return;
+    }
+
+    /// <summary>
+    /// 复制一张卡：得到一个与 source **没有任何引用关系**的新对象，数值保持 source 当前状态。
+    ///
+    /// 用途：Develop 从牌堆/手牌/场上取出的候选是真实对象，既不能改动它们的状态，
+    /// 也不能把原对象交给选择界面与手牌（否则同一对象会同时存在于两处），故先复制。
+    ///
+    /// 只做「建对象 + 搬数值」，**不调用任何会跑动画的 setter**：
+    /// SetCostValue 内部有 FlashAttributeWithColor + AnimateCostRoll、SetDefence 内部有
+    /// FlashAttributeWithColor，而那些都依赖节点已在场景树中。数值直接写字段。
+    /// </summary>
+    private cardBase_ Copy(cardBase_ source)
+    {
+        if (source == null) return null;
+
+        var data = GetCardMaganer().GetCard(source.id);
+        if (data == null) return null;
+
+        var copy = ResourceManager.Instance.AcquireEmptyCard();
+        if (copy == null) return null;
+
+        copy.SetCardInformation(data);            // 卡图、文本、初始数值
+        copy.SetIsFriend(source.GetIsFriend());
+
+        // 搬运当前数值——直接写字段，绕开带动画的 setter
+        copy.cost    = source.cost;
+        copy.attack  = source.attack;
+        copy.defence = source.defence;
+
+        return copy;
     }
 
     /// <summary>
