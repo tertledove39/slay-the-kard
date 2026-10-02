@@ -65,6 +65,50 @@
   - 不要把本函数的逻辑和正常战场点击混在一起，保持它只处理选择阶段点击
   - 若需要将来支持触碰反馈，可以在这里扩展 hover 逻辑，但不要改变 `selectedChoiceCard` 赋值方式
 
+---
+
+## 必须遵守：选择界面是模态的，它的点击不受控制锁管辖
+
+`_Input` 里的顺序**必须**是——选择界面判定**在前**，`ReadControlState()` 控制锁判定**在后**：
+
+```csharp
+if (isShowingChoiceUI && @event is InputEventMouseButton choiceClick
+    && choiceClick.ButtonIndex == MouseButton.Left && choiceClick.Pressed)
+{
+    HandleChoiceCardClick(GetGlobalMousePosition());
+    return; // 选择界面中不要处理其他输入
+}
+
+//如果当前正处于无法操作状态 取消这一次操作
+if (ReadControlState() == 1) return;
+```
+
+**为什么顺序不能反**：`Develop(...)` 不只从手牌打出的指令卡触发，也会由时点触发，
+而时点常常嵌在控制锁里面：
+
+```
+OnNextTurnButtonPressed → ForbidControl → RunTurnTransitionAsync → FriendlyTurnBegin
+```
+
+`[步兵第190团]` 的效果就是 `FriendlyTurnBegin:Develop($deck)`。此时选择界面已经弹出、
+正等玩家点一张卡，但 `allowControl == 1`。若让控制锁那一行先 `return`，点击永远到不了
+`HandleChoiceCardClick`，`ShowCardChoice` 里
+
+```csharp
+while (selectedChoiceCard == null) await Task.Delay(50);
+```
+
+就会永久等待——**卡看得见、一张都点不动、界面卡死，而且不报任何错**。
+
+**改动 `_Input` 时的注意事项**：
+
+- 任何新增的「提前 `return`」判定，都要问一句：它会不会挡在 `isShowingChoiceUI` 之前？
+- 左键限定（`ButtonIndex == MouseButton.Left`）与 `Pressed` 要写在同一行，
+  `tests/verify_drag_right_click.py` 会逐行扫描 `*.Pressed` 并检查同一行有没有
+  `ButtonIndex`——这是为了防「右键误入拖拽分支」那类 bug，别为绕开它而改测试。
+- 回归测试：`tests/verify_choice_ui_modal.py`。它会断言上述两条判定的**下标先后**，
+  并校验触发场景（`[i190]` 的 `FriendlyTurnBegin:Develop($deck)`）确实存在。
+
 ### `CheckCardClick(Vector2 mousePosition)`
 - 作用：返回当前鼠标所在的第一张场上卡牌。
 - 重点：

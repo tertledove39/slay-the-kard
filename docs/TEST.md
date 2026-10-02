@@ -357,3 +357,31 @@ HQ 的「血」是`defence`，`attack`恒为 0 且总部不会攻击，因此对
 - 显示同步：`Copy()` 末尾调了 `RefreshState()`（直接写字段绕开了 `SetCostValue` 等
   setter 的刷新副作用，三个 Label 需自己补）。
 - 断言有效性：删掉 `copy.PinDesignSize();` 后立即报 FAIL。
+
+## 选择界面的模态性（控制锁不得吃掉它的点击）
+
+测试脚本：`tests/verify_choice_ui_modal.py`。
+
+`_Input` 里原本把 `if (ReadControlState() == 1) return;` 写在选择界面判定**之前**。
+平时没事——从手牌打出的指令卡（`[紧急投产]` 的 `Develop($deck)`）不在锁里。但时点
+触发的 Develop 嵌在回合切换的锁内部：
+
+```
+OnNextTurnButtonPressed → ForbidControl → RunTurnTransitionAsync → FriendlyTurnBegin
+```
+
+`[步兵第190团]` 的 effect 正是 `FriendlyTurnBegin:Develop($deck)`。此时选择界面已经
+弹出、正等玩家点卡，可 `allowControl == 1`，点击全被控制锁那行吃掉，
+`HandleChoiceCardClick` 永远收不到事件——卡看得见、却一张都点不动，且不报任何错。
+
+- 冒烟测试：源文件与卡表均存在；`_Input` 与 `_Process` 可定位。
+- **回归（核心）**：在 `_Input` 体内，`if (isShowingChoiceUI` 的下标必须**小于**
+  `if (ReadControlState() == 1) return;` 的下标。
+- 单一实现：`_Input` 里 `HandleChoiceCardClick(` 只出现一次（不许为了绕过锁而在两处
+  各写一个分支）。
+- 前提校验（防空转断言）：`[i190]` 存在且 `name = 步兵第190团`，其 effect 以
+  `FriendlyTurnBegin:` 开头并含 `Develop($deck)`；`OnNextTurnButtonPressed` 确实把
+  `RunTurnTransitionAsync()` 包在 `ForbidControl()` 里、且要到它返回后才 `AllowControl()`。
+- 对照组：`[紧急投产]` 的 effect 无时点前缀（从手牌打出），与「它一直正常」的实机
+  反馈一致——证明这条断言区分的正是两者的差异，而不是巧合。
+

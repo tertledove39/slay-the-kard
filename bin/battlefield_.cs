@@ -692,17 +692,6 @@ private const int OpeningHandSize = 5;
             await Task.Delay(20); // 从10000减少到500毫秒
         }
 
-        // TODO 临时诊断：定位「开发候选卡不显示」后删除
-        GD.Print($"[Choice] 进入 ShowCardChoice，{choiceCards.Count} 张，animateExit={animateExit}，"
-                 + $"choiceLayer intree={choiceLayer.IsInsideTree()} layer={choiceLayer.Layer} "
-                 + $"followViewport={choiceLayer.FollowViewportEnabled} visible={choiceLayer.Visible}");
-        foreach (var c in choiceCards)
-        {
-            if (c == null) { GD.Print("  [Choice] 候选里有 null"); continue; }
-            GD.Print($"  [Choice] {c.name} parent={c.GetParent()?.Name} visible={c.Visible} "
-                     + $"pos={c.GlobalPosition} size={c.Size} scale={c.Scale} mod={c.Modulate} z={c.ZIndex}");
-        }
-
         choiceContainer.Visible = true;
         isShowingChoiceUI = true;
 
@@ -794,12 +783,6 @@ private const int OpeningHandSize = 5;
                 return;
             }
         }
-
-        // TODO 临时诊断：定位「开发选择界面点不中」后删除。
-        // 只在一次点击没命中任何候选卡时打印，正常游玩不会刷屏。
-        GD.Print($"[Choice] 未命中 mouse={mousePosition} 候选="
-                 + string.Join(" | ", choiceCards.Where(c => c != null)
-                                                 .Select(c => $"{c.name}{c.GetGlobalRect()}")));
     }
 
 
@@ -1111,22 +1094,26 @@ InputState currentInputState = InputState.nil;
         }
     }
 
+    // 卡牌选择界面（ShowCardChoice）是模态的，必须放在控制锁判定之前处理。
+    //
+    // 「友方回合开始时」这类时点触发的 Develop 嵌在回合切换的控制锁里面：
+    //   OnNextTurnButtonPressed → ForbidControl → RunTurnTransitionAsync → FriendlyTurnBegin
+    // 此时 allowControl == 1，但选择界面已经弹出、正等玩家点一张卡。若让下面的
+    // ReadControlState() 先把事件吃掉，点击永远到不了 HandleChoiceCardClick，
+    // 界面就永久卡死（卡能看见、但一张都点不动）。
+    if (isShowingChoiceUI && @event is InputEventMouseButton choiceClick
+        && choiceClick.ButtonIndex == MouseButton.Left && choiceClick.Pressed)
+    {
+        HandleChoiceCardClick(GetGlobalMousePosition());
+        return; // 选择界面中不要处理其他输入
+    }
+
     //如果当前正处于无法操作状态 取消这一次操作
     if (ReadControlState() == 1) return;
 
     if (@event is InputEventMouseButton mouseButton)
     {
-        // 处理卡牌选择界面的输入
-            if (mouseButton.Pressed && mouseButton.ButtonIndex == MouseButton.Left)
-            {
-                if (isShowingChoiceUI)
-                {
-                    HandleChoiceCardClick(GetGlobalMousePosition());
-                    return; // 选择界面中不要处理其他输入
-                }
-            }
 
-            
             var mousePosition = GetGlobalMousePosition();
             // 必须限定左键：拖拽期间右键按下会误入此分支，
             // 把 currentInputState 冲成 nil，导致随后的左键释放无法落位
@@ -4966,13 +4953,7 @@ InputState currentInputState = InputState.nil;
                     // 候选卡来自牌堆/手牌/场上的真实对象：既不能改动它们的状态，
                     // 也不能把原对象交给选择界面与手牌（否则同一个对象会同时存在于两处）。
                     // 故一律先复制成独立对象，用复制品去显示与入手牌——原卡原封不动。
-                    // TODO 临时诊断：定位「开发候选卡不显示」后删除
-                    GD.Print($"[Develop] instruction=\"{instruction}\" 复制前={cardsToShow.Count}");
-
                     cardsToShow = cardsToShow.Select(c => Copy(c)).Where(c => c != null).ToList();
-
-                    GD.Print($"[Develop] 复制后={cardsToShow.Count}"
-                             + (cardsToShow.Count == 0 ? " —— 候选为空，不会弹选择界面" : ""));
 
                     if (cardsToShow.Count > 0)
                     {
@@ -5206,7 +5187,9 @@ InputState currentInputState = InputState.nil;
     /// </summary>
     private cardBase_ Copy(cardBase_ source)
     {
-        // TODO 临时诊断：定位「开发候选卡不显示」后删除
+        // 三处提前返回都会让候选卡**静默变少**——调用方用 .Where(c => c != null)
+        // 过滤，候选全空时连选择界面都不弹，画面上只会表现为「开发没反应」。
+        // 故每一处都留日志（只在真出问题时打印，正常路径无输出）。
         if (source == null) { GD.Print("[Copy] 中止：source 为 null"); return null; }
 
         var data = GetCardMaganer().GetCard(source.id);

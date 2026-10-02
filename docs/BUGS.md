@@ -294,3 +294,50 @@ card.Size = new Godot.Vector2(180, 240);
 
 **回归**：`tests/verify_card_copy.py`（16 条），其中断言 `new Vector2(180, 240)` 在两个
 源文件里只允许出现一次。
+
+### 35. 时点触发的 Develop 选择界面点不动（控制锁吃掉了点击）
+
+需求方反馈：`[紧急投产]`（手牌打出的指令卡）的开发一切正常，但 `[步兵第190团]`
+**无法正确点击**；不报任何错，候选卡也**正常显示**（日志确认：3 张、`visible=True`、
+`size=(180,240)`、坐标 `(420,330)/(670,330)/(920,330)`）。
+
+**两张卡的唯一区别是触发时点**：
+
+| 卡 | effect | 触发路径 |
+|---|---|---|
+| `[紧急投产]` | `Develop($deck)\|GetCardsBeingTreated\|setCost(0)` | 从手牌打出，**不在任何控制锁里** |
+| `[步兵第190团]` | `FriendlyTurnBegin:Develop($deck)` | **嵌在回合切换的控制锁里** |
+
+`OnNextTurnButtonPressed()`（`battlefield_.cs`）：
+
+```csharp
+ForbidControl();
+try { await RunTurnTransitionAsync(); }   // ← FriendlyTurnBegin 在这里面触发 Develop
+finally { AllowControl(); }                 // ← 选择界面还开着时，锁尚未解除
+```
+
+而 `_Input` 的原顺序是**控制锁判定在选择界面判定之前**：
+
+```csharp
+if (ReadControlState() == 1) return;                        // ← 一锁就 return
+...
+if (isShowingChoiceUI) { HandleChoiceCardClick(...); return; }   // ← 永远到不了
+```
+
+于是每一次点击都被第 1098 行吃掉，`ShowCardChoice` 里
+`while (selectedChoiceCard == null) await Task.Delay(50);` 永久等待——
+**卡看得见、点不动、界面卡死，全程无任何报错。**
+
+**修复**：把选择界面的处理**提到控制锁判定之前**。选择界面是模态的，它的点击
+不应该受战场操作锁管辖；战场那侧被锁住反而是对的（回合切换还没走完）。
+修完两块都不受影响：选择界面照常可点，战场输入照旧被锁住。
+
+**回归**：`tests/verify_choice_ui_modal.py`（13 条）。核心断言是
+「`if (isShowingChoiceUI` 的下标必须小于 `if (ReadControlState() == 1) return;` 的下标」，
+并附带断言触发场景确实存在（`[i190]` 的 effect 以 `FriendlyTurnBegin:` 开头、
+`OnNextTurnButtonPressed` 确实把 `RunTurnTransitionAsync` 包在 `ForbidControl` 里），
+避免这条断言变成空转。
+
+> 注：本条与 #34 是**两个独立问题**。#34（`Copy()` 未钉死尺寸）是「与正规建卡流程
+> 不一致」的真实差异，也已修复；但它并不是「不显示 / 点不动」的原因——#34 修完后
+> 症状依旧，才据此继续查到时点与控制锁。
