@@ -120,35 +120,23 @@ def main():
 
     # --------------------- Develop 从牌堆取卡的收尾动作 ---------------------
     print("\n--- Develop 的牌堆收尾（#2 牌堆污染 / #7 空卡牌）---")
-    cl = re.search(r"private cardBase_ CloneCardWithCurrentValues\(cardBase_ source\)(.*?)\n    \}",
-                   battle, re.S)
-    results.append(check(cl is not None, "存在专门的复制函数 CloneCardWithCurrentValues"))
-    if cl:
-        c = cl.group(1)
-        # 数值搬运——这才叫「保留数值」
-        results.append(check("copy.SetCostValue(source.ReadCost())" in c, "复制品搬运费用"))
-        results.append(check("copy.SetDefence(source.ReadDefence())" in c, "复制品搬运防御"))
-        results.append(check("copy.attack = source.ReadAttack()" in c, "复制品搬运攻击"))
-        results.append(check("copy.RefreshState()" in c, "直接改字段后刷新显示"))
-        results.append(check("copy.Visible = true" in c,
-                             "复制品恢复可见——对象池取出的卡可能残留隐藏状态"))
-        results.append(check("AcquireEmptyCard()" in c,
-                             "用新建实例而不是搬用原对象"))
-        # 必须先把基础数据灌进去，再用当前数值覆盖
-        i_data = c.find("SetCardInformation(data)")
-        i_cost = c.find("SetCostValue(source.ReadCost())")
-        results.append(check(i_data != -1 and i_cost != -1 and i_data < i_cost,
-                             "先灌基础数据、后覆盖当前数值（顺序反了会被初始值冲掉）"))
-
+    results.append(check("public bool RemoveFromDeck(cardBase_ card)" in battle,
+                         "Player 暴露 RemoveFromDeck()"))
     dev = re.search(r'StartsWith\("Develop".*?(?=\n                // HealAllTargets)',
                     battle, re.S)
     results.append(check(dev is not None, "Develop 块可定位"))
     if dev:
         d = dev.group(0)
-        results.append(check(d.count("CloneCardWithCurrentValues(selectedCard)") == 2,
-                             "Develop 加入手牌前先复制（友方/敌方各一处）"))
-        results.append(check("RemoveFromDeck" not in d and "deck.Remove" not in d,
-                             "Develop 不再从牌堆摘除——开发不消耗牌堆"))
+        results.append(check(d.count("RemoveFromDeck(selectedCard)") == 2,
+                             "选中卡在加入手牌前都先从牌堆摘除（友方/敌方各一处）"))
+        results.append(check(d.count("selectedCard.Visible = true") == 2,
+                             "选中卡恢复可见——牌堆卡靠停在屏幕外隐藏，不恢复就是「空卡牌」"))
+        i_rm = d.find("RemoveFromDeck(selectedCard)")
+        i_add = d.find("AddCardToHand(selectedCard)")
+        results.append(check(i_rm != -1 and i_add != -1 and i_rm < i_add,
+                             "摘除发生在加入手牌之前"))
+    results.append(check("AcquireEmptyCard()" in dev.group(0)[:dev.group(0).find("cardsToShow.Count")] if dev else False,
+                         "Develop 仍保留「不按 id 重新实例化」的路径（保住牌堆实例上的费用/攻防改动）"))
 
     # ------------------------------ 定点回归 ------------------------------
     print("\n--- 定点回归：新卡必须带属性方括号 ---")
