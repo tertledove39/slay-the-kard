@@ -4836,6 +4836,9 @@ InputState currentInputState = InputState.nil;
                         var cardA = GetCardMaganer().GetCard(cardAName);
                         var cardB = GetCardMaganer().GetCard(cardBName);
 
+                        // 【临时诊断，定位「全面总攻无效果」用，定位后删除】
+                        GD.Print($"[Choose] 取卡 '{cardAName}'={cardA != null} '{cardBName}'={cardB != null}");
+
                         if (cardA != null && cardB != null)
                         {
                             // 创建卡牌实例
@@ -4848,10 +4851,15 @@ InputState currentInputState = InputState.nil;
                             cardAInstance.SetIsFriend(sourceCard?.GetIsFriend() ?? IsFriend.friend);
                             cardBInstance.SetIsFriend(sourceCard?.GetIsFriend() ?? IsFriend.friend);
 
+                            // 【临时诊断，定位「全面总攻无效果」用，定位后删除】
+                            GD.Print($"[Choose] 实例效果 A='{cardAInstance.effect}' | B='{cardBInstance.effect}'");
+
                             // 显示选择界面
                             var selectedCard = await ShowCardChoice(new List<cardBase_> { cardAInstance, cardBInstance }, true);
                             
                             // 执行选中卡牌的效果
+                            // 【临时诊断，定位「全面总攻无效果」用，定位后删除】
+                            GD.Print($"[Choose] 选中={(selectedCard != null ? selectedCard.id : "null")} effect='{selectedCard?.effect}'");
                             if (selectedCard != null)
                             {
                                 await ParseAndExecuteEffect(selectedCard.effect, selectedCard, null);
