@@ -31,6 +31,18 @@
 | `&theNumberOfSkirmisher` | 场上轻步兵单位的数量 |
 | `&任意名称` | 自定义内存变量（通过 `SetMemory()` 设置） |
 
+> ⚠️ **变量名里不能带点。** `ReplaceVariables` 扫描变量名时只接受字母、数字与下划线
+> （`battlefield_.cs:1408`），遇到 `.` 就截断——所以 `&target.attack` 解析出的名字是
+> `target`，不是已知变量，会走「自定义内存变量」分支返回 **0**，指令静默失效。
+>
+> 上表中所有 `A / B` 写法**只有 A 合法**（`&sourceAttack`、`&targetsCount`、
+> `&fieldFriendUnitCount`、`&friendHqDefence`…）；带点的 B 形式**一个都不能用**。
+> 代码里 `ReplaceVariables` 的 `case "target.attack":` 一类分支是**不可达的死代码**，
+> 不要照它写卡。`[全面总攻]` 的两张辅助卡曾因写成 `&target.attack` 而完全无效；
+> `card.ini:1855`、`card.ini:2301` 两张老卡也有同一处错误。
+>
+> 权威写法见 `bin/timesList.ini` 的 `[keys]` 段。
+
 #### `&lifeTime` 的计数约定
 
 `lifeTime` 在 `SetCardInformation()` 中初始化为 0，之后**每轮在时点触发之后**由 `RunTurnTransitionAsync()` 各加一次（敌方单位在敌方回合开始后、友方单位在友方回合开始后）。因此**时点里读到的值 = 该单位已经在场度过的完整回合数**：
@@ -83,7 +95,7 @@
 |---|---|
 | `LoseAttack`、`KillAllTargets`、`HealAllTargets`、`addCost`/`subCost`/`setCost` | `Heal`、`addDefence`、`damage`、`SetDefence`、`GetAttack` |
 
-变量替换是**逐条指令**进行的（`battlefield_.cs:3699`），因此 `&target.defence` 读到的是**缓存结算前**的值。若要表达「攻击力等于加防后的防御力」，必须把增量显式算进去，例如合成橡胶：`setTarget|setResult(5)|Heal(&result)|LoseAttack(&target.attack)|GetAttack(&target.defence)|GetAttack(&result)`。
+变量替换是**逐条指令**进行的（`battlefield_.cs:3699`），因此 `&target.defence` 读到的是**缓存结算前**的值。若要表达「攻击力等于加防后的防御力」，必须把增量显式算进去，例如合成橡胶：`setTarget|setResult(5)|Heal(&result)|LoseAttack(&targetAttack)|GetAttack(&targetDefence)|GetAttack(&result)`。
 | `setResult(n)` | 设置 result 变量值 |
 | `SetMemory(name, n)` | 设置自定义内存变量 |
 | `getCount($selector)` | 计数字段上匹配selector的单位 |
