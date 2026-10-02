@@ -4960,15 +4960,13 @@ InputState currentInputState = InputState.nil;
                         // （如「精简编制」的 subCost），重新初始化会把那些改动丢掉。
                         if (selectedCard != null && sourceCard?.GetIsFriend() == IsFriend.friend)
                         {
-                            player1.RemoveFromDeck(selectedCard);
-                            selectedCard.Visible = true;
-                            await player1.AddCardToHand(selectedCard);
+                            var cardToHand = CloneCardWithCurrentValues(selectedCard);
+                            if (cardToHand != null) await player1.AddCardToHand(cardToHand);
                         }
                         else if (selectedCard != null && sourceCard?.GetIsFriend() == IsFriend.enemy)
                         {
-                            player2.RemoveFromDeck(selectedCard);
-                            selectedCard.Visible = true;
-                            await player2.AddCardToHand(selectedCard);
+                            var cardToHand = CloneCardWithCurrentValues(selectedCard);
+                            if (cardToHand != null) await player2.AddCardToHand(cardToHand);
                         }
 
                         // 释放未选择的卡牌回到池中
@@ -5174,6 +5172,42 @@ InputState currentInputState = InputState.nil;
         await Task.Delay(100);
 
         return;
+    }
+
+    /// <summary>
+    /// 按一张已有卡的**当前状态**复制出一张新卡，用于「开发」这类需要新实例、
+    /// 又必须保留运行时改动的场景。
+    ///
+    /// 两种错误做法（都不要用）：
+    /// - 直接搬用原实例：卡会离开它原来所在的位置（牌堆里的卡被移走，牌堆被消耗）
+    /// - 只用 SetCardInformation(按 id 取卡)：拿到的是配置里的初始值，牌堆实例上
+    ///   被改过的数值（如「精简编制」subCost 减过的费用、各种 buff）全部丢失
+    ///
+    /// 建卡流程沿用项目既有做法（Develop 名字分支 / PostBattleReward 的
+    /// AcquireEmptyCard + SetCardInformation），随后把费用/攻击/防御搬到新卡上。
+    /// </summary>
+    private cardBase_ CloneCardWithCurrentValues(cardBase_ source)
+    {
+        if (source == null) return null;
+
+        var data = GetCardMaganer().GetCard(source.id);
+        if (data == null) return null;
+
+        var copy = ResourceManager.Instance.AcquireEmptyCard();
+        if (copy == null) return null;
+
+        copy.SetCardInformation(data);            // 卡图、文本、初始数值
+        copy.SetIsFriend(source.GetIsFriend());
+
+        // 搬运运行时数值——这一步才是「保留数值」的关键
+        copy.SetCostValue(source.ReadCost());
+        copy.SetDefence(source.ReadDefence());
+        copy.attack = source.ReadAttack();
+
+        copy.Visible = true;                      // 对象池取出的卡可能残留隐藏状态
+        copy.RefreshState();                      // 直接改字段后手动刷新显示
+
+        return copy;
     }
 
     /// <summary>
@@ -5764,16 +5798,6 @@ public class Player
     public List<cardBase_> GetCardsInDeck()
     {
         return deck;
-    }
-
-    /// <summary>
-    /// 把一张卡从牌堆摘除，返回是否真的摘掉了。
-    /// 「从牌堆把卡拿进手牌」时必须调用：DrawCard() 走的就是 deck.RemoveAt(0)，
-    /// 漏掉这一步会让同一张卡同时留在牌堆与手牌，之后抽卡会抽到已在手上的实例。
-    /// </summary>
-    public bool RemoveFromDeck(cardBase_ card)
-    {
-        return deck != null && deck.Remove(card);
     }
 
     /// <summary>手牌上限（供指令 GetHandMax() 使用，避免在效果脚本里写死数字）</summary>
