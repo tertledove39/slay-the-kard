@@ -107,10 +107,10 @@ def main():
     # --------------------------- 新卡是否用上了这些能力 ---------------------------
     print("\n--- 新卡对新能力的实际使用 ---")
     used = {
-        "${allTargets.unit.Ambush}": "特性片段（伏击接应）",
+        "${allTargets.unit.friend.Ambush}": "特性片段 + 友方限定（伏击接应）",
         "Develop($deck)": "牌堆选择器（步兵第190团）",
         "FriendlyCommandPlayed": "新时点（参谋总部）",
-        "GetHandMax()": "手牌上限指令（破釜沉舟）",
+        "GetHandMax": "手牌上限指令（破釜沉舟，无参指令按约定裸写不带括号）",
         "aFrontLineUnit": "前线目标类型（步兵第173团）",
     }
     for needle, why in used.items():

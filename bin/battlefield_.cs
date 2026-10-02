@@ -4543,7 +4543,11 @@ InputState currentInputState = InputState.nil;
                 // GetHandMax() - 获得手牌上限
                 // 「抽牌直到手牌已满」这类效果需要它；上限是 Player 的常量，
                 // 脚本读不到，若写死数字就违反「禁止魔鬼数字」
-                if (ins == "gethandmax")
+                // 同时接受 GetHandMax 与 GetHandMax() 两种写法。
+                // 项目约定无参指令裸写（Retreat、HealAllTargets 都是），但 LOGIC.md 的
+                // 指令表是按带括号列的，作者很容易照着文档写成带括号的版本；而 ins 不做
+                // 去括号处理，带括号时会静默不匹配。
+                if (ins == "gethandmax" || ins.StartsWith("gethandmax("))
                 {
                     if (sourceCard?.GetIsFriend() == IsFriend.enemy)
                         result = player2.ReadHandMax();
