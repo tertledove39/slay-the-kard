@@ -692,6 +692,17 @@ private const int OpeningHandSize = 5;
             await Task.Delay(20); // 从10000减少到500毫秒
         }
 
+        // TODO 临时诊断：定位「开发候选卡不显示」后删除
+        GD.Print($"[Choice] 进入 ShowCardChoice，{choiceCards.Count} 张，animateExit={animateExit}，"
+                 + $"choiceLayer intree={choiceLayer.IsInsideTree()} layer={choiceLayer.Layer} "
+                 + $"followViewport={choiceLayer.FollowViewportEnabled} visible={choiceLayer.Visible}");
+        foreach (var c in choiceCards)
+        {
+            if (c == null) { GD.Print("  [Choice] 候选里有 null"); continue; }
+            GD.Print($"  [Choice] {c.name} parent={c.GetParent()?.Name} visible={c.Visible} "
+                     + $"pos={c.GlobalPosition} size={c.Size} scale={c.Scale} mod={c.Modulate} z={c.ZIndex}");
+        }
+
         choiceContainer.Visible = true;
         isShowingChoiceUI = true;
 
@@ -4955,7 +4966,13 @@ InputState currentInputState = InputState.nil;
                     // 候选卡来自牌堆/手牌/场上的真实对象：既不能改动它们的状态，
                     // 也不能把原对象交给选择界面与手牌（否则同一个对象会同时存在于两处）。
                     // 故一律先复制成独立对象，用复制品去显示与入手牌——原卡原封不动。
+                    // TODO 临时诊断：定位「开发候选卡不显示」后删除
+                    GD.Print($"[Develop] instruction=\"{instruction}\" 复制前={cardsToShow.Count}");
+
                     cardsToShow = cardsToShow.Select(c => Copy(c)).Where(c => c != null).ToList();
+
+                    GD.Print($"[Develop] 复制后={cardsToShow.Count}"
+                             + (cardsToShow.Count == 0 ? " —— 候选为空，不会弹选择界面" : ""));
 
                     if (cardsToShow.Count > 0)
                     {
@@ -5189,13 +5206,14 @@ InputState currentInputState = InputState.nil;
     /// </summary>
     private cardBase_ Copy(cardBase_ source)
     {
-        if (source == null) return null;
+        // TODO 临时诊断：定位「开发候选卡不显示」后删除
+        if (source == null) { GD.Print("[Copy] 中止：source 为 null"); return null; }
 
         var data = GetCardMaganer().GetCard(source.id);
-        if (data == null) return null;
+        if (data == null) { GD.Print($"[Copy] 中止：GetCard(\"{source.id}\") 取不到 CardData"); return null; }
 
         var copy = ResourceManager.Instance.AcquireEmptyCard();
-        if (copy == null) return null;
+        if (copy == null) { GD.Print("[Copy] 中止：AcquireEmptyCard 返回 null"); return null; }
 
         // 与项目里既有的建卡流程（InitializeDeckFromIni）保持一致：cardbase.tscn 的根
         // Control 是锚点布局，尺寸由父节点 rect 算出。ShowCardChoice 会把这批候选卡
