@@ -79,7 +79,7 @@
 
 **属性变更的结算时机不一致（写复杂效果时必须注意）**
 
-| 立即生效 | 缓存到 `ChangeList`，由 `ExecChangeLists()` 结算 |
+| 立即生效 | 缓存到 `ChangeList`，由 `ExecChangeList()` 结算 |
 |---|---|
 | `LoseAttack`、`KillAllTargets`、`HealAllTargets`、`addCost`/`subCost`/`setCost` | `Heal`、`addDefence`、`damage`、`SetDefence`、`GetAttack` |
 

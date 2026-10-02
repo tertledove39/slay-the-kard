@@ -167,3 +167,77 @@ commit `ebc702f`（CardParser 重构）在替换 `GetRarity`/`GetTypes` 等本�
 此外，原流程在 `RemoveCard` 中同步调用 `ShowSettlement` 后立即 fire-and-forget `ReturnToWorldMapAfterVictory`（直接跳到奖励选择），缺少结算→用户确认→奖励的等待环节。
 
 **修复**: (1) 去掉 `SetAnchorsPreset`，直接用 `(viewSize - panelSize) / 2` 居中定位；(2) 添加确认按钮，`ShowSettlement` 改为 `async Task` 等待按钮按下；(3) 将 `ShowSettlement` 调用移入 `ReturnToWorldMapAfterVictory` 最前面，确保确认后才进入奖励选择。
+
+---
+
+## 新卡批次（撤退/开发/费用/抉择一系）实机反馈的问题
+
+> 2026-10 新增 18 张卡 + 2 张辅助卡后，实机测试反馈 7 个问题。
+> 其中 4 个已修（见下方「已修」），其余为尚未定位/待确认项，记录在此供接手者直接开工。
+
+### 已修（仅存档，不必再动）
+
+| 现象 | 根因 | 修复 | 提交 |
+|---|---|---|---|
+| 破釜沉舟抽不了牌 | 无参指令按项目约定须裸写（`Retreat`/`HealAllTargets` 都是），而 `GetHandMax()` 带括号会让 `ins`（`instruction.ToLowerInvariant()`，不去括号）变成 `"gethandmax()"`，与 `ins == "gethandmax"` 永不相等 | card.ini 改裸写；代码同时接受两种写法 | `c0d9777` |
+| 伏击接应需限定友方 | — | 选择器改为 `${allTargets.unit.friend.Ambush}` | `c0d9777` |
+| 开发后牌堆错乱 / 手牌出现空卡牌 | `Develop($选择器)` 把牌堆里的真实卡实例直接加进手牌，既未从牌堆摘除（同一对象同时在两处），也未恢复 `Visible`（牌堆卡靠停在屏幕外隐藏） | 新增 `CloneCardWithCurrentValues()`，复制一份并搬运当前数值进手牌，原卡留在牌堆 | `13efaca` |
+
+### 29. 全面总攻打出后无任何效果 (card.ini [全面总攻] / battlefield_.cs Choose 分支)
+
+`[全面总攻]` 的 effect 是 `Choose(总攻_强攻,总攻_固守)`，期望弹出二选一并执行选中效果，实机无任何反应。
+
+**已排除的原因**（均读过实现确认无误）：
+- `foreach` 会把 `targets` 切成当前元素：`battlefield_.cs` 的 foreach 分支里 `targets = new List<cardBase_> { savedTargets[0] };`，循环推进时同理。故辅助卡里的 `&target.attack` 取的是当前单位，写法本身正确。
+- `GetCard()` 按 **section ID** 查（`_items[card.Id]`），`Choose(总攻_强攻, 总攻_固守)` 的两个参数与两个辅助卡的 section ID 一致。
+- 两张辅助卡的 `effect` 字段与 `cardType` 已写入 card.ini。
+
+**尚未查证**：
+- `Choose` 分支内部是 `await ShowCardChoice(new List<cardBase_>{...}, true)` 然后 `await ParseAndExecuteEffect(selectedCard.effect, selectedCard, null)` —— **targets 传的是 `null`**。需确认 `ParseAndExecuteEffect` 对 null targets 的处理，以及 `ShowCardChoice` 第二个参数 `true` 的语义。
+- `Choose` 是唯一一处把 `ShowCardChoice` 的返回值直接拿去执行效果的路径，缺少可对照的既有用例。
+
+**建议定位方式**：在 `Choose` 分支的 `if (cardA != null && cardB != null)` 与 `if (selectedCard != null)` 两处各加一行 `GD.Print`，复现后即可看出是「卡没取到」「选择界面没弹」还是「弹了但效果没执行」。
+
+### 30. 无法正确重设费用 (card.ini [机动调配] / [紧急征调])
+
+`setCost(0)` 不生效。**注意：反馈已澄清，出问题的不是「紧急征调」**，嫌疑在 `[机动调配]`。
+
+`[机动调配]` 的 effect：
+```
+setTargets(${allCardInHand})|getCount(${allCardInHand})|GetRandomNumber(0,&result-1)|GetTargetByIndex(&result)|setCost(0)
+```
+
+**已查证**：
+- `setCost(n)` 走 `target.AddChange(ChangeType.SetCost, n)`，由 `cardBase_.cs:490` 的 **`ExecChangeList()`（单数！）** 结算，其中 `case ChangeType.SetCost: SetCostValue(change.Value);`。
+- `ExecChangeList()` 全项目只有两个调用点：`battlefield_.cs:3031`（遍历 `ReadCardInPlaces()` 逐张执行，手牌卡也在 `cardInPlaces` 中，故理论上覆盖得到）与 `battlefield_.cs:5460`。
+
+**尚未查证**（按嫌疑排序）：
+1. `GetRandomNumber(0,&result-1)` 的第二个参数是否支持表达式。该指令分支在 `battlefield_.cs:4713`，需确认它用 `EvaluateExpression` 还是 `int.Parse`。
+2. `getCount(${allCardInHand})` 是否正确统计手牌数（决定 `&result-1` 是否合法）。
+3. `GetTargetByIndex(&result)` 是否接受变量形式的下标。
+4. 结算时机：`setCost` 是缓存型变更，需等 `ExecChangeList()` 被调用才生效。若手牌卡在那之前就被查看，会看到未改的费用。
+
+### 31. 文档错误：LOGIC.md 提到的 ExecChangeLists() 并不存在
+
+`docs/LOGIC.md`「效果指令一览」下的结算时机表写「缓存到 `ChangeList`，由 `ExecChangeLists()` 结算」，但**全项目没有 `ExecChangeLists`**，实际函数是 `cardBase_.cs:490` 的 **`ExecChangeList()`（单数）**。
+
+**影响**：照着文档去搜 `ExecChangeLists` 会一无所获，排查费用/治疗/伤害类问题时白费时间。本次排查 #4 时就先被误导了一次。
+
+**修复**：把 LOGIC.md 中该处函数名改为 `ExecChangeList()`。
+
+### 32. 撤退回手的单位若没有 Blitz，重新部署后永久无法移动/攻击（待确认是否 bug）
+
+`RetreatUnit()`（`battlefield_.cs`）在单位回手牌时调用 `unit.DisableCombatAbility()`，把 `moveAble` 与 `attackAble` 一起置 0。而唯一能恢复它们的 `cardBase_.RefreshUnit()`（`cardBase_.cs:105`）在部署路径上**只对有 `Blitz` 特性的单位调用**（`battlefield_.cs:324` 与 `:2103` 两处都是 `if(card.HasTrait(UnitTraits.Blitz)) card.RefreshUnit();`）。
+
+**待确认**：这可能是**刻意的**——「新部署的单位本回合不能攻击」本就是基础规则，`attackAble=0` 恰好符合；`RefreshUnit()` 只给 Blitz 用也说得通。**尚未读卡牌实例化时这两个标志的初值**，无法判断「非闪击单位撤退回手再打出后是否应该能立即行动」。
+
+**若判定为 bug**：注意修法不能简单地在部署时无条件 `RefreshUnit()`——那等于给所有单位闪击。
+
+### 33. 本批次其余未验证项（非已报问题，属隐患）
+
+| 项 | 说明 |
+|---|---|
+| `[破釜沉舟]` 的弃牌/抽牌时序 | `setTargets(${allCardInHand})\|foreach\|DiscardWithTarget\|End&\|GetHandMax\|drawCard`。`DiscardWithTarget` 会播放异步弃牌动画，紧随其后的 `drawCard` 可能与之竞态 |
+| `[紧急征调]` 的目标语义 | 效果是 `setTarget\|setCost(0)`，`targetType = aFriendlyUnit`（场上单位）。但「费用」是**手牌打出时的成本**，给已在场上的单位设费用是否有可观察效果，存疑。需求方曾澄清「选的是场上的一个友方单位」，但未确认这是否就是想要的效果 |
+| `Develop($选择器)` 的 `$` 形式 | 全项目 9 处真实用法都是 `Develop(具体卡名,...)`，**`$` 形式此前从未被使用过**。本次为「步兵第190团」「紧急投产」首次启用，仅按代码分支（参数 `Substring(1)`）推断其语法 |
+| 未被选中的候选卡泄漏 | `Develop` 收尾处「释放未选择的卡牌回到池中」那段被注释掉了。命名分支的候选是新建实例，未选中的不会回收。属既有问题，非本次引入 |
