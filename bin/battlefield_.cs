@@ -916,7 +916,7 @@ InputState currentInputState = InputState.nil;
         "setCost()", "addCost()", "subCost()",
         "setResult()", "setTarget", "drawCard", "DrawUnitCards()",
         "GetEffect()", "AddToHand()", "addToSupportLine()", "addToEnemySupportLine()",
-        "addToDeck()", "SetMemory()", "AddPoint()", "AddPointMax()", "losePointAtNextTurnBegin()",
+        "addToDeck()", "SetMemory()", "AddPoint()", "AddPointMax()", "losePointAtNextTurnBegin()", "GetHandMax()",
         "ShuffleIntoDeck", "GetCardsShuffledIntoDeck",
         "displayAllCardState", "GetAllFriendUnits", "GetAllEnemyUnits", "GetAllFriendTargets", "GetAllEnemyTargets",
         "GetRandomFriendUnit", "GetRandomEnemyUnit",
@@ -3560,6 +3560,10 @@ InputState currentInputState = InputState.nil;
                 return card.GetIsFriend() == IsFriend.friend;
             case TargetType.enemyTarget:
                 return card.GetIsFriend() == IsFriend.enemy;
+            case TargetType.aFrontLineUnit:
+                // 前线单位（任意阵营）。高亮与目标计数都委托本函数，故只需在此加一处
+                return card.isHq == HQ.normalCard && card.GetMyPlace() != null
+                       && frontLine.Contains(card.GetMyPlace());
             default:
                 return false;
         }
@@ -4536,6 +4540,17 @@ InputState currentInputState = InputState.nil;
                     }
                 }
 
+                // GetHandMax() - 获得手牌上限
+                // 「抽牌直到手牌已满」这类效果需要它；上限是 Player 的常量，
+                // 脚本读不到，若写死数字就违反「禁止魔鬼数字」
+                if (ins == "gethandmax")
+                {
+                    if (sourceCard?.GetIsFriend() == IsFriend.enemy)
+                        result = player2.ReadHandMax();
+                    else
+                        result = player1.ReadHandMax();
+                }
+
                 // AddPointMax() - 增加指挥点槽
                 if (instruction.StartsWith("AddPointMax", StringComparison.OrdinalIgnoreCase))
                 {
@@ -5182,6 +5197,11 @@ InputState currentInputState = InputState.nil;
         // 效果结算
         await ParseAndExecuteEffect(commandCard.effect, commandCard, targets);
         await CheckIfAnyUnitDiedAsync();
+
+        // 友方指令打出时点（如「参谋总部」：友方打出指令时抽1张卡）。
+        // 必须放在自身效果结算之后——结算完毕才算真正「打出过」这张指令。
+        // 两处打出入口（_Input 的无目标/有目标分支）都经由本函数，故只需挂这里一处。
+        await TriggerUnitEffects("FriendlyCommandPlayed", commandCard);
     }
 
     /// <summary>
@@ -5293,6 +5313,12 @@ InputState currentInputState = InputState.nil;
             results.AddRange(player2.GetCardsInHand());
             startIdx = 1;
         }
+        else if (parts.Length > 0 && parts[0] == "deck")
+        {
+            // 当前牌堆。与 allCardInHand 同属「非场上卡」根，故同样不走下面的场上填充
+            results.AddRange(player1.GetCardsInDeck());
+            startIdx = 1;
+        }
         else
         {
             results.AddRange(cardInPlaces.Where(x => x.getState() == CardState.placed).ToList());
@@ -5341,9 +5367,26 @@ InputState currentInputState = InputState.nil;
             {
                 results = results.Where(x => x.cardType == CardTypes.Plane || x.cardType == CardTypes.Bomber).ToList();
             }
+            else if (part == "frontLine" || part == "supportLine" || part == "enemySupportLine")
+            {
+                // 三条阵线：前线(Place6-10)、友方支援阵线(Place11-15)、敌方支援阵线(Place1-5)。
+                // 注意代码里的字段名拼错了(enemySupprotLine)，但选择器片段按正确拼写对外。
+                var lane = part == "frontLine" ? frontLine
+                         : part == "supportLine" ? supportLine
+                         : enemySupprotLine;
+                results = results.Where(x => x.GetMyPlace() != null && lane.Contains(x.GetMyPlace())).ToList();
+            }
             else if (part == "damaged")
             {
                 results = results.Where(x => x.ReadDefence() < x.ReadMaxHistoryDefence()).ToList();
+            }
+            else if (Enum.TryParse<UnitTraits>(part, true, out UnitTraits traitFilter)
+                     && traitFilter != UnitTraits.None)
+            {
+                // 特性筛选，如 ${allTargets.unit.Ambush} 取场上所有伏击单位。
+                // 必须先试特性、认得出才当特性用；认不出才交给下面的卡牌类型解析，
+                // 否则会把 Attack 之类解析失败的名字误当成「筛选掉全部」
+                results = results.Where(x => x.HasTrait(traitFilter)).ToList();
             }
             else
             {
@@ -5701,6 +5744,18 @@ public class Player
     public int ReadDeckCount()
     {
         return deck?.Count ?? 0;
+    }
+
+    /// <summary>当前牌堆的卡（供选择器 ${deck} 使用）</summary>
+    public List<cardBase_> GetCardsInDeck()
+    {
+        return deck;
+    }
+
+    /// <summary>手牌上限（供指令 GetHandMax() 使用，避免在效果脚本里写死数字）</summary>
+    public int ReadHandMax()
+    {
+        return maxHandSize;
     }
 
     /// <summary>

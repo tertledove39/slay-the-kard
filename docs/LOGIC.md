@@ -116,6 +116,7 @@
 | `GetRandomNumber(min, max)` | 随机整数存入result |
 | `GetFriendHq` / `GetEnemyHq` | targets设为友方/敌方总部 |
 | `GetPoint()` / `GetPointMax()` | 读取指挥点/最大点存入result |
+| `GetHandMax()` | 读取手牌上限存入result。上限是 `Player.maxHandSize` 常量，脚本读不到，写「抽到手牌满」的效果必须用它，不要写死数字 |
 | `AddPoint(n)` / `AddPointMax(n)` | 增加指挥点/最大点；`AddPointMax` 不会重复执行 `AddPoint`。`AddPoint` 的天花板是 `pointMaxMaxMax`(24) 而非当前上限 `pointMax`，即可把点数攒到本回合上限之上；逐回合的预算约束由回合开始的 `RefreshPoint()` 刷满提供 |
 | `losePointAtNextTurnBegin(n)` | 下回合开始时失去n点指挥点（不足则清零） |
 | `DiscardRandomly(n)` | 随机弃n张手牌 |
@@ -142,8 +143,10 @@
 位置：`battlefield_.cs` line 4653
 
 Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
-- 首段：`allTargets` = 所有场上+HQ的卡 / `allCardInHand` = 所有手牌
+- 首段：`allTargets` = 所有场上+HQ的卡 / `allCardInHand` = 所有手牌 / `deck` = 当前牌堆
 - 后续段：`unit`=非HQ / `hq`=总部 / `friend`=友方 / `enemy`=敌方 / `land`=陆军 / `air`=空军 / `damaged`=防御力低于历史最大值 / 类型名=CardTypes过滤
+- **阵线段**：`frontLine`=前线(Place6-10) / `supportLine`=友方支援阵线(Place11-15) / `enemySupportLine`=敌方支援阵线(Place1-5)。按 `GetMyPlace()` 是否属于该格子表筛选，**与阵营无关**，可组合成 `${allTargets.unit.frontLine}`。（代码里的字段名拼错作 `enemySupprotLine`，但选择器片段按正确拼写对外。）
+- **特性段**：`UnitTraits` 的枚举名，如 `${allTargets.unit.Ambush}` 取场上所有伏击单位。识别顺序是**先试特性、再试卡牌类型**——`Enum.TryParse` 成功且非 `None` 才当特性，否则交给卡牌类型解析；两类都不认得才静默忽略。
 
 **必须写成 `${...}`，花括号不能省。** `setTargets` 用的是正则
 `\$\{([^}]*)\}`，只认带花括号的形式；写成 `$(...)` 或裸 `$xxx` 时正则不匹配，
@@ -153,6 +156,12 @@ Selector 使用点号分段过滤：`allTargets.unit.friend.Infantry`
 同理，选择器里**不认识的片段会被静默忽略**（走 `ParseCardTypeFromName` 返回
 null 后不作处理），过滤条件凭空消失、结果集比预期大。写错片段同样不报错。
 这两类问题由 `tests/verify_card_scripts.py` 静态守住。
+
+**唯一的例外是 `Develop()` 的参数。** `Develop($选择器)` 走的是另一条解析路径：
+代码对参数做 `Substring(1)` 后再交给本函数，所以那里**必须写不带花括号**的形式
+（`$deck`、`$allTargets.unit`）；若写成 `${...}`，花括号会被当成片段名的一部分，
+同样静默失效。`tests/verify_card_scripts.py` 已把 `Develop($...)` 从「裸 `$` 写法」
+检查中排除，避免把它误报成漏花括号。
 
 ---
 
@@ -404,6 +413,7 @@ if (from.HasTrait(UnitTraits.Immunity)) counterDamage = 0;  // 1898，打人时�
 | EnemyUnitDead | 敌方单位死亡时（所有剩余单位触发） |
 | BeingAddedToField | 单位被加入战场时 |
 | BePicked | 被指向（被选为目标时） |
+| FriendlyCommandPlayed | 友方打出指令时（在 `ExecuteCommandAndDiscard` 中、该指令自身效果结算之后触发） |
 
 **前缀必须与上表逐字一致（含大小写）。** `TriggerUnitEffects` 的判定是：
 

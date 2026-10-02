@@ -30,7 +30,24 @@ INI_FILES = ["cards/card.ini", "cards/enemyTurn.ini", "bin/event.ini"]
 SELECTOR_KEYWORDS = {
     "allTargets", "allCardInHand", "unit", "command", "friend", "enemy",
     "hq", "land", "air", "damaged",
+    # 三条阵线（GetTargetsFromSelector 支持）
+    "frontLine", "supportLine", "enemySupportLine",
+    # 根片段：当前牌堆
+    "deck",
 }
+
+
+def trait_names():
+    """从 cardBase_.cs 的 UnitTraits 枚举解析特性名。
+
+    特性也能作为选择器片段（如 ${allTargets.unit.Ambush}），新增特性时
+    本测试自动跟上，不必手改关键字表。
+    """
+    text = read("bin/cardBase_.cs")
+    m = re.search(r"public enum UnitTraits\s*\{(.*?)\n\}", text, re.S)
+    if not m:
+        return set()
+    return set(re.findall(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=", m.group(1), re.M))
 # 由 ParseCardTypeFromName 识别的卡牌类型（大小写不敏感）
 CARD_TYPES = {"tank", "infantry", "artillery", "plane", "bomber", "command"}
 
@@ -130,7 +147,14 @@ def main():
     bare, dollar_paren = [], []
     for f in INI_FILES:
         text = read(f)
+        # Develop($选择器) 的参数就是「$ 开头、不带花括号」的形式——这是该指令的
+        # 既定语法（代码对参数做 Substring(1) 后交给 GetTargetsFromSelector），
+        # 与写错的裸 $xxx 选择器不是一回事，先把这些区间标出来排除掉
+        develop_spans = [(m.start(), m.end())
+                         for m in re.finditer(r"Develop\(\s*\$[^),]*\)", text)]
         for m in re.finditer(r"(?<![\$\{])\$([A-Za-z_][A-Za-z0-9_.]*)", text):
+            if any(s <= m.start() < e for s, e in develop_spans):
+                continue
             bare.append((f, text[: m.start()].count("\n") + 1, m.group(0)))
         for m in re.finditer(r"\$\(([^)]*)\)", text):
             dollar_paren.append((f, text[: m.start()].count("\n") + 1, m.group(0)))
@@ -150,6 +174,8 @@ def main():
 
     # --------------------------- 2) 选择器片段 ---------------------------
     print("\n--- 选择器片段合法性 ---")
+    traits = trait_names()
+    print(f"        （特性片段来源：cardBase_.cs UnitTraits，共 {len(traits)} 个）")
     unknown = []
     selectors = set()
     for f in INI_FILES:
@@ -160,6 +186,8 @@ def main():
                 if not part:
                     continue
                 if part in SELECTOR_KEYWORDS or part.lower() in CARD_TYPES:
+                    continue
+                if part in traits:
                     continue
                 unknown.append((f, sel, part))
     for f, sel, part in unknown:
