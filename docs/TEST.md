@@ -335,3 +335,25 @@ HQ 的「血」是`defence`，`attack`恒为 0 且总部不会攻击，因此对
 - 定点回归：`[i1005]` 与 `[雅克9]` 的 `effect` 必须以 `Dead:` 开头，且不得残留小写时点前缀。
 - 边界检查：确认配置确实使用了多种时点前缀（15 种）且 `Dead` / `Deployed` 在受检范围内，规则不是空转。
 - 断言有效性：把两处数据改回 `dead:` 后立即报出 5 个 FAIL，并准确指出 `card.ini:1341 [i1005]` 与 `card.ini:1543 [雅克9]`。
+
+## 卡牌复制（Develop 用）
+
+测试脚本：`tests/verify_card_copy.py`。
+
+`Develop($选择器)` 的候选来自牌堆/手牌/场上的真实对象，不能改它们、也不能把原对象
+同时塞进两个容器，所以三个分支统一先过 `Copy(cardBase_)`。`Copy` 必须做到两件事，
+两件写错都**静默失效**：数值搬不全（按 id 重读会把运行时改过的值丢掉）、尺寸没钉死
+（`Reparent` 到 `choiceLayer` 后 `GetGlobalRect()` 的命中框跟着变，卡就点不中了）。
+
+- 冒烟测试：两个源文件存在；`Copy(cardBase_)` 可定位。
+- 基本验证：`cost`/`attack`/`defence`/`effect` 四项都按 `copy.X = source.X` 搬运；
+  `traits` 走 `AddTrait(source.traits)` 而非直接写字段（直接写会让 `hasAmbushActive`
+  等运行时标志缺失，伏击静默失效，故专门加一条反向断言禁止 `copy.traits = source.traits`）。
+- **回归（针对「开发出来的卡点不中」）**：`cardBase_` 暴露 `PinDesignSize()`，其内部钉
+  `TopLeft` 锚点 + `DesignSize`；`Copy()` 里确实调了它；`InitializeDeckFromIni` 的两条
+  分支（持久化重建 / 首次读 `deck.ini`）都调了它。
+- 边界/配置项单一：`new Vector2(180, 240)` 在两个源文件里**只允许出现一次**，且必须在
+  `cardBase_.cs`——钉死并断言这一点，防止尺寸又被抄成第二处配置。
+- 显示同步：`Copy()` 末尾调了 `RefreshState()`（直接写字段绕开了 `SetCostValue` 等
+  setter 的刷新副作用，三个 Label 需自己补）。
+- 断言有效性：删掉 `copy.PinDesignSize();` 后立即报 FAIL。

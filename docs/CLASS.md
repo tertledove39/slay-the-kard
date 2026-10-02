@@ -37,6 +37,7 @@
 | 图标面板 | `BuildAttributePanel()` 构建右侧attribute图标；`GetAllAttributes()` 收集所有图标 |
 | 悬停高亮 | `SetHover()`/`ResetVisualsInstant()` 悬停边框+缩放 |
 | 生命周期 | `Dead()` 死亡回收；`lifeTime` 存活回合计数 |
+| 尺寸钉死 | `PinDesignSize()` / `DesignSize`(180x240)：把锚点钉成左上角并固定尺寸，使卡牌的可点区域不随父节点变化。任何要把卡牌放进别的父节点（尤其 `ShowCardChoice` 的 `choiceLayer` 这种 CanvasLayer）之前都必须先调 |
 
 ### `Cardbase` : Node2D (bin/Cardbase.cs)
 

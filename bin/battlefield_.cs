@@ -783,6 +783,12 @@ private const int OpeningHandSize = 5;
                 return;
             }
         }
+
+        // TODO 临时诊断：定位「开发选择界面点不中」后删除。
+        // 只在一次点击没命中任何候选卡时打印，正常游玩不会刷屏。
+        GD.Print($"[Choice] 未命中 mouse={mousePosition} 候选="
+                 + string.Join(" | ", choiceCards.Where(c => c != null)
+                                                 .Select(c => $"{c.name}{c.GetGlobalRect()}")));
     }
 
 
@@ -5191,6 +5197,12 @@ InputState currentInputState = InputState.nil;
         var copy = ResourceManager.Instance.AcquireEmptyCard();
         if (copy == null) return null;
 
+        // 与项目里既有的建卡流程（InitializeDeckFromIni）保持一致：cardbase.tscn 的根
+        // Control 是锚点布局，尺寸由父节点 rect 算出。ShowCardChoice 会把这批候选卡
+        // Reparent 到 choiceLayer（一个 CanvasLayer）下，尺寸若不钉死就会跟着换父节点
+        // 重算——而 HandleChoiceCardClick 判定「点到哪张卡」用的正是 GetGlobalRect()。
+        copy.PinDesignSize();
+
         copy.SetCardInformation(data);            // 卡图、文本、初始数值
         copy.SetIsFriend(source.GetIsFriend());
 
@@ -5211,6 +5223,11 @@ InputState currentInputState = InputState.nil;
         // hasAmbushActive，Suppressed 还会关掉行动），只写字段会让这些标志缺失，
         // 例如复制出的伏击单位 hasAmbushActive 为 false，伏击直接失效。
         copy.AddTrait(source.traits);
+
+        // 上面是直接写字段，绕开了 SetCostValue / SetDefence 的刷新副作用，
+        // 三个数值 Label 还停在 SetCardInformation 写进去的初始值上。
+        // RefreshState 是项目自己的公开刷新入口，照着字段重写一遍 Label。
+        copy.RefreshState();
 
         return copy;
     }
@@ -5934,8 +5951,7 @@ public class Player
                 if (cardData != null)
                 {
                     var card = template.Duplicate() as cardBase_;
-                    card.SetAnchorsPreset(Godot.Control.LayoutPreset.TopLeft);
-                    card.Size = new Godot.Vector2(180, 240);
+                    card.PinDesignSize();
                     card.SetCardInformation(cardData);
                     card.SetIsFriend(isFriend);
                     deck.Add(card);
@@ -5992,6 +6008,7 @@ public class Player
                 if (cardData != null && cardData.Rarity != Rarity.Unobtainable)
                 {
                     var card = cardRes.Instantiate() as cardBase_;
+                    card.PinDesignSize();
                     card.SetCardInformation(cardData);
                     card.SetIsFriend(isFriend);
                     deck.Add(card);

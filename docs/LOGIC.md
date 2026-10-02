@@ -175,6 +175,38 @@ null 后不作处理），过滤条件凭空消失、结果集比预期大。写
 同样静默失效。`tests/verify_card_scripts.py` 已把 `Develop($...)` 从「裸 `$` 写法」
 检查中排除，避免把它误报成漏花括号。
 
+### Develop 与卡牌复制 `Copy()` (battlefield_.cs)
+
+`Develop($选择器)` 的候选卡是**牌堆/手牌/场上的真实对象**。既不能改动它们，
+也不能把它们直接交给选择界面与手牌（否则同一个对象会同时存在于两处：牌堆里
+一张、手牌里一张）。所以三个分支产出的候选**统一先过一遍 `Copy(cardBase_)`**：
+
+```csharp
+cardsToShow = cardsToShow.Select(c => Copy(c)).Where(c => c != null).ToList();
+```
+
+`Copy()` 只做「建对象 + 搬数值」，**不调用任何会跑动画的 setter**：
+
+| 搬运项 | 方式 | 为什么不能按 id 重读 |
+|---|---|---|
+| `cost`/`attack`/`defence` | 直接写字段 | 运行时被 setCost/subCost/伤害/治疗改过 |
+| `effect` | 直接赋值 | `GetEffect(...)` 会往 `target.effect` 上追加字符串 |
+| `traits` | `AddTrait(source.traits)` | 会同时初始化 `hasSmokeScreen`/`hasShock`/`hasMobilize`/`hasAmbushActive` 等运行时标志；只写 `traits` 字段会让复制出的伏击单位 `hasAmbushActive=false`，伏击静默失效 |
+
+两点容易踩的坑：
+
+1. **不能用 `SetCostValue()` / `SetDefence()` 搬数值。** 它们内部有
+   `FlashAttributeWithColor` 与 `AnimateCostRoll`（都要 `CreateTween()`），
+   而复制出来的卡此刻**还没进场景树**，直接报错并中断整个效果链。数值写字段，
+   写完后补一句 `RefreshState()` 把三个 Label 同步过来（绕开 setter 就等于绕开了
+   它的刷新副作用）。
+2. **必须调 `PinDesignSize()`。** `cardbase.tscn` 的根 Control 是锚点布局
+   （`anchor_right=0.112`、`anchor_bottom=0.267`），**尺寸由父节点 rect 算出来**。
+   `ShowCardChoice` 会把候选卡 `Reparent` 到 `choiceLayer`（一个 `CanvasLayer`），
+   尺寸不钉死就会跟着换父节点重算——而 `HandleChoiceCardClick` 判定「点到哪张卡」
+   用的正是 `GetGlobalRect()`。这是「开发出来的卡点不中」的直接原因。
+   `InitializeDeckFromIni` 的两条分支同样要钉，否则牌堆卡与手牌卡的命中框不一致。
+
 ---
 
 ## 二、回合流程

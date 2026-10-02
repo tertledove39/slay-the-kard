@@ -241,3 +241,56 @@ setTargets(${allCardInHand})|getCount(${allCardInHand})|GetRandomNumber(0,&resul
 | `[紧急征调]` 的目标语义 | 效果是 `setTarget\|setCost(0)`，`targetType = aFriendlyUnit`（场上单位）。但「费用」是**手牌打出时的成本**，给已在场上的单位设费用是否有可观察效果，存疑。需求方曾澄清「选的是场上的一个友方单位」，但未确认这是否就是想要的效果 |
 | `Develop($选择器)` 的 `$` 形式 | 全项目 9 处真实用法都是 `Develop(具体卡名,...)`，**`$` 形式此前从未被使用过**。本次为「步兵第190团」「紧急投产」首次启用，仅按代码分支（参数 `Substring(1)`）推断其语法 |
 | 未被选中的候选卡泄漏 | `Develop` 收尾处「释放未选择的卡牌回到池中」那段被注释掉了。命名分支的候选是新建实例，未选中的不会回收。属既有问题，非本次引入 |
+
+### 34. 开发选择界面弹出的卡点不中（Copy 未钉死尺寸）
+
+需求方反馈：`Develop` 复制出来的卡「点选不了」。
+
+**根因**：`cardbase.tscn` 的根 Control 用的是**锚点布局**，不是固定尺寸：
+
+```
+[node name="Control" type="Control"]
+anchor_right  = 0.112
+anchor_bottom = 0.26700002
+offset_right  = 0.7999878
+offset_bottom = -0.3000183
+```
+
+即 `Size = (0.112 × 父宽 + 0.8, 0.267 × 父高 − 0.3)`——**尺寸是从父节点算出来的**。
+
+`ShowCardChoice()` 会把候选卡 `Reparent(choiceLayer)`，而 `choiceLayer` 是个
+`CanvasLayer`（不是 Control），卡牌的 anchorable rect 随之换成视口矩形，尺寸被重算。
+而**判定「点到哪张卡」用的正是 `GetGlobalRect()`**：
+
+```csharp
+if (card.GetGlobalRect().HasPoint(mousePosition)) { selectedChoiceCard = card; return; }
+```
+
+尺寸一变，命中框就与眼睛看到的位置对不上，点击落空。
+
+**为什么牌堆卡没事**：`InitializeDeckFromIni()` 早就把这件事修过了，只是没抽成公共入口——
+
+```csharp
+var card = template.Duplicate() as cardBase_;
+card.SetAnchorsPreset(Godot.Control.LayoutPreset.TopLeft);
+card.Size = new Godot.Vector2(180, 240);
+```
+
+锚点全归零 + 尺寸写死，卡牌的 rect 就与父节点无关。**`Copy()` 出来的卡没有这两行**，
+所以一 `Reparent` 到 `choiceLayer` 就出问题。（同一个函数里首次读 `deck.ini` 的分支
+用 `Instantiate()` 也没钉，属同一处遗漏，一并补上。）
+
+**修复**：
+
+1. `cardBase_` 新增 `DesignSize`（180x240，全项目唯一一处配置）与
+   `PinDesignSize()`（`SetAnchorsPreset(TopLeft)` + `Size = DesignSize`）。
+2. `InitializeDeckFromIni()` 的两条分支改调 `PinDesignSize()`，消除重复配置。
+3. `Copy()` 在 `SetCardInformation` **之前**调 `copy.PinDesignSize()`。
+
+**顺带修掉的第二处差异**：`Copy()` 直接写 `copy.cost/attack/defence` 绕开了
+`SetCostValue`/`SetDefence` 的刷新副作用，三个数值 Label 还停在 `SetCardInformation`
+写进去的初始值上——显示的费用与实际 `ReadCost()` 对不上。末尾补一句 `copy.RefreshState()`
+（项目自己的公开刷新入口）即可。
+
+**回归**：`tests/verify_card_copy.py`（16 条），其中断言 `new Vector2(180, 240)` 在两个
+源文件里只允许出现一次。

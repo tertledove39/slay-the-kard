@@ -102,6 +102,24 @@ public partial class cardBase_ : Control
     int styleInit; //0 未初始化 1 已初始化
     battlefield_ battlefield;
 
+    /// <summary>
+    /// 卡牌设计尺寸。cardbase.tscn 的根 Control 用的是锚点布局（anchor_right=0.112、
+    /// anchor_bottom=0.267），尺寸是从父节点的 rect 算出来的，因此脱离原父节点后
+    /// 尺寸会跟着变。任何要把卡牌放进别的父节点（尤其是非 Control 的 CanvasLayer）
+    /// 的场合，都必须先用 PinDesignSize() 钉死。
+    /// </summary>
+    public static readonly Vector2 DesignSize = new Vector2(180, 240);
+
+    /// <summary>
+    /// 把卡牌钉成「左上角锚点 + 固定设计尺寸」，使其位置与可点区域不再随父节点变化。
+    /// 复制卡、牌堆卡在入树前都要调一次。
+    /// </summary>
+    public void PinDesignSize()
+    {
+        SetAnchorsPreset(Control.LayoutPreset.TopLeft);
+        Size = DesignSize;
+    }
+
     public void RefreshUnit()
     {
         moveAble = 1;
