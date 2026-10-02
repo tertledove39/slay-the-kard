@@ -5199,6 +5199,12 @@ InputState currentInputState = InputState.nil;
         copy.attack  = source.attack;
         copy.defence = source.defence;
 
+        // effect 也必须搬：GetEffect(...) 是在运行时往目标卡的 effect 上追加字符串的
+        // （battlefield_.cs 里 `target.effect = target.effect + "," + effectToGive`），
+        // 所以被「炮火准备」这类卡加过效果的单位，其 effect 已与 CardData 里的不同。
+        // 只靠 SetCardInformation 会拿回按 id 读到的初始效果串，把追加的部分丢掉。
+        copy.effect  = source.effect;
+
         return copy;
     }
 
