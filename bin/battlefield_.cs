@@ -5205,6 +5205,13 @@ InputState currentInputState = InputState.nil;
         // 只靠 SetCardInformation 会拿回按 id 读到的初始效果串，把追加的部分丢掉。
         copy.effect  = source.effect;
 
+        // traits 同样会在运行时被 AddTrait / RemoveTrait 改。
+        // 这里用 AddTrait 而不是直接写 copy.traits——它除了 |= traits，还会初始化
+        // 配套的运行时状态标志（hasSmokeScreen / hasShock / hasMobilize /
+        // hasAmbushActive，Suppressed 还会关掉行动），只写字段会让这些标志缺失，
+        // 例如复制出的伏击单位 hasAmbushActive 为 false，伏击直接失效。
+        copy.AddTrait(source.traits);
+
         return copy;
     }
 
