@@ -5153,12 +5153,6 @@ InputState currentInputState = InputState.nil;
                 unit.ClearMyPlace();
                 // 禁用单位的战斗能力
                 unit.DisableCombatAbility();
-                // 必须把卡从场上列表摘掉：AddCardToHand 只改 state 为 inHand，
-                // 不移除 cardInPlaces。留着会让同一张卡同时属于手牌与场上列表，
-                // 而 CheckCardClick（判断点到哪张卡）、显示排序、死亡检查都遍历
-                // cardInPlaces——再次打出时行为会错乱。
-                cardInPlaces.Remove(unit);
-                _displayOrderDirty = true;
                 await player1.AddCardToHand(unit);
                 return;
             }
