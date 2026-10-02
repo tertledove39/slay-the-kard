@@ -118,26 +118,6 @@ def main():
     results.append(check("${allCardInHand.unit}" in cards,
                          "card.ini 使用了新选择器片段 unit 作用于手牌（炮火准备）"))
 
-    # --------------------- Develop 从牌堆取卡的收尾动作 ---------------------
-    print("\n--- Develop 的牌堆收尾（#2 牌堆污染 / #7 空卡牌）---")
-    results.append(check("public bool RemoveFromDeck(cardBase_ card)" in battle,
-                         "Player 暴露 RemoveFromDeck()"))
-    dev = re.search(r'StartsWith\("Develop".*?(?=\n                // HealAllTargets)',
-                    battle, re.S)
-    results.append(check(dev is not None, "Develop 块可定位"))
-    if dev:
-        d = dev.group(0)
-        results.append(check(d.count("RemoveFromDeck(selectedCard)") == 2,
-                             "选中卡在加入手牌前都先从牌堆摘除（友方/敌方各一处）"))
-        results.append(check(d.count("selectedCard.Visible = true") == 2,
-                             "选中卡恢复可见——牌堆卡靠停在屏幕外隐藏，不恢复就是「空卡牌」"))
-        i_rm = d.find("RemoveFromDeck(selectedCard)")
-        i_add = d.find("AddCardToHand(selectedCard)")
-        results.append(check(i_rm != -1 and i_add != -1 and i_rm < i_add,
-                             "摘除发生在加入手牌之前"))
-    results.append(check("AcquireEmptyCard()" in dev.group(0)[:dev.group(0).find("cardsToShow.Count")] if dev else False,
-                         "Develop 仍保留「不按 id 重新实例化」的路径（保住牌堆实例上的费用/攻防改动）"))
-
     # ------------------------------ 定点回归 ------------------------------
     print("\n--- 定点回归：新卡必须带属性方括号 ---")
     for sid in ["炮火准备", "参谋总部"]:

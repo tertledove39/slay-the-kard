@@ -4951,23 +4951,13 @@ InputState currentInputState = InputState.nil;
                         // 显示选择界面
                         var selectedCard = await ShowCardChoice(cardsToShow, false);
                         
-                        // 将选中卡加入手牌。
-                        // Develop($选择器) 的候选来自真实对象（牌堆卡 / 手牌 / 场上单位），
-                        // 这里必须补上 DrawCard() 那套「从牌堆进手牌」的收尾动作，
-                        // 否则：(a) 卡会同时留在牌堆与手牌，抽卡时抽到已在手上的实例；
-                        //       (b) 牌堆卡是靠停在屏幕外隐藏的，不恢复可见就是一张「空卡牌」。
-                        // 刻意不按 id 重新实例化——牌堆里的实例可能已被别的卡改过费用/攻防
-                        // （如「精简编制」的 subCost），重新初始化会把那些改动丢掉。
+                        // 将选中卡加入手牌
                         if (selectedCard != null && sourceCard?.GetIsFriend() == IsFriend.friend)
                         {
-                            player1.RemoveFromDeck(selectedCard);
-                            selectedCard.Visible = true;
                             await player1.AddCardToHand(selectedCard);
                         }
                         else if (selectedCard != null && sourceCard?.GetIsFriend() == IsFriend.enemy)
                         {
-                            player2.RemoveFromDeck(selectedCard);
-                            selectedCard.Visible = true;
                             await player2.AddCardToHand(selectedCard);
                         }
 
@@ -5764,16 +5754,6 @@ public class Player
     public List<cardBase_> GetCardsInDeck()
     {
         return deck;
-    }
-
-    /// <summary>
-    /// 把一张卡从牌堆摘除，返回是否真的摘掉了。
-    /// 「从牌堆把卡拿进手牌」时必须调用：DrawCard() 走的就是 deck.RemoveAt(0)，
-    /// 漏掉这一步会让同一张卡同时留在牌堆与手牌，之后抽卡会抽到已在手上的实例。
-    /// </summary>
-    public bool RemoveFromDeck(cardBase_ card)
-    {
-        return deck != null && deck.Remove(card);
     }
 
     /// <summary>手牌上限（供指令 GetHandMax() 使用，避免在效果脚本里写死数字）</summary>
