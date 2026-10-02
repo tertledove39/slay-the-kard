@@ -4204,7 +4204,7 @@ InputState currentInputState = InputState.nil;
                         {
                             List<cardBase_> addedCards = new List<cardBase_>();
                             PackedScene cardRes = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
-                            
+
                             // 根据数量添加多张卡
                             for (int j = 0; j < count; j++)
                             {
@@ -4212,8 +4212,7 @@ InputState currentInputState = InputState.nil;
                                 card.SetCardInformation(cardData);
                                 card.SetIsFriend(sourceCard?.GetIsFriend() ?? IsFriend.friend);
                                 addedCards.Add(card);
-                                lastCardAddedToHand = card;
-                                
+
                                 if (sourceCard?.GetIsFriend() == IsFriend.friend)
                                 {
                                     await player1.AddCardToHand(card);
@@ -4223,15 +4222,15 @@ InputState currentInputState = InputState.nil;
                                     await player2.AddCardToHand(card);
                                 }
                             }
-                            
+
                             // 设置最后添加的卡牌列表
                             if (sourceCard?.GetIsFriend() == IsFriend.friend)
                             {
-                                player1.SetLastDrawnCards(addedCards);
+                                RecordCardsObtained(addedCards, IsFriend.friend);
                             }
                             else if (sourceCard?.GetIsFriend() == IsFriend.enemy)
                             {
-                                player2.SetLastDrawnCards(addedCards);
+                                RecordCardsObtained(addedCards, IsFriend.enemy);
                             }
                         }
                     }
@@ -4964,10 +4963,15 @@ InputState currentInputState = InputState.nil;
                         if (selectedCard != null && sourceCard?.GetIsFriend() == IsFriend.friend)
                         {
                             await player1.AddCardToHand(selectedCard);
+                            // Develop 也是「让卡入手」的效果路径，必须和「加入手牌」指令一样
+                            // 记下刚入手的卡。否则紧跟其后的 GetCardsBeingTreated 会指向
+                            // 上一次抽到的卡，`[紧急投产]` 的 setCost(0) 就减不到开发出的卡上。
+                            RecordCardsObtained(new List<cardBase_> { selectedCard }, IsFriend.friend);
                         }
                         else if (selectedCard != null && sourceCard?.GetIsFriend() == IsFriend.enemy)
                         {
                             await player2.AddCardToHand(selectedCard);
+                            RecordCardsObtained(new List<cardBase_> { selectedCard }, IsFriend.enemy);
                         }
 
                         // 释放未选择的卡牌回到池中
@@ -5173,6 +5177,31 @@ InputState currentInputState = InputState.nil;
         await Task.Delay(100);
 
         return;
+    }
+
+    /// <summary>
+    /// 记录「刚刚通过效果入手的卡」，供后续的 GetCardsBeingTreated / GetCardBeingAddToHand 取用。
+    ///
+    /// 这两条指令读的是**两套互相独立的指针**：
+    ///   - GetCardsBeingTreated     → Player.lastDrawnCards      （走 Player.GetLastDrawnCards()）
+    ///   - GetCardBeingAddToHand    → battlefield_.lastCardAddedToHand
+    /// 必须两个都写，否则其中一条会拿到**上一次入手的卡**（或空列表）。
+    ///
+    /// 凡是让卡进入手牌的**效果路径**都要调一次本函数。漏调不会报任何错，
+    /// 只表现为「后续指令作用到了别的卡上」——「紧急投产」的 setCost(0) 就是这么
+    /// 减不到开发出来的那张卡上的。
+    ///
+    /// 注意边界：DrawCard / DrawACard 一系只写 Player.lastDrawnCards（抽牌语义），
+    /// 不属于本函数的调用范围。
+    /// </summary>
+    private void RecordCardsObtained(List<cardBase_> cards, IsFriend side)
+    {
+        if (cards == null || cards.Count == 0) return;
+
+        lastCardAddedToHand = cards[cards.Count - 1];
+
+        if (side == IsFriend.friend) player1.SetLastDrawnCards(cards);
+        else if (side == IsFriend.enemy) player2.SetLastDrawnCards(cards);
     }
 
     /// <summary>

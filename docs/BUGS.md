@@ -341,3 +341,51 @@ if (isShowingChoiceUI) { HandleChoiceCardClick(...); return; }   // ← 永远�
 > 注：本条与 #34 是**两个独立问题**。#34（`Copy()` 未钉死尺寸）是「与正规建卡流程
 > 不一致」的真实差异，也已修复；但它并不是「不显示 / 点不动」的原因——#34 修完后
 > 症状依旧，才据此继续查到时点与控制锁。
+
+### 36. `GetCardsBeingTreated` 指不到开发出来的卡，导致「紧急投产」减不了费
+
+需求方反馈：`[紧急投产]`（`Develop($deck)|GetCardsBeingTreated|setCost(0)`）的开发出的卡
+没有变成 0 费。
+
+**根因**：项目里有**两套互相独立**的「刚入手的卡」指针，由两条不同指令读取：
+
+| 指针 | 读取它的指令 |
+|---|---|
+| `Player.lastDrawnCards` | `GetCardsBeingTreated`（经 `Player.GetLastDrawnCards()`） |
+| `battlefield_.lastCardAddedToHand` | `GetCardBeingAddToHand` |
+
+写入点原本散在三处：`DrawCard`、`DrawACard` 一系、以及「加入手牌」指令
+（`battlefield_.cs` 的 `AddToHand` 分支，它**两个都写**）。
+
+**`Develop` 让卡进了手牌，却两个都没写。** 于是紧跟其后的 `GetCardsBeingTreated`
+拿到的是**上一次抽到的卡**（回合开始时通常刚抽过牌），`setCost(0)` 就减到了别人身上；
+若 `lastDrawnCards` 恰好是空列表，则 `targets` 为空，`foreach` 一次都不进，
+表现为「整张卡毫无反应」。两种表现都不报任何错。
+
+**修复**（按《需求实现规范》(A)「优先寻找已有功能，避免同一功能多处实现」）：
+把「加入手牌」指令里那段记账抽成单一入口
+
+```csharp
+private void RecordCardsObtained(List<cardBase_> cards, IsFriend side)
+{
+    if (cards == null || cards.Count == 0) return;
+    lastCardAddedToHand = cards[cards.Count - 1];
+    if (side == IsFriend.friend) player1.SetLastDrawnCards(cards);
+    else if (side == IsFriend.enemy) player2.SetLastDrawnCards(cards);
+}
+```
+
+调用方两处：`Develop(...)` 的两个分支（本次修复）、「加入手牌」指令（原本的内联写法
+改为调用它）。`lastCardAddedToHand` 的赋值点由此收敛为**全项目唯一一处**。
+
+**边界（有意不动的部分）**：`DrawCard` / `DrawACard` 一系仍只写 `Player.lastDrawnCards`
+（抽牌语义），未纳入本函数。因此纯抽牌之后 `GetCardBeingAddToHand` 仍指向上一次
+`AddToHand` 的结果——目前无卡使用该组合，记为已知边界而非缺陷。
+
+**结算时机**（顺带核实，不是本 bug 的原因）：`setCost` 是缓存型变更
+（`target.AddChange(ChangeType.SetCost, n)`），由 `cardBase_.ExecChangeList()` 落地；
+`ParseAndExecuteEffect` 末尾就有 `await ExecuteChangeLists();`，故会在本次效果结算完时生效。
+所以「指针错了」就是全部病因。
+
+**回归**：`tests/verify_card_obtained_pointer.py`（17 条），其中断言
+`lastCardAddedToHand` 的赋值点全项目只有一处。

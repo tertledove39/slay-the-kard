@@ -133,7 +133,8 @@
 | `losePointAtNextTurnBegin(n)` | 下回合开始时失去n点指挥点（不足则清零） |
 | `DiscardRandomly(n)` | 随机弃n张手牌 |
 | `DiscardWithName(pattern, n)` | 弃ID含pattern的n张手牌 |
-| `GetCardsBeingTreated` | targets设为最近抽到的卡列表 |
+| `GetCardsBeingTreated` | targets设为**最近入手的卡**（读 `Player.lastDrawnCards`） |
+| `GetCardBeingAddToHand` | targets设为最近入手的那一张（读 `battlefield_.lastCardAddedToHand`） |
 | `If(condition)label` | 条件满足则跳转到标签 |
 | `foreach ... End&` | 遍历当前targets执行循环体 |
 | `displayAllCardState` | 调试：打印所有单位状态 |
@@ -206,6 +207,31 @@ cardsToShow = cardsToShow.Select(c => Copy(c)).Where(c => c != null).ToList();
    尺寸不钉死就会跟着换父节点重算——而 `HandleChoiceCardClick` 判定「点到哪张卡」
    用的正是 `GetGlobalRect()`。这是「开发出来的卡点不中」的直接原因。
    `InitializeDeckFromIni` 的两条分支同样要钉，否则牌堆卡与手牌卡的命中框不一致。
+
+### 「刚入手的卡」指针 `RecordCardsObtained()`
+
+项目里有**两套互相独立**的指针，由两条不同指令读取，两者都必须写：
+
+| 指针 | 读取它的指令 |
+|---|---|
+| `Player.lastDrawnCards` | `GetCardsBeingTreated`（经 `Player.GetLastDrawnCards()`，返回副本） |
+| `battlefield_.lastCardAddedToHand` | `GetCardBeingAddToHand` |
+
+**凡是让卡进入手牌的效果路径都要记一笔。** 漏记不会报任何错，只表现为
+「后续指令作用到了别的卡上」——`[紧急投产]` 的
+`Develop($deck)|GetCardsBeingTreated|setCost(0)` 就是这么减不到开发出来的那张卡上的：
+`Develop` 当时两套都没写，`GetCardsBeingTreated` 于是返回**上一次抽到的卡**。
+
+统一入口 `battlefield_.RecordCardsObtained(List<cardBase_> cards, IsFriend side)`，
+取列表末张记入 `lastCardAddedToHand`，并按阵营写对应 Player 的 `lastDrawnCards`。
+目前调用方：`Develop(...)` 的两个分支、「加入手牌」指令（`AddToHand`）。
+
+**边界**：`DrawCard` / `DrawACard` 一系只写 `Player.lastDrawnCards`（抽牌语义），
+不走本函数——`GetCardBeingAddToHand` 在纯抽牌后仍指向上一次 `AddToHand` 的结果。
+
+结算时机：`setCost` 一类是**缓存型变更**（`AddChange`），由 `cardBase_.ExecChangeList()`
+落地。`ParseAndExecuteEffect` 末尾就有 `await ExecuteChangeLists();`，
+所以紧跟 `GetCardsBeingTreated` 的 `setCost` 会在本次效果结算完时生效。
 
 ---
 

@@ -385,3 +385,31 @@ OnNextTurnButtonPressed → ForbidControl → RunTurnTransitionAsync → Friendl
 - 对照组：`[紧急投产]` 的 effect 无时点前缀（从手牌打出），与「它一直正常」的实机
   反馈一致——证明这条断言区分的正是两者的差异，而不是巧合。
 
+
+## 「刚入手的卡」指针
+
+测试脚本：`tests/verify_card_obtained_pointer.py`。
+
+项目里有**两套互相独立**的指针，由两条不同指令读取：
+
+```
+GetCardsBeingTreated   → Player.lastDrawnCards      （Player.GetLastDrawnCards()）
+GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
+```
+
+只写其中一个，另一条就会拿到**上一次入手的卡**（或空列表）。全程不报错，只表现为
+「后续指令作用到了别的卡上」——`[紧急投产]` 的
+`Develop($deck)|GetCardsBeingTreated|setCost(0)` 就是这么减不到开发出的那张卡上的。
+
+- 冒烟测试：源文件与卡表均存在；`RecordCardsObtained(List<cardBase_>, IsFriend)` 可定位。
+- 基本验证：该函数**两套指针都写**——`lastCardAddedToHand = cards[cards.Count - 1]`，
+  以及 friend / enemy 两条分支各自写对应 Player 的 `SetLastDrawnCards`；且有空列表守卫。
+- **回归**：`RecordCardsObtained(` 全项目恰好 5 处（1 处定义 + 4 处调用）；`Develop` 的
+  友方/敌方两个分支都调了它；「加入手牌」指令也改走同一入口。
+- 单一实现：`^\s*lastCardAddedToHand\s*=` 全项目只匹配到 **1** 处；且
+  「加入手牌」指令里原来的内联 `lastCardAddedToHand = card;` 已不存在。
+- 前提校验（防空转断言）：`GetCardsBeingTreated` 确实读 `player1.GetLastDrawnCards()`；
+  `GetCardBeingAddToHand` 确实读 `lastCardAddedToHand` 字段。
+- 触发用例：`[紧急投产]` 的 effect 以 `Develop($deck)|GetCardsBeingTreated` 开头且含
+  `setCost(0)`。
+- 边界（有意保留）：`DrawCard` 仍写 `Player.lastDrawnCards`（抽牌路径未被改动）。
