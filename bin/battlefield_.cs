@@ -943,15 +943,12 @@ InputState currentInputState = InputState.nil;
         _consolePanel.Position = new Vector2(50, 10);
         _consolePanel.Size = new Vector2(600, 200);
         _consolePanel.ZIndex = 1000;
-        var style = new StyleBoxFlat();
-        style.BgColor = new Color(0, 0, 0, 0.85f);
-        _consolePanel.AddThemeStyleboxOverride("panel", style);
         AddChild(_consolePanel);
 
         _consoleInput = new LineEdit();
         _consoleInput.Position = new Vector2(0, 0);
         _consoleInput.Size = new Vector2(600, 30);
-        _consoleInput.AddThemeColorOverride("font_color", Colors.LimeGreen);
+        _consoleInput.AddThemeColorOverride("font_color", ConsoleStyle.TextColor);
         _consoleInput.AddThemeFontSizeOverride("font_size", 14);
         _consoleInput.PlaceholderText = "输入效果指令，回车执行...";
         _consoleInput.TextSubmitted += OnConsoleSubmit;
@@ -962,9 +959,11 @@ InputState currentInputState = InputState.nil;
         _consoleOutput.Size = new Vector2(592, 162);
         _consoleOutput.ScrollFollowing = true;
         _consoleOutput.BbcodeEnabled = true;
-        _consoleOutput.AddThemeColorOverride("default_color", Colors.LimeGreen);
+        _consoleOutput.AddThemeColorOverride("default_color", ConsoleStyle.TextColor);
         _consoleOutput.AddThemeFontSizeOverride("normal_font_size", 12);
         _consolePanel.AddChild(_consoleOutput);
+
+        ConsoleStyle.Apply(_consolePanel, _consoleInput);
     }
 
     private void ConsolePrint(string text)

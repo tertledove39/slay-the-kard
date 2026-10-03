@@ -433,3 +433,22 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 - **返回按钮的双向语义**：`DismissChooseMission()`（事件完成后）必须清空 `_drawnIds`，
   而 `CloseMissionPanel()`（点返回）**不得**清空——两条断言一正一反，防止把两者合并。
 - **同名去重**：断言按 id 计数而不逐张罗列（`[snowstorm]` 有 20 张同名「埋伏」）。
+
+## 调试控制台外观
+
+测试脚本：`tests/verify_console_style.py`（26 条）。
+
+需求：把战斗场景与世界地图两个控制台的边框去掉，改成浅黑色非圆角矩形。
+
+**最容易漏的一点**：只换外层 `Panel` 的 StyleBox **去不掉边框**——Godot 默认主题给
+`LineEdit` 的 `normal` / `focus` 样式自带圆角与描边，输入框那一圈框照样画得出来。
+所以测试显式断言 `normal` / `focus` / `read_only` 三个状态都被覆盖。
+
+- 冒烟：`bin/ConsoleStyle.cs` 存在。
+- 边框与圆角：八个属性（BorderWidth × 4、CornerRadius × 4）逐个断言显式归零。
+- 浅黑色：解析 `Background` 常量的 RGBA，断言 R=G=B（中性灰，不是带色的黑）
+  且 `0 < alpha < 1`（带透明度才是「浅」黑，纯黑不透明不算）。
+- **样式单一来源**：`battlefield_.cs` 与 `WorldMap.cs` 里**不得**再出现
+  `new StyleBoxFlat` 或 `AddThemeStyleboxOverride`，且各自恰好调用一次
+  `ConsoleStyle.Apply(_consolePanel, _consoleInput)`。原先两处各写了一遍同样的样式，
+  改一处忘一处就会出现两个控制台长得不一样。

@@ -646,7 +646,7 @@ public partial class WorldMap : Control
         _consoleOutput.Position = new Vector2(50, 50);
         _consoleOutput.Size = new Vector2(600, 0);
         _consoleOutput.ZIndex = 1001;
-        _consoleOutput.AddThemeColorOverride("font_color", Colors.LimeGreen);
+        _consoleOutput.AddThemeColorOverride("font_color", ConsoleStyle.TextColor);
         _consoleOutput.AddThemeFontSizeOverride("font_size", 13);
         _consoleOutput.Text = "";
         AddChild(_consoleOutput);
@@ -657,18 +657,17 @@ public partial class WorldMap : Control
         _consolePanel.Position = new Vector2(50, 10);
         _consolePanel.Size = new Vector2(600, 36);
         _consolePanel.ZIndex = 1000;
-        var style = new StyleBoxFlat();
-        style.BgColor = new Color(0, 0, 0, 0.85f);
-        _consolePanel.AddThemeStyleboxOverride("panel", style);
         AddChild(_consolePanel);
 
         _consoleInput = new LineEdit();
         _consoleInput.SetAnchorsPreset(LayoutPreset.FullRect);
-        _consoleInput.AddThemeColorOverride("font_color", Colors.LimeGreen);
+        _consoleInput.AddThemeColorOverride("font_color", ConsoleStyle.TextColor);
         _consoleInput.AddThemeFontSizeOverride("font_size", 14);
         _consoleInput.PlaceholderText = "输入指令，回车执行。输入 help 查看可用指令...";
         _consoleInput.TextSubmitted += OnConsoleSubmit;
         _consolePanel.AddChild(_consoleInput);
+
+        ConsoleStyle.Apply(_consolePanel, _consoleInput);
     }
 
 
