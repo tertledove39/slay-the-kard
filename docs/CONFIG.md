@@ -62,19 +62,32 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 
 抽取组成固定为 **2 战斗 + 1 事件**（`MissionDrawer.BattleCount` / `EventCount`），可选项不足 3 个时用剩余战斗补位，因此事件永远不超过 1 个。**补位只用战斗**，所以只有事件、没有战斗的区域每次只出 1 个按钮。
 
-### 事件分配
+### 区域内容分配
 
 区域按地理位置命名、按历史时序推进，`entryN` 的事件按各自的历史时点归入对应区域：
 
-| 区域 | 城市 | 时期 | 事件数 |
-|------|------|------|--------|
-| area1 | 莫斯科 | 1941 秋 – 1942 初 | 14 |
-| area2 | 斯大林格勒 | 1942 夏 – 1943 初 | 10 |
-| area3 | 斯摩棱斯克 | 1943 秋 | 6 |
-| area4 | 哈尔科夫 | 1943 春 | 6 |
-| area5 | 库尔斯克 | 1943 夏 | 5 |
-| area6 | 明斯克 | 1944 夏 | 6 |
-| area7 | 柏林 | 1945 春 | 5 |
+| 区域 | 城市 | 时期 | 战斗 `enemyN` | boss | 事件数 |
+|------|------|------|--------------|------|--------|
+| area1 | 莫斯科 | 1941 秋 – 1942 初 | 3 | Bryansk | 14 |
+| area2 | 斯大林格勒 | 1942 夏 – 1943 初 | 5 | RedOctober | 10 |
+| area3 | 斯摩棱斯克 | 1943 秋 | **0（待补）** | — | 6 |
+| area4 | 哈尔科夫 | 1943 春 | 7 | KharkovMarch | 6 |
+| area5 | 库尔斯克 | 1943 夏 | 7 | KharkovAugust | 5 |
+| area6 | 明斯克 | 1944 夏 | **0（待补）** | — | 6 |
+| area7 | 柏林 | 1945 春 | 1 | — | 5 |
+
+**boss 按约定不写进 `enemyN`**（`MissionDrawer` 在烈度为 1 时单独提供它），因此上表的「战斗」列不含 boss。
+`tests/verify_campaign_content.py` 的「孤立内容」提示把 `enemyN` 与 `boss` 一并算作可达引用——早先只算 `enemyN`，
+会把 `Bryansk` / `RedOctober` 这类 boss 误报成「游戏内不可达」。
+
+**area3 与 area6 目前只有事件、没有战斗**（`enemyTurn.ini` 里已有对应的 `name` 骨架，行动脚本待补），
+这两个区域进任务面板时只会出 1 个按钮（见上一节「补位只用战斗」）。
+
+> **待处理**：`AreaPool.ini` 头注释把 area3 标为「斯摩棱斯克(1943 秋)」、area4 标为「哈尔科夫(1943 春)」，
+> 但哈尔科夫战役在 1943 年 2–3 月、斯摩棱斯克进攻战役在 8–10 月，**时序是倒的**。要么对调 area3/area4，
+> 要么订正年代标注。本表按现状（文件实际配置）如实记录，未擅自改动。
+
+同一事件可出现在多个区域（`event.ini` 共 25 个事件均已分配，无遗漏、无重复引用）。全程性事件跨越多个区域：`strange_command`（1941–42 通信混乱）、`tank_crew_replacement`（1941–42 乘员补充）、`deep_battle_doctrine`（纵深作战条令）、`guards_title`（近卫称号）、`snowstorm`（冬季）。专属时点的事件只归一个区域，如 `citadel_intelligence`(1943 春 → 库尔斯克)、`maskirovka_bagration`(1944 夏 → 明斯克)、`reichstag_banner`(1945 → 柏林)、`order_227` 与 `operation_uranus`(1942 → 斯大林格勒)。
 
 同一事件可出现在多个区域（`event.ini` 共 25 个事件均已分配，无遗漏、无重复引用）。全程性事件跨越多个区域：`strange_command`（1941–42 通信混乱）、`tank_crew_replacement`（1941–42 乘员补充）、`deep_battle_doctrine`（纵深作战条令）、`guards_title`（近卫称号）、`snowstorm`（冬季）。专属时点的事件只归一个区域，如 `citadel_intelligence`(1943 春 → 库尔斯克)、`maskirovka_bagration`(1944 夏 → 明斯克)、`reichstag_banner`(1945 → 柏林)、`order_227` 与 `operation_uranus`(1942 → 斯大林格勒)。
 

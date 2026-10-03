@@ -97,7 +97,10 @@ def main():
         if area not in areas:
             continue
         for key, value in areas[area].items():
-            if key.startswith("enemy"):
+            if key.startswith("enemy") or key == "boss":
+                # boss 也是关卡引用：它由 MissionDrawer 在烈度为 1 时单独提供，
+                # 按约定不写进 enemyN，但同样「可达」。漏掉它会把 Bryansk /
+                # RedOctober 这类 boss 误报成「游戏内不可达」，且拼错时查不出来。
                 referenced_battles.add(value)
                 if value not in battles.sections():
                     dangling_battles.append(f"{area}.{key}={value}")
