@@ -92,11 +92,11 @@ def main():
     results.append(check(
         not any(c in preview_tscn for c in ("HBoxContainer", "VBoxContainer", "GridContainer")),
         "预览容器不得是 Container 类（会强行接管子节点的 Position/Size 把卡撑爆）"))
-    results.append(check('[node name="Cards" type="Control"' in preview_tscn,
-                         "Cards 是普通 Control"))
+    results.append(check(preview_tscn.count('[node name=') == 1,
+                         "预览场景只有一个 Control 根节点（没有中间容器）"))
     # 顺序照抄 ChooseSomeCard：钉锚点 → 原生尺寸 → 缩放 → 入树 → SetCardInformation → Position
     order = ["SetAnchorsPreset(LayoutPreset.TopLeft)", "card.Size = cardBase_.DesignSize",
-             "card.Scale = new Vector2(CardScale, CardScale)", "_cards.AddChild(card)",
+             "card.Scale = new Vector2(CardScale, CardScale)", "AddChild(card)",
              "card.SetCardInformation(data)", "card.Position = new Vector2(x, 0)"]
     idxs = [preview_cs.find(tok) for tok in order]
     results.append(check(all(i != -1 for i in idxs) and idxs == sorted(idxs),
@@ -108,8 +108,14 @@ def main():
 
     # --------------------------- 4) UI 在场景里（需求 4） ---------------------------
     print("\n--- 4) 新增 UI 一律在 .tscn 里（需求 4） ---")
-    results.append(check('script = ExtResource("1_script")' in preview_tscn and "StyleBoxFlat" in preview_tscn,
-                         "预览面板的布局与配色在 event_card_preview.tscn"))
+    results.append(check('script = ExtResource("1_script")' in preview_tscn,
+                         "预览场景挂上了脚本"))
+    results.append(check("StyleBoxFlat" not in preview_tscn and 'type="Panel"' not in preview_tscn,
+                         "预览没有底板/边框（需求方要求去掉）"))
+    results.append(check('type="Label"' not in preview_tscn,
+                         "预览没有文字（需求方要求去掉）"))
+    results.append(check("Caption" not in preview_cs and "_caption" not in preview_cs,
+                         "代码里也不再有说明文字"))
     results.append(check('[node name="heartPic" type="Sprite2D"' in world_tscn
                          and '[node name="hpNum" type="Label"' in world_tscn,
                          "worldMap.tscn 里有 heartPic / hpNum 节点"))

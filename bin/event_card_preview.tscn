@@ -1,50 +1,10 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://bin/EventCardPreview.cs" id="1_script"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
-bg_color = Color(0.06, 0.06, 0.08, 0.95)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.78, 0.66, 0.28, 0.9)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
 [node name="EventCardPreview" type="Control"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
+layout_mode = 0
+offset_right = 344.0
+offset_bottom = 216.0
 mouse_filter = 2
 script = ExtResource("1_script")
-
-[node name="Background" type="Panel" parent="."]
-layout_mode = 0
-offset_right = 392.0
-offset_bottom = 284.0
-mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
-
-[node name="Cards" type="Control" parent="Background"]
-layout_mode = 0
-offset_left = 10.0
-offset_top = 8.0
-offset_right = 382.0
-offset_bottom = 236.0
-mouse_filter = 2
-
-[node name="Caption" type="Label" parent="Background"]
-layout_mode = 0
-offset_left = 10.0
-offset_top = 240.0
-offset_right = 382.0
-offset_bottom = 280.0
-mouse_filter = 2
-theme_override_colors/font_color = Color(0.95, 0.85, 0.45, 1)
-theme_override_font_sizes/font_size = 15
-text = "将加入卡组"
-vertical_alignment = 1

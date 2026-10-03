@@ -560,7 +560,8 @@ area7 的 `berlin_final_battle` 没配 boss，由 `IsFinalArea` 特判，走不�
 - **门槛**：选项效果里 `materialPoints` 的负数部分累加即该选项的花费（`EventEffectRunner.ParseMaterialCost`），
   余额不足时按钮置灰并显示「（需要 N 资源点）」。执行侧仍有下限 0 的兜底。
 - **预览**：含 `replaceCard` / `replaceRandomCard` 的选项，悬浮时弹出 `bin/event_card_preview.tscn`，
-  按 id **去重计数**后显示真卡面 + 「将加入卡组：埋伏 ×20」。
+  按 id **去重后最多显示 2 张真卡面**。没有底板、没有边框、没有文字——所以去重只保证
+  「20 张同名卡不会画 20 遍」，不再标出数量。
 
 ### 弹窗里排卡的标准写法（踩过坑，别再自己发明）
 

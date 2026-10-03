@@ -19,7 +19,7 @@
 | project.godot | Godot项目配置文件 |
 | StoreHpShop.cs | 商店「买血」入口（`Store` 的 partial 部分；拆出来是因为 Store.cs 加上这块会破 300 行的红线） |
 | bin/EventEffectRunner.cs | 事件选项效果的解析与执行（从 EventScene 拆出） |
-| bin/EventCardPreview.cs | 事件选项的「会加入哪些卡」悬浮预览；结构与配色在 bin/event_card_preview.tscn |
+| bin/EventCardPreview.cs | 事件选项的「会加入哪些卡」悬浮预览（只画卡，无底板无边框无文字）；场景在 bin/event_card_preview.tscn |
 | bin/event_card_preview.tscn | 上述预览面板的场景 |
 | road_to_berlin.sln / .csproj | .NET 解决方案和项目文件。文件名即程序集名，与 `project.godot` 的 `dotnet/project/assembly_name` 必须一致——改名时三件套要一起改，见 EXPORT.md「改名注意事项」 |
 

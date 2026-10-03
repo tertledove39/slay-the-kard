@@ -96,7 +96,7 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 
 **选项可否点击由资源点决定**：`materialPoints` 的负数部分累加即为该选项的花费，余额不足时按钮置灰并显示「（需要 N 资源点）」。执行侧另有一层下限 0 的兜底。
 
-**悬浮预览**：选项若含 `replaceCard` / `replaceRandomCard`，鼠标悬浮时会弹出预览面板（`bin/event_card_preview.tscn`），显示将被加入的卡。同名卡**去重并标数量**——`[snowstorm]` 的第 3 个选项有 20 张同名「埋伏」，逐张画会铺满屏幕。
+**悬浮预览**：选项若含 `replaceCard` / `replaceRandomCard`，鼠标悬浮时会在按钮上方显示将被加入的卡（`bin/event_card_preview.tscn`，**只画卡，无底板、无边框、无文字**）。同名卡去重后最多显示 2 张——实测一个选项最多只有 2 种不同的卡；`[snowstorm]` 的第 3 个选项有 20 张同名「埋伏」，去重后就只是一张。
 
 `materialPoints(n)` 让玩家获得非负整数 `n` 点战役资源，结果即时同步到世界地图，资源总量最高为 `int.MaxValue`。负数、非整数和超出整数范围的参数不会生效，并记录包含时间和代码位置的错误日志。该效果与战斗内指挥点 `AddPoint(n)` 无关。
 

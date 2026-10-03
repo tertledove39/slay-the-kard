@@ -2,44 +2,38 @@ using Godot;
 using System.Collections.Generic;
 
 /// <summary>
-/// 事件选项的「会加入哪些卡」悬浮预览面板。
+/// 事件选项的「会加入哪些卡」悬浮预览：**只画卡，没有底板、没有边框、没有文字**。
 ///
-/// 布局与配色在 <c>bin/event_card_preview.tscn</c> 里（需求：UI 不写在代码里），
-/// 本类只负责：清空上一批卡、按去重后的列表摆出真卡面、填数量说明、挪到按钮旁边。
+/// 场景 <c>bin/event_card_preview.tscn</c> 只有一个 Control 根节点，卡直接挂上去——
+/// 连中间容器都不要，少一层就少一处出错的地方（曾被 Container 类强行接管子节点尺寸
+/// 而把卡撑满屏幕，见 docs/LOGIC.md「弹窗里排卡的标准写法」）。
 ///
-/// **建卡与排版一律照抄 <c>ChooseSomeCard.BuildGrid()</c>**（弹窗里排卡的标准写法），
-/// 不自己发明：
-///   - 容器是**普通 Control**，不是 HBoxContainer —— 容器类会强行接管子节点的
-///     Position 与 Size，卡会被撑到容器大小（这里踩过一次，整张卡糊满屏幕）；
-///   - 顺序固定为「钉锚点 → 原生尺寸 → 缩放 → 入树 → SetCardInformation → Position」，
-///     顺序颠倒会让字体测量拿到错误的尺寸；
-///   - 缩放而非改 Size：卡面内部各控件的坐标是按 180x240 摆的，改 Size 只会让布局错位。
+/// 建卡与排版一律照抄 <c>ChooseSomeCard.BuildGrid()</c>：
+///   钉锚点 → 原生尺寸 → 缩放 → 入树 → SetCardInformation → 最后 Position。
 ///
-/// 同名卡（如 [snowstorm] 的 20 张「埋伏」）**去重后只画一张**，数量写进 Caption。
-/// 实测 event.ini 里一个选项最多只有 2 种不同的卡，面板按此留位。
+/// 同名卡（如 [snowstorm] 的 20 张「埋伏」）**去重后只画一张**——所以 20 张也只是一张卡。
 /// </summary>
 public partial class EventCardPreview : Control
 {
-    /// <summary>预览卡的缩放。与 ChooseSomeCard 的网格同值，保持观感一致。</summary>
+    /// <summary>预览卡的缩放，与 ChooseSomeCard 的网格同值。</summary>
     private const float CardScale = 0.9f;
 
     /// <summary>卡与卡之间的横向间距（像素，按缩放后的宽度算）。</summary>
     private const float GapX = 20f;
 
+    /// <summary>
+    /// 最多画两张。实测 event.ini 里一个选项最多只有 2 种不同的卡
+    /// （最多的那条是「拖拉机厂 + 预备役 ×2」），故场景与代码都按 2 张留位。
+    /// </summary>
+    private const int MaxCards = 2;
+
     private const string CardScenePath = "res://bin/cardbase.tscn";
 
-    private Panel _background;
-    private Control _cards;
-    private Label _caption;
     private PackedScene _cardScene;
 
     public override void _Ready()
     {
-        _background = GetNodeOrNull<Panel>("Background");
-        _cards = GetNodeOrNull<Control>("Background/Cards");
-        _caption = GetNodeOrNull<Label>("Background/Caption");
         _cardScene = ResourceLoader.Load<PackedScene>(CardScenePath);
-
         Visible = false;
     }
 
@@ -47,24 +41,25 @@ public partial class EventCardPreview : Control
     public void Show(List<(CardData card, int count)> cards, Control anchor)
     {
         if (cards == null || cards.Count == 0) { Hide(); return; }
-        if (_cards == null) return;
 
         ClearCards();
 
-        float cardW = cardBase_.DesignSize.X * CardScale;
-        float totalW = cards.Count * cardW + (cards.Count - 1) * GapX;
-        float x = (_cards.Size.X - totalW) / 2f;
-
-        var names = new List<string>();
-        foreach (var (data, count) in cards)
+        int shown = Mathf.Min(cards.Count, MaxCards);
+        if (cards.Count > MaxCards)
         {
-            AddCardFace(data, x);
-            x += cardW + GapX;
-
-            names.Add(count > 1 ? $"{data.Name} ×{count}" : data.Name);
+            // 界面按 2 张留位且不显示文字，多出来的画不下。真出现就记一笔，别静默吞掉。
+            GD.Print($"[EventCardPreview] 选项涉及 {cards.Count} 种不同的卡，预览只画前 {MaxCards} 种");
         }
 
-        if (_caption != null) _caption.Text = "将加入卡组：" + string.Join("、", names);
+        float cardW = cardBase_.DesignSize.X * CardScale;
+        float totalW = shown * cardW + (shown - 1) * GapX;
+        float x = (Size.X - totalW) / 2f;
+
+        for (int i = 0; i < shown; i++)
+        {
+            AddCardFace(cards[i].card, x);
+            x += cardW + GapX;
+        }
 
         Position = ResolvePosition(anchor);
         Visible = true;
@@ -91,7 +86,7 @@ public partial class EventCardPreview : Control
         card.SetAnchorsPreset(LayoutPreset.TopLeft);
         card.Size = cardBase_.DesignSize;
         card.Scale = new Vector2(CardScale, CardScale);
-        _cards.AddChild(card);
+        AddChild(card);
         card.SetCardInformation(data);
         card.SetIsFriend(IsFriend.friend);
         card.Position = new Vector2(x, 0);
@@ -101,10 +96,10 @@ public partial class EventCardPreview : Control
         card.ZIndex = 10;
     }
 
-    /// <summary>把面板摆在按钮正上方；贴边时夹回屏幕内。</summary>
+    /// <summary>把预览摆在按钮正上方；贴边时夹回屏幕内。</summary>
     private Vector2 ResolvePosition(Control anchor)
     {
-        Vector2 size = _background?.Size ?? new Vector2(392, 284);
+        Vector2 size = Size;
         Vector2 view = GetViewportRect().Size;
 
         Vector2 pos = anchor.GlobalPosition + new Vector2(0, -size.Y - 8);
@@ -115,10 +110,9 @@ public partial class EventCardPreview : Control
 
     private void ClearCards()
     {
-        if (_cards == null) return;
-        foreach (Node child in _cards.GetChildren())
+        foreach (Node child in GetChildren())
         {
-            _cards.RemoveChild(child);
+            RemoveChild(child);
             child.QueueFree();
         }
     }
