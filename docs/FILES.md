@@ -17,7 +17,7 @@
 | memory/ | （空目录，预留） |
 | .godot/ | Godot编辑器自动生成目录 |
 | project.godot | Godot项目配置文件 |
-| 新建游戏项目.sln / .csproj | .NET 解决方案和项目文件 |
+| road_to_berlin.sln / .csproj | .NET 解决方案和项目文件。文件名即程序集名，与 `project.godot` 的 `dotnet/project/assembly_name` 必须一致——改名时三件套要一起改，见 EXPORT.md「改名注意事项」 |
 
 ## 核心源码文件 (bin/)
 

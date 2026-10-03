@@ -20,7 +20,7 @@
 完整构建命令：
 
 ```bash
-dotnet build 新建游戏项目.csproj --no-restore --no-incremental
+dotnet build road_to_berlin.csproj --no-restore --no-incremental
 ```
 
 ## 3. 第一优先级：影响程序正确性
@@ -178,7 +178,7 @@ dotnet build 新建游戏项目.csproj --no-restore --no-incremental
 ### M-03 修复项目文件中的机器专属路径
 
 - 状态：`[ ]`
-- 证据：`新建游戏项目.csproj:5` 指向 `c:\Users\Surbrina_Zha\Documents\godot\easikard\.vscode\ruleset.xml`，不是当前项目路径。
+- 证据：`road_to_berlin.csproj:5` 指向 `c:\Users\Surbrina_Zha\Documents\godot\easikard\.vscode\ruleset.xml`，不是当前项目路径。
 - 问题：项目移动或克隆后规则集失效，当前规则还依赖本机旧目录。
 - 建议：改为相对路径；检查 `Microsoft.CodeAnalysis.CSharp.Scripting` 是否实际使用，未使用则移除包和 using。
 - 验收：项目在不同目录可重建，规则集确定生效，无未使用包。

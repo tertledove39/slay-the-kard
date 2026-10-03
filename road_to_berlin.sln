@@ -1,6 +1,6 @@
 ﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "新建游戏项目", "新建游戏项目.csproj", "{8BBF1D4D-D08C-4B22-8AFD-F8C11123C2AC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "road_to_berlin", "road_to_berlin.csproj", "{8BBF1D4D-D08C-4B22-8AFD-F8C11123C2AC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

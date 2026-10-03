@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="新建游戏项目"
+config/name="柏林之路"
 run/main_scene="res://bin/start_menu.tscn"
 config/features=PackedStringArray("4.5", "C#", "Mobile")
 run/max_fps=144
@@ -40,7 +40,7 @@ window/lossless_compression/force_png=false
 
 [dotnet]
 
-project/assembly_name="新建游戏项目"
+project/assembly_name="road_to_berlin"
 
 [editor_plugins]
 
