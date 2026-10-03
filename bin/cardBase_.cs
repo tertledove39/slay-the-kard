@@ -120,6 +120,31 @@ public partial class cardBase_ : Control
         Size = DesignSize;
     }
 
+    /// <summary>
+    /// 「禁止主动行动」类特性：驻守（常驻）与压制（所属方回合结束时失去）。
+    ///
+    /// 二者都**只关主动移动与攻击，不影响反击**——
+    /// `battlefield_.cs` 的 `Attack()` 判定反击只看兵种（非轰炸机）、冲击与伏击，
+    /// 从不读 `attackAble`，所以 `attackAble == 0` 的单位照样会反击。
+    ///
+    /// 新增同类特性时只需并进这个掩码，`AddTrait` / `RemoveTrait` / `RefreshUnit`
+    /// 三处会一起生效（它们都只引用本常量，不再逐个列特性名）。
+    /// </summary>
+    private const UnitTraits ActionForbiddingTraits = UnitTraits.Garrison | UnitTraits.Suppressed;
+
+    /// <summary>
+    /// 本单位的主动行动是否被特性禁止（驻守 / 压制）。
+    ///
+    /// 用于两处：① `RefreshUnit()` 重算行动能力时；
+    /// ② `battlefield_.cs` 的 `Fight` / `FightRandomEnemy` —— 那两条指令会**临时把
+    /// `attackAble` 抬到 1** 再调 `Attack()`（注释写明「不计入攻击次数」），
+    /// 不显式挡一下，驻守单位就会被「强制参战」绕过。
+    /// </summary>
+    public bool IsActionForbidden()
+    {
+        return (traits & ActionForbiddingTraits) != 0;
+    }
+
     public void RefreshUnit()
     {
         moveAble = 1;
@@ -134,6 +159,14 @@ public partial class cardBase_ : Control
 
         // 恢复伏击（新回合）
         RestoreAmbush();
+
+        // 禁止行动类特性必须在上面几行的恢复**之后**重新钳制。
+        // 驻守是常驻的，不重钳的话每个回合开始都会被放行，特性形同失效。
+        if (IsActionForbidden())
+        {
+            moveAble = 0;
+            attackAble = 0;
+        }
 
         UpdateMoveableLight();
     }
@@ -208,8 +241,16 @@ public partial class cardBase_ : Control
         if ((trait & UnitTraits.Shock) != 0) hasShock = true;
         if ((trait & UnitTraits.Mobilize) != 0) hasMobilize = true;
         if ((trait & UnitTraits.Ambush) != 0) hasAmbushActive = true;
-        if ((trait & UnitTraits.Suppressed) != 0) { moveAble = 0; attackAble = 0; }
-        // 闪击/奋战需要刷新行动次数
+        // 驻守/压制：关掉主动移动与攻击（反击不受影响，见 ActionForbiddingTraits 的说明）
+        if ((trait & ActionForbiddingTraits) != 0)
+        {
+            moveAble = 0;
+            attackAble = 0;
+            UpdateMoveableLight();
+        }
+        // 闪击/奋战需要刷新行动次数。
+        // 放在上面之后调用是对的：RefreshUnit 末尾会重新钳制禁止行动类特性，
+        // 所以「闪击 + 驻守」同时加进来时，最终仍是禁止行动。
         if ((trait & (UnitTraits.Blitz | UnitTraits.Determination)) != 0)
             RefreshUnit();
         RefreshDescriptionText();
@@ -227,7 +268,10 @@ public partial class cardBase_ : Control
         if ((trait & UnitTraits.Shock) != 0) hasShock = false;
         if ((trait & UnitTraits.Mobilize) != 0) hasMobilize = false;
         if ((trait & UnitTraits.Ambush) != 0) hasAmbushActive = false;
-        if ((trait & UnitTraits.Suppressed) != 0) UpdateMoveableLight();
+        // 解除驻守/压制只刷新指示灯，不在此恢复行动能力——与压制既有行为一致：
+        // 恢复统一由本方回合开始的 RefreshUnit 负责，避免「先移动 → 被驻守 → 解除」
+        // 这类顺序凭空多出一次行动。
+        if ((trait & ActionForbiddingTraits) != 0) UpdateMoveableLight();
         RefreshDescriptionText();
         BuildAttributePanel();
     }
@@ -977,6 +1021,8 @@ public partial class cardBase_ : Control
             names.Append("同仇 ");
         if ((traits & UnitTraits.Suppressed) != 0)
             names.Append("压制 ");
+        if ((traits & UnitTraits.Garrison) != 0)
+            names.Append("驻守 ");
 
         if (names.Length == 0) return "";
         // 去除末尾空格
@@ -1166,6 +1212,7 @@ public partial class cardBase_ : Control
         UnitTraits.Mobilize => "动员：友方回合开始时+1+1，受伤后消失",
         UnitTraits.SharedHatred => "同仇：被指向时，其他友方同仇单位+1+1",
         UnitTraits.Suppressed => "压制：无法移动或攻击，所属方回合结束时失去",
+        UnitTraits.Garrison => "驻守：无法移动或攻击，但仍可反击",
         _ => ""
     };
 
@@ -1857,7 +1904,9 @@ public enum UnitTraits
     /// <summary>同仇：被指向时，所有其他友方同仇单位+1攻击+1防御</summary>
     SharedHatred = 1 << 9,
     /// <summary>压制：无法移动或攻击，所属方回合结束时失去</summary>
-    Suppressed = 1 << 10
+    Suppressed = 1 << 10,
+    /// <summary>驻守：无法移动或攻击（常驻，不会自行消失），但仍可反击</summary>
+    Garrison = 1 << 11
 }
 
 
@@ -1954,7 +2003,7 @@ public static class IconCache
         "action", "Determination", "Guardian",
         "greenLight", "yellowLight", "redLight",
         "blitz", "mobilize", "smoke", "impact",
-        "ambush", "heavyArmour", "beGuardianed", "hatred", "dead", "suppress",
+        "ambush", "heavyArmour", "beGuardianed", "hatred", "dead", "suppress", "protect",
         "boss", "normalUnit", "bigUnit", "heal", "damage", "upgrade"
     };
 
@@ -1972,6 +2021,7 @@ public static class IconCache
         { UnitTraits.Mobilize, "mobilize" },
         { UnitTraits.SharedHatred, "hatred" },
         { UnitTraits.Suppressed, "suppress" },
+        { UnitTraits.Garrison, "protect" },
     };
 
     public static void Init()

@@ -171,6 +171,54 @@ traits      = Immunity
 
 ---
 
+### 9. 驻守 (Garrison)
+**效果**：此单位无法移动或攻击，**但仍会正常反击**（常驻，不会自行消失）
+
+**使用示例**：
+```ini
+[要塞守备队]
+price       = 4
+attack      = 2
+defense     = 6
+cardType    = Infantry
+description = 无法移动或攻击
+traits      = Garrison
+```
+
+**实现细节**：
+- 与既有的**压制（Suppressed）**共用同一套机制，二者并称为「禁止行动类特性」，
+  掩码是 `cardBase_.ActionForbiddingTraits`（`Garrison | Suppressed`）。
+  新增同类特性时只需并进这个常量，`AddTrait` / `RemoveTrait` / `IsActionForbidden`
+  三处会一起生效。
+- 表现层只关 `moveAble` 与 `attackAble`：
+  - 移动：`CheckIfCanMove()` 返回 false → 玩家落位校验（`battlefield_.cs`）与敌方 AI
+    （`EnemyPerformActionsAsync`）都会被挡；
+  - 攻击：`CheckIfCanAttack()` 返回 false → 所有 8 处 `Attack()` 调用点入口统一拦截。
+- **反击不受影响**是设计使然：`Attack()` 里判定反击只看兵种（非轰炸机）、冲击与伏击，
+  **从不读 `attackAble`**。所以置 0 的单位照样会反击。
+- **`RefreshUnit()` 末尾必须重新钳制**。它在回合开始时把 `moveAble/attackAble` 恢复成 1/2；
+  驻守是常驻的，漏掉这一步的话每个回合开始都会被放行，特性形同失效。
+- **`Fight` / `FightRandomEnemy` 里显式挡了一次**。这两条指令会临时把 `attackAble` 抬到 1
+  再调 `Attack()`（注释写明「不计入攻击次数」），不挡就会被「强制参战」绕过。
+  这一改动同时补上了 `Suppressed` 一直存在的同一个洞。
+- 解除驻守（`RemoveTrait(Garrison)`）**不会即时恢复行动能力**，与压制既有行为一致：
+  恢复统一交给本方回合开始的 `RefreshUnit`，避免「先移动 → 被驻守 → 解除」这类顺序
+  凭空多出一次行动。
+
+**与压制的区别**：
+
+| | 驻守 Garrison | 压制 Suppressed |
+|---|---|---|
+| 持续时间 | 常驻，随卡牌数据或 `AddTrait` 存在 | 所属方回合结束时自动移除 |
+| 来源 | `card.ini` 的 `traits = ` 或 `AddTrait(Garrison)` | 只能由效果指令施加 |
+| 图标 | `protect` | `suppress` |
+
+> **待补**：本指南目前只覆盖到「免疫」，**动员 / 同仇 / 压制 / 驻守**四节是新补或仍缺的。
+> 上表之外的特性说明见 `docs/LOGIC.md` 与 `cardBase_.GetTraitDescription()`（悬停提示的
+> 唯一权威来源）。
+
+---
+
 ## 特性组合示例
 
 ### 多特性组合

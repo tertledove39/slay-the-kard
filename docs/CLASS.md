@@ -208,7 +208,9 @@
 | `CardData` : Resource | 卡牌数据模型。Id/Name/Attack/Defense/Cost/Effect/CardType/Rarity/Traits/IconPath/TargetType |
 | `HQ` enum | normalCard / hq / command |
 | `CardTypes` enum | Plane / Bomber / Tank / Infantry / Artillery / Command |
-| `UnitTraits` enum (Flags) | None / Blitz(闪击) / Determination(奋战) / HeavyArmor(重甲) / SmokeScreen(烟幕) / Guardian(守护) / Shock(冲击) / Ambush(伏击) / Immunity(免疫) / Mobilize(动员) / SharedHatred(同仇) |
+| `UnitTraits` enum (Flags) | None / Blitz(闪击) / Determination(奋战) / HeavyArmor(重甲) / SmokeScreen(烟幕) / Guardian(守护) / Shock(冲击) / Ambush(伏击) / Immunity(免疫) / Mobilize(动员) / SharedHatred(同仇) / Suppressed(压制) / Garrison(驻守) |
+| `ActionForbiddingTraits` const | 「禁止主动行动」类特性的**唯一掩码**（`Garrison \| Suppressed`）。AddTrait / RemoveTrait / IsActionForbidden 三处共用；新增同类特性只需并进它 |
+| `IsActionForbidden()` | 本单位主动行动是否被特性禁止；`battlefield_.cs` 的 Fight / FightRandomEnemy 靠它挡住「强制参战」绕过 |
 | `Rarity` enum | Common / Rare / Epic / Legendary / Unobtainable |
 | `Stage` enum | Prepare / Draw / Battle / End / EnemyPrepare / EnemyDraw / EnemyBattle / EnemyEnd |
 | `CardState` enum | inHand / caught / placed / played / attack / beAttacked / destroyed / inplaceAndCaught / commandCardCaught |

@@ -3893,6 +3893,10 @@ InputState currentInputState = InputState.nil;
                         {
                             if (attacker != null && attacker.getState() == CardState.placed)
                             {
+                                // 驻守/压制单位不能被「强制参战」绕过——下面会把 attackAble
+                                // 临时抬到 1，不挡一下「无法攻击」就形同虚设。
+                                if (attacker.IsActionForbidden()) continue;
+
                                 int savedMoveAble = attacker.moveAble;
                                 int savedAttackAble = attacker.attackAble;
                                 int savedAttackCount = attacker.attackCountThisTurn;
@@ -4745,6 +4749,8 @@ InputState currentInputState = InputState.nil;
                     foreach (var t in targetsSnapshot)
                     {
                         if (t == null || t.getState() != CardState.placed) continue;
+                        // 同上：本指令同样会临时抬高 attackAble，驻守/压制单位必须排除
+                        if (t.IsActionForbidden()) continue;
                         var allTargets = GetAllowedTargets(t);
                         var validTargets = allTargets.Where(v => v.isHq != HQ.hq).ToList();
                         if (validTargets.Count > 0)
