@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://d35dy87rvq1mc"]
+[gd_scene load_steps=9 format=3 uid="uid://d35dy87rvq1mc"]
 
 [ext_resource type="Script" uid="uid://dbkfpoeflekpg" path="res://bin/WorldMap.cs" id="1_kanex"]
 [ext_resource type="Texture2D" uid="uid://1wq05532vpn4" path="res://assest/worldMap.png" id="1_wpv1p"]
@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" uid="uid://tijuuut6gmwa" path="res://assest/chooseThisAreaPresssed.png" id="3_kanex"]
 [ext_resource type="Texture2D" uid="uid://cl2c37lfu3l2y" path="res://assest/chooseThisAreaHover.png" id="4_ord10"]
 [ext_resource type="Texture2D" uid="uid://357opc6t10uq" path="res://assest/资源点.png" id="6_kanex"]
+[ext_resource type="Texture2D" path="res://assest/hearts.png" id="7_hearts"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_cs12g"]
 font_size = 43
@@ -132,6 +133,20 @@ text = "卡组"
 modulate = Color(1.6845763e-06, 0.706827, 9.62615e-07, 1)
 position = Vector2(49, 55)
 texture = ExtResource("6_kanex")
+
+[node name="heartPic" type="Sprite2D" parent="."]
+modulate = Color(1, 0.35, 0.4, 1)
+position = Vector2(49, 148)
+texture = ExtResource("7_hearts")
+
+[node name="hpNum" type="Label" parent="."]
+layout_mode = 0
+offset_left = 86.0
+offset_top = 118.0
+offset_right = 212.0
+offset_bottom = 179.0
+text = "5"
+label_settings = SubResource("LabelSettings_cs12g")
 
 [connection signal="pressed" from="store" to="." method="_on_store_pressed"]
 [connection signal="pressed" from="deck" to="." method="_on_deck_pressed"]

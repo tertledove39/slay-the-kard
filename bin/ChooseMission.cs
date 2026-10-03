@@ -32,6 +32,10 @@ public partial class ChooseMission : Control
     private Label[] _labels;
     private List<MissionEntry> _entries = new();
     private string _areaName;
+    private Button _backButton;
+
+    /// <summary>玩家点「返回」时触发；由 WorldMap 接住并关闭本面板（面板本身不管外面的事）。</summary>
+    public event Action BackRequested;
     private float _buttonY;
     private float _labelOffsetY;
 
@@ -57,6 +61,10 @@ public partial class ChooseMission : Control
         ConnectHover(_btn1);
         ConnectHover(_btn2);
         ConnectHover(_btn3);
+
+        _backButton = GetNodeOrNull<Button>("BackButton");
+        if (_backButton != null)
+            _backButton.Pressed += () => BackRequested?.Invoke();
 
         ApplyNames();
         RefreshIntensityLabel();

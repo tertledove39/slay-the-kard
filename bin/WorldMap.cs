@@ -109,6 +109,15 @@ public partial class WorldMap : Control
     private ChooseMission _chooseMissionPanel;
 
     /// <summary>
+    /// 本次抽到的任务。点 area 进面板后按「返回」再进来时复用这一批，
+    /// 免得玩家靠反复进出刷出想要的组合。
+    /// 用实例字段而非静态：选了任务就会换场景（战斗 → battleField，事件 → 场景重载），
+    /// WorldMap 会被重建，缓存自然失效，不需要额外清理。
+    /// </summary>
+    private string _drawnArea;
+    private List<string> _drawnIds;
+
+    /// <summary>
     /// 每个区域的敌人池（从AreaPool.ini加载）
     /// </summary>
     private Dictionary<string, Area> _areaPools = new();
@@ -162,6 +171,7 @@ public partial class WorldMap : Control
     }
 
     private Label pointNum;
+    private Label hpNum;
 
 
     public override void _Ready()
@@ -177,7 +187,9 @@ public partial class WorldMap : Control
 
 
         pointNum = GetNodeOrNull<Label>("pointNum");
+        hpNum = GetNodeOrNull<Label>("hpNum");
         RefreshMaterialPoint();
+        RefreshHp();
 
         // 预加载选择任务界面
         _chooseMissionScene = ResourceLoader.Load<PackedScene>("res://bin/chooseMission.tscn");
@@ -198,6 +210,15 @@ public partial class WorldMap : Control
     private void RefreshMaterialPoint()
     {
         pointNum.Text = BattleStateManager.MaterialPoints.ToString();
+    }
+
+    /// <summary>
+    /// 刷新血量显示（心形图标 + 数字）。血量无上限，所以用数字承载数量，
+    /// 图标只作标识，不会因为血量变多而排不下。
+    /// </summary>
+    private void RefreshHp()
+    {
+        if (hpNum != null) hpNum.Text = BattleStateManager.Hp.ToString();
     }
     private void ConnectHover(string path)
     {
@@ -471,10 +492,21 @@ public partial class WorldMap : Control
         // 首次进入该区域时按 AreaPool.ini 的 areaTimes 初始化战斗烈度
         BattleStateManager.EnsureAreaIntensity(areaName, pool.ReadAreaTimes());
 
-        // 抽取规则集中在 MissionDrawer：按当前烈度处理 boss，并保证 2战斗+1事件
-        var candidates = pool.ReadEntrys();
-        int intensity = BattleStateManager.ReadAreaIntensity(areaName);
-        var selectedIds = MissionDrawer.Draw(candidates, pool.ReadBoss(), intensity);
+        // 同一个区域先前抽过就直接复用（返回世界地图后再进来是同一批）。
+        // 抽取规则集中在 MissionDrawer：按当前烈度处理 boss，并保证 2战斗+1事件。
+        List<string> selectedIds;
+        if (_drawnArea == areaName && _drawnIds != null)
+        {
+            selectedIds = _drawnIds;
+        }
+        else
+        {
+            var candidates = pool.ReadEntrys();
+            int intensity = BattleStateManager.ReadAreaIntensity(areaName);
+            selectedIds = MissionDrawer.Draw(candidates, pool.ReadBoss(), intensity);
+            _drawnArea = areaName;
+            _drawnIds = selectedIds;
+        }
 
         if (selectedIds.Count < 1)
         {
@@ -489,6 +521,7 @@ public partial class WorldMap : Control
         if (_chooseMissionPanel != null)
         {
             _chooseMissionPanel.SetEntries(entries, areaName);
+            _chooseMissionPanel.BackRequested += CloseMissionPanel;
             _chooseMissionPanel.SetAnchorsPreset(LayoutPreset.FullRect);
             _chooseMissionPanel.ZIndex = 200;
             AddChild(_chooseMissionPanel);
@@ -503,17 +536,29 @@ public partial class WorldMap : Control
 
     }
 
-    /// <summary>
-    /// 事件完成后关闭三选一面板并刷新区域状态
-    /// </summary>
-    public void DismissChooseMission()
+    /// <summary>只关闭面板、保留本次抽到的任务——供「返回」按钮使用。</summary>
+    private void CloseMissionPanel()
     {
         if (_chooseMissionPanel != null)
         {
+            _chooseMissionPanel.BackRequested -= CloseMissionPanel;
             _chooseMissionPanel.QueueFree();
             _chooseMissionPanel = null;
         }
         RefreshAreaStates();
+        RefreshHp();
+    }
+
+    /// <summary>
+    /// 事件完成后关闭三选一面板并刷新区域状态。
+    /// 与 CloseMissionPanel 的差别：**丢弃本次抽到的任务**——事件已经消耗掉烈度，
+    /// 下次进这个区域必须重新抽，否则玩家能反复看到同一批里已被用掉的那一项。
+    /// </summary>
+    public void DismissChooseMission()
+    {
+        _drawnIds = null;
+        _drawnArea = null;
+        CloseMissionPanel();
         RefreshMaterialPoint();
     }
 

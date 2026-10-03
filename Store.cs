@@ -49,6 +49,8 @@ public partial class Store : Control
             backBtn.MouseEntered += () => AnimateButton(backBtn, HoverScale);
             backBtn.MouseExited += () => AnimateButton(backBtn, 1f);
         }
+        SetupHpShop();
+
         var refreshBtn = GetNodeOrNull<TextureButton>("refresh");
         if (refreshBtn != null)
         {
@@ -159,6 +161,7 @@ public partial class Store : Control
                 slot.IsDiscounted ? ColorDiscount : Colors.White);
         }
         _lastPricePoints = points;
+        RefreshBuyHpState();
     }
 
     public override void _Input(InputEvent @event)

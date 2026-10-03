@@ -3295,7 +3295,26 @@ InputState currentInputState = InputState.nil;
         if (card.GetIsFriend() == IsFriend.friend && card.isHq == HQ.hq && !defeatTransitionStarted)
         {
             defeatTransitionStarted = true;
-            _ = ReturnToStartMenuAfterDefeat();
+
+            // 战役模式下失败不再立刻结束本局：先按规则扣血（area7 清零 / boss 战 -2 /
+            // 其余 -1，规则集中在 BattleStateManager.LoseHpOnBattleDefeat），
+            // 血还有剩就回世界地图继续，归零才走「游戏结束」回主菜单并重置进度。
+            // 非战役模式（直接跑战场场景调试）没有血量概念，维持原行为。
+            if (BattleStateManager.IsCampaignMode)
+            {
+                int hpBefore = BattleStateManager.Hp;
+                int hpLeft = BattleStateManager.LoseHpOnBattleDefeat();
+                GD.Print($"[Battle] 战斗失败：area={BattleStateManager.SelectedArea} "
+                       + $"关卡={BattleStateManager.SelectedEnemy} boss={BattleStateManager.IsBossBattle()} "
+                       + $"血量 {hpBefore}→{hpLeft}");
+
+                if (hpLeft > 0) _ = ReturnToWorldMapAfterDefeat(hpBefore - hpLeft, hpLeft);
+                else _ = ReturnToStartMenuAfterDefeat();
+            }
+            else
+            {
+                _ = ReturnToStartMenuAfterDefeat();
+            }
         }
         if(card.GetIsFriend()== IsFriend.enemy && card.isHq == HQ.hq)
         {
@@ -3356,6 +3375,28 @@ InputState currentInputState = InputState.nil;
     /// <summary>
     /// 战役模式下敌方总部被摧毁后，标记区域已完成并返回世界地图
     /// </summary>
+    /// <summary>
+    /// 战败但血量未归零：显示撤退面板，扣掉本次的区域烈度，回世界地图继续本局。
+    ///
+    /// 与战胜路径的差别有三处，都是刻意的：
+    ///   1. 不发战后奖励（PostBattleReward 只在战胜后走）；
+    ///   2. 不结算物资点（CalculateMaterialPoints 只由敌方总部阵亡触发）；
+    ///   3. 烈度**照常消耗 1 点**（需求方确认）——所以归零时同样解锁下一区域，
+    ///      否则玩家可以靠一直输来无限重试、区域永远推不下去。
+    /// </summary>
+    private async Task ReturnToWorldMapAfterDefeat(int hpLost, int hpLeft)
+    {
+        ForbidControl();
+
+        var endNode = GetNodeOrNull<End>("end");
+        if (endNode != null) await endNode.ShowRetreat(hpLost, hpLeft);
+
+        BattleStateManager.ConsumeAreaIntensity(BattleStateManager.SelectedArea);
+        BattleStateManager.IsCampaignMode = false;
+
+        await SceneLoader.ChangeSceneAsync(this, "res://bin/worldMap.tscn");
+    }
+
     private async System.Threading.Tasks.Task ReturnToWorldMapAfterVictory()
     {
         var endNode = GetNodeOrNull<End>("end");

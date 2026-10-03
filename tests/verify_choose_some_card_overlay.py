@@ -20,7 +20,9 @@ def main():
     scene = (ROOT / "choose_some_card.tscn").read_text(encoding="utf-8")
     sources = {
         "Store": (ROOT / "Store.cs").read_text(encoding="utf-8"),
-        "EventScene": (ROOT / "bin" / "EventScene.cs").read_text(encoding="utf-8"),
+        # 事件选项的效果执行已从 EventScene 拆到 EventEffectRunner（EventScene 曾达 299 行，
+        # 逼近 300 红线）。「两条手动换卡路径都走 ChooseSomeCard」这条约束随之跟到新文件。
+        "EventScene": (ROOT / "bin" / "EventEffectRunner.cs").read_text(encoding="utf-8"),
         "PostBattleReward": (ROOT / "bin" / "PostBattleReward.cs").read_text(encoding="utf-8"),
     }
 

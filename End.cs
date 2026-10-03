@@ -17,6 +17,8 @@ public partial class End : CanvasLayer
     private const string OverlayPath = "SettlementOverlay";
     private const string SettlementPath = OverlayPath + "/Settlement";
     private const string DefeatPath = OverlayPath + "/Defeat";
+    /// <summary>可撤退的失败面板：血量还有剩，扣完血回世界地图继续打。</summary>
+    private const string RetreatPath = OverlayPath + "/Retreat";
 
     private ColorRect _overlay;
 
@@ -31,6 +33,10 @@ public partial class End : CanvasLayer
 
     private Control _defeat;
     private Button _returnButton;
+
+    private Control _retreat;
+    private Label _retreatHpInfo;
+    private Button _retreatButton;
 
     private Tween _tween;
 
@@ -90,6 +96,10 @@ public partial class End : CanvasLayer
         _confirmButton = GetNodeOrNull<Button>(SettlementPath + "/ConfirmButton");
 
         _returnButton = GetNodeOrNull<Button>(DefeatPath + "/ReturnButton");
+
+        _retreat = GetNodeOrNull<Control>(RetreatPath);
+        _retreatHpInfo = GetNodeOrNull<Label>(RetreatPath + "/HpInfo");
+        _retreatButton = GetNodeOrNull<Button>(RetreatPath + "/ReturnButton");
     }
 
     /// <summary>
@@ -136,6 +146,35 @@ public partial class End : CanvasLayer
 
         _returnButton.Pressed -= OnReturnPressed;
         _defeat.Visible = false;
+    }
+
+    /// <summary>
+    /// 可撤退的失败面板：本场打输了但血量还有剩，本局不结束。
+    /// 显示本次损失与剩余血量，等玩家确认后由调用方送回世界地图。
+    /// </summary>
+    public async Task ShowRetreat(int hpLost, int hpLeft)
+    {
+        Dim();
+        var img = GetNode<Sprite2D>("img");
+        img.Modulate = new Color(0.5f, 0.5f, 0.5f, 1f);
+
+        if (_retreat == null || _retreatHpInfo == null || _retreatButton == null)
+        {
+            GD.PushError($"{Time.GetDatetimeStringFromSystem()} End.cs: 撤退面板缺失，跳过显示直接返回");
+            return;
+        }
+
+        _retreatHpInfo.Text = $"失去 {hpLost} 点血量，剩余 {hpLeft}";
+        _retreat.Visible = true;
+
+        var completion = new TaskCompletionSource<bool>();
+        void OnReturnPressed() => completion.TrySetResult(true);
+        _retreatButton.Pressed += OnReturnPressed;
+
+        await completion.Task;
+
+        _retreatButton.Pressed -= OnReturnPressed;
+        _retreat.Visible = false;
     }
 
     /// <summary>

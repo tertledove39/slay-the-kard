@@ -159,3 +159,12 @@ text = "5"
 
 [connection signal="pressed" from="refresh" to="." method="_on_texture_button_pressed"]
 [connection signal="pressed" from="Back" to="." method="_on_back_pressed"]
+
+[node name="BuyHp" type="Button" parent="."]
+layout_mode = 0
+offset_left = 1120.0
+offset_top = 750.0
+offset_right = 1400.0
+offset_bottom = 804.0
+theme_override_font_sizes/font_size = 26
+text = "买血 200"

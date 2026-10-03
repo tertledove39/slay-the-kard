@@ -92,7 +92,11 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 同一事件可出现在多个区域（`event.ini` 共 25 个事件均已分配，无遗漏、无重复引用）。全程性事件跨越多个区域：`strange_command`（1941–42 通信混乱）、`tank_crew_replacement`（1941–42 乘员补充）、`deep_battle_doctrine`（纵深作战条令）、`guards_title`（近卫称号）、`snowstorm`（冬季）。专属时点的事件只归一个区域，如 `citadel_intelligence`(1943 春 → 库尔斯克)、`maskirovka_bagration`(1944 夏 → 明斯克)、`reichstag_banner`(1945 → 柏林)、`order_227` 与 `operation_uranus`(1942 → 斯大林格勒)。
 
 ### bin/event.ini
-定义50个历史背景事件。每个事件包含2至3个选项，效果支持 `none`、`materialPoints(n)`、`replaceCard(id)` 和 `replaceRandomCard(id)`，多个效果使用逗号连接。
+定义50个历史背景事件。每个事件包含2至3个选项，效果支持 `none`、`materialPoints(n)`、`hp(n)`、`replaceCard(id)` 和 `replaceRandomCard(id)`，多个效果使用逗号连接。
+
+**选项可否点击由资源点决定**：`materialPoints` 的负数部分累加即为该选项的花费，余额不足时按钮置灰并显示「（需要 N 资源点）」。执行侧另有一层下限 0 的兜底。
+
+**悬浮预览**：选项若含 `replaceCard` / `replaceRandomCard`，鼠标悬浮时会弹出预览面板（`bin/event_card_preview.tscn`），显示将被加入的卡。同名卡**去重并标数量**——`[snowstorm]` 的第 3 个选项有 20 张同名「埋伏」，逐张画会铺满屏幕。
 
 `materialPoints(n)` 让玩家获得非负整数 `n` 点战役资源，结果即时同步到世界地图，资源总量最高为 `int.MaxValue`。负数、非整数和超出整数范围的参数不会生效，并记录包含时间和代码位置的错误日志。该效果与战斗内指挥点 `AddPoint(n)` 无关。
 

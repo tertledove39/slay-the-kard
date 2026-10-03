@@ -505,3 +505,59 @@ if (prefix != triggerPoint) continue;      // 区分大小写的精确比较
 触发时机：BePicked 时点（被攻击选中 / 被友方指令选中）
 
 效果：被指向的单位若具有 SharedHatred 特性，所有与该单位同阵营的同仇单位获得 +1 攻击 +1 防御（被指向的单位自身除外）。
+
+---
+
+## 血量系统
+
+血量是「整局还能失败几次」的计数器，存在 `BattleStateManager`（`bin/CardRestoration.cs`）。
+
+| 项 | 值 | 说明 |
+|---|---|---|
+| 开局 | 5 | `InitialHp` |
+| 上限 | **无** | 事件与商店都能加，可以攒到 5 以上 |
+| 下限 | 0 | `AddHp()` 里钳住，不会出现负血量 |
+| 商店价格 | 200 资源点 / 1 点 | `HpPrice` |
+
+### 战斗失败不再立刻结束本局
+
+原先友方总部阵亡就直接 `ReturnToStartMenuAfterDefeat()`（含重置整局进度）。现在插入一层：
+
+```
+友方总部阵亡
+  └─ 战役模式？
+       ├─ 否（直接跑战场场景调试）→ 原行为：回主菜单
+       └─ 是 → LoseHpOnBattleDefeat() 扣血
+                 ├─ 血量 > 0 → ReturnToWorldMapAfterDefeat()：显示撤退面板 → 回世界地图继续
+                 └─ 血量 = 0 → ReturnToStartMenuAfterDefeat()：游戏结束，回主菜单并重置进度
+```
+
+**扣血规则**（唯一实现在 `BattleStateManager.LoseHpOnBattleDefeat()`）：
+
+| 情形 | 扣血 |
+|---|---|
+| area7（终局区域，`IsFinalArea`） | 直接清零 |
+| boss 战 | -2 |
+| 其余战斗 | -1 |
+
+**boss 判定**：`IsBossBattle()` 拿「本次抽中的关卡名」与该区域 `AreaPool.ini` 里配的 `boss` 比对。
+boss 按约定不写进 `enemyN`（由 `MissionDrawer` 在烈度为 1 时单独提供），所以只能这样反查。
+area7 的 `berlin_final_battle` 没配 boss，由 `IsFinalArea` 特判，走不到 boss 分支。
+
+**战败与战胜的差别**（`ReturnToWorldMapAfterDefeat`）：不发战后奖励、不结算物资点，
+但**烈度照常消耗 1 点**——否则玩家可以靠一直输来无限重试、区域永远推不下去。
+
+### 事件与商店里的血量
+
+- 事件：`hp(n)`，正数加血、负数扣血，与 `materialPoints(n)` 写法一致
+- 商店：`store.tscn` 的 `BuyHp` 按钮，逻辑在 `StoreHpShop.cs`（`Store` 的 partial 部分）
+
+世界地图左上角用 `hearts.png` + 数字显示（`worldMap.tscn` 的 `heartPic` / `hpNum`）。
+用数字承载数量而不是排 N 颗心，是因为血量无上限。
+
+## 事件选项的资源点门槛与卡牌预览
+
+- **门槛**：选项效果里 `materialPoints` 的负数部分累加即该选项的花费（`EventEffectRunner.ParseMaterialCost`），
+  余额不足时按钮置灰并显示「（需要 N 资源点）」。执行侧仍有下限 0 的兜底。
+- **预览**：含 `replaceCard` / `replaceRandomCard` 的选项，悬浮时弹出 `bin/event_card_preview.tscn`，
+  按 id **去重计数**后显示真卡面 + 「将加入卡组：埋伏 ×20」。

@@ -413,3 +413,23 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 - 触发用例：`[紧急投产]` 的 effect 以 `Develop($deck)|GetCardsBeingTreated` 开头且含
   `setCost(0)`。
 - 边界（有意保留）：`DrawCard` 仍写 `Player.lastDrawnCards`（抽牌路径未被改动）。
+
+## 血量系统与事件界面
+
+测试脚本：`tests/verify_hp_and_event_ui.py`（54 条）。
+
+覆盖本批 7 项需求：事件选项的资源点门槛、会加卡选项的悬浮预览（同名去重计数）、
+血量系统（开局 5 / 失败扣血不再立刻结束 / area7 清零 / 事件 `hp(n)` / worldMap 显示）、
+新增 UI 一律在场景里、任务面板的返回按钮与「返回后重进不重抽」、商店 200 资源点买 1 点血。
+
+- **界面相关的断言一律读 `.tscn`** —— 这本身就是对「UI 不写在代码里」这条需求的校验：
+  哪天有人把 UI 挪回代码，`worldMap.tscn 里有 heartPic / hpNum`、`store.tscn 里有 BuyHp`
+  这类断言就会红。另有一条反向断言：`EventCardPreview.cs` 里不得出现 `new Panel(`、
+  `new Label(`、`new HBoxContainer(`。
+- **扣血规则**：断言 `LoseHpOnBattleDefeat()` 里 `IsFinalArea` 清零、`IsBossBattle() ? -2 : -1`。
+- **失败分支**：断言 `if (hpLeft > 0) _ = ReturnToWorldMapAfterDefeat(...)` 与
+  `else _ = ReturnToStartMenuAfterDefeat();` 同时存在——两条路都要在。
+- **战败不重复给奖励**：断言 `ReturnToWorldMapAfterDefeat` 体内不出现 `PostBattleReward`。
+- **返回按钮的双向语义**：`DismissChooseMission()`（事件完成后）必须清空 `_drawnIds`，
+  而 `CloseMissionPanel()`（点返回）**不得**清空——两条断言一正一反，防止把两者合并。
+- **同名去重**：断言按 id 计数而不逐张罗列（`[snowstorm]` 有 20 张同名「埋伏」）。
