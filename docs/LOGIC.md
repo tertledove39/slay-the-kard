@@ -561,3 +561,24 @@ area7 的 `berlin_final_battle` 没配 boss，由 `IsFinalArea` 特判，走不�
   余额不足时按钮置灰并显示「（需要 N 资源点）」。执行侧仍有下限 0 的兜底。
 - **预览**：含 `replaceCard` / `replaceRandomCard` 的选项，悬浮时弹出 `bin/event_card_preview.tscn`，
   按 id **去重计数**后显示真卡面 + 「将加入卡组：埋伏 ×20」。
+
+### 弹窗里排卡的标准写法（踩过坑，别再自己发明）
+
+`EventCardPreview.AddCardFace()` 与 `ChooseSomeCard.BuildGrid()` 是同一套写法，改的时候照着抄：
+
+```csharp
+card.SetAnchorsPreset(LayoutPreset.TopLeft);   // 1 钉锚点
+card.Size = cardBase_.DesignSize;              // 2 原生 180x240
+card.Scale = new Vector2(CardScale, CardScale);// 3 再缩放（卡面内部坐标是按原生尺寸摆的）
+container.AddChild(card);                      // 4 入树
+card.SetCardInformation(data);                 // 5 填数据（必须在树里，否则字体测不准）
+card.Position = new Vector2(x, y);             // 6 最后定位
+```
+
+**容器必须是普通 `Control`。** 曾经用 `HBoxContainer` 装预览卡，它**强行接管子节点的 Position
+与 Size**，卡被撑到容器大小、整张糊满屏幕。`ChooseSomeCard` / `DisplayCard` 也都用普通 `Control`
+加显式 `Position`，没有一个用 Container 类。
+
+`Scale` 只影响绘制、不影响布局占位，所以缩放后的实际占位是
+`DesignSize * scale`，命中框要另算——`ChooseSomeCard` 为此单独铺了一层透明 `ColorRect` 作点击区
+（`pfX/pfY` 那两行就是在算这个偏移）。预览面板不吃鼠标，所以不需要点击区。

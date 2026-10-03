@@ -86,6 +86,26 @@ def main():
     results.append(check('_cardPreview = ResourceLoader.Load<PackedScene>(PreviewScenePath)?.Instantiate()' in event_scene,
                          "EventScene 只实例化场景，不自建 UI"))
 
+    # --- 回归：预览卡的建法必须照抄 ChooseSomeCard.BuildGrid ---
+    # 曾经的 bug：容器用了 HBoxContainer，它强行接管子节点的 Position 与 Size，
+    # 把卡撑到容器大小，整张卡糊满屏幕。
+    results.append(check(
+        not any(c in preview_tscn for c in ("HBoxContainer", "VBoxContainer", "GridContainer")),
+        "预览容器不得是 Container 类（会强行接管子节点的 Position/Size 把卡撑爆）"))
+    results.append(check('[node name="Cards" type="Control"' in preview_tscn,
+                         "Cards 是普通 Control"))
+    # 顺序照抄 ChooseSomeCard：钉锚点 → 原生尺寸 → 缩放 → 入树 → SetCardInformation → Position
+    order = ["SetAnchorsPreset(LayoutPreset.TopLeft)", "card.Size = cardBase_.DesignSize",
+             "card.Scale = new Vector2(CardScale, CardScale)", "_cards.AddChild(card)",
+             "card.SetCardInformation(data)", "card.Position = new Vector2(x, 0)"]
+    idxs = [preview_cs.find(tok) for tok in order]
+    results.append(check(all(i != -1 for i in idxs) and idxs == sorted(idxs),
+                         "建卡顺序照抄 ChooseSomeCard（锚点→尺寸→缩放→入树→填信息→Position）"))
+    results.append(check("CustomMinimumSize" not in preview_cs,
+                         "不用 CustomMinimumSize 当尺寸——缩放型布局靠 Size + Scale"))
+    results.append(check("card.Size = cardBase_.DesignSize" in preview_cs,
+                         "先给卡原生 180x240 再缩放（卡面内部坐标是按这个尺寸摆的）"))
+
     # --------------------------- 4) UI 在场景里（需求 4） ---------------------------
     print("\n--- 4) 新增 UI 一律在 .tscn 里（需求 4） ---")
     results.append(check('script = ExtResource("1_script")' in preview_tscn and "StyleBoxFlat" in preview_tscn,

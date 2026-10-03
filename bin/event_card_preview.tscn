@@ -24,26 +24,25 @@ script = ExtResource("1_script")
 
 [node name="Background" type="Panel" parent="."]
 layout_mode = 0
-offset_right = 640.0
-offset_bottom = 196.0
+offset_right = 392.0
+offset_bottom = 284.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 
-[node name="Cards" type="HBoxContainer" parent="Background"]
+[node name="Cards" type="Control" parent="Background"]
 layout_mode = 0
 offset_left = 10.0
 offset_top = 8.0
-offset_right = 630.0
-offset_bottom = 128.0
+offset_right = 382.0
+offset_bottom = 236.0
 mouse_filter = 2
-theme_override_constants/separation = 6
 
 [node name="Caption" type="Label" parent="Background"]
 layout_mode = 0
 offset_left = 10.0
-offset_top = 136.0
-offset_right = 630.0
-offset_bottom = 186.0
+offset_top = 240.0
+offset_right = 382.0
+offset_bottom = 280.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.95, 0.85, 0.45, 1)
 theme_override_font_sizes/font_size = 15
