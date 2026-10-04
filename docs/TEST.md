@@ -452,3 +452,62 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
   `new StyleBoxFlat` 或 `AddThemeStyleboxOverride`，且各自恰好调用一次
   `ConsoleStyle.Apply(_consolePanel, _consoleInput)`。原先两处各写了一遍同样的样式，
   改一处忘一处就会出现两个控制台长得不一样。
+
+## 战斗动作与行动能力时序
+
+测试脚本：`tests/verify_combat_action_timing.py`（27 条）。
+
+覆盖四项「状态该结束时没结束」的问题：拖拽被截图工具打断后的兜底收尾、
+行动能力按阵营在各自回合开头刷新、被撤退单位的战斗能力、多张单位卡弃置的错开节奏。
+
+- **① 拖拽兜底**：断言 `CancelCurrentDrag()` 同时把 `caught` 还原成 `inHand`、
+  `inplaceAndCaught` 还原成 `placed`，并调用 `RefreshMyHand()`。
+  另有一条**顺序断言**：`_Input` 里那条「物理左键已松开」的兜底必须出现在
+  `if (ReadControlState() == 1) return;` **之前**——放在后面的话，
+  控制锁期间永远轮不到它，收尾照样挂住。
+- **② 按阵营刷新**：正向断言 `RefreshCardsInField(IsFriend.friend)` 出现在
+  `EnemyTurnAsync()` 与 `ApplyTurnStartTraits()` 之间，反向断言被替换掉的
+  `RefreshAllCardInField()` 已经不存在（防止有人把两者都留着）。
+- **③ 撤退禁战**：断言 `RetreatUnit()` 里 `DisableCombatAbility()` 恰好出现两次
+  （友方回手牌、敌方弃置各一次），且敌方那条排在挂待弃置标记之前。
+- **④ 弃置错开**：解析 `DiscardStaggerSeconds` 的值断言为 0.5；
+  断言 `Task.WhenAll(tasks)` 存在、辅助函数自己不播动画、单张时不额外等待。
+
+> 写这个脚本时踩到一个 Python 陷阱值得记下：`"x" in s is False` 是**链式比较**，
+> 等价于 `("x" in s) and (s is False)`，恒为假。要写 `("x" in s) is False`。
+
+## 敌方脚本、刷兵与关卡开局效果
+
+测试脚本：`tests/verify_enemy_scripts_and_spawn.py`（27 条）。
+
+这三件事的共同点是**失效时一声不吭**：写错了既没有报错也没有效果，
+只能靠对局里「怎么没反应」发现，所以逐条静态钉住。
+
+- **④ 弃置玩家的牌**：反向断言战役行动里**不得**再出现裸的 `DiscardRandomly`；
+  新分支里**不得**出现 `sourceCard?.GetIsFriend()`（那正是旧写法按阵营派发的病根）。
+  另有一条配置侧的**描述一致性**检查：`DiscardPlayerRandomly(n)` 的数字与
+  `弃n张` 的说明必须相等（t6 曾经是「代码弃1张、说明写2张」）。
+- **⑤ 刷兵吃表达式**：用正则断言旧的 `(\d+)` 写法不再出现、`int.Parse(` 不再出现，
+  以及三条静默出路各有一条 `[SpawnByCost]` 日志。
+- **⑪ battleStart**：断言它被从行动队列里**单独摘出**（否则会作为一条「敌方意图」
+  显示在左侧面板上）、换关卡时一并清空、且 `StartBattleAsync()` 里
+  `RunBattleStartEffectAsync` 排在 `StartOpeningHandAsync` 之前。
+  另有一条 `&hp` 的「没有偷偷做换算」断言：取值附近不得出现 `/10` 之类的修饰。
+
+## 守护豁免与事件叠层
+
+测试脚本：`tests/verify_guardian_bypass_and_overlay.py`（25 条）。
+
+- **⑩ 火炮/轰炸机无视守护**：断言豁免只认兵种、不看阵营
+  （`IgnoresGuardian` 函数体内不得出现 `IsFriend`），且
+  `IsTargetProtectedByGuardian` 里它排在 `HasSmokeScreenActive` **之前**——
+  排在后面的话，目标带烟幕时函数会先返回，豁免被绕过。
+  再断言守护判定函数被调用 3 次以上，确认玩家侧与 AI 侧走的是同一处。
+- **⑥ 事件叠层**：断言事件暗幕是 `Ignore`（不拦鼠标）、
+  `EnterEventOverlay` 走 `CloseMissionPanel` 而**不含** `DismissChooseMission`
+  （保留批次），`ExitEventOverlay` 才丢弃；并解析 `_on_store_pressed` 的
+  `canvasLayer.Layer` 断言它大于事件层的 2。
+- **⑦ 标准弹药**：断言两段 `foreach` 各有自己的 `End&`、`subCost(1)` 恰好两次、
+  `FriendlyCardDrawn` 已消失。另断言 `AnimateCostRoll` 的 `IsInsideTree()` 保护
+  排在 `GetNode<Label>("cost")` **之前**——牌堆里的卡不在场景树上，
+  这层保护放晚了照样空引用。

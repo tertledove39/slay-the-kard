@@ -476,6 +476,7 @@ public partial class WorldMap : Control
     /// </summary>
     private void OnAreaPressed(string areaName)
     {
+        if (_eventOverlayActive) return;
         if (_chooseMissionPanel != null) return;
         if (!BattleStateManager.UnlockedArea.TryGetValue(areaName, out int unlocked) || unlocked != 1) return;
 
@@ -534,6 +535,33 @@ public partial class WorldMap : Control
             _chooseMissionPanel.MoveChild(bg, 0);
         }
 
+    }
+
+    /// <summary>
+    /// 事件叠加层是否正在显示。事件期间地图上只放开商店与卡组，
+    /// 区域按钮一律忽略——事件暗幕已改成不拦鼠标（好让商店/卡组能点），
+    /// 不在这里挡一下的话，点到底下的区域会在事件背后又叠一个任务面板。
+    /// </summary>
+    private bool _eventOverlayActive;
+
+    /// <summary>
+    /// 事件叠加层开始显示：收起任务选择面板，但**保留**本次抽到的那一批，
+    /// 并接管区域按钮。
+    /// </summary>
+    public void EnterEventOverlay()
+    {
+        CloseMissionPanel();
+        _eventOverlayActive = true;
+    }
+
+    /// <summary>
+    /// 事件结束：交还区域按钮，并丢弃本次抽到的一批——烈度已被事件消耗，
+    /// 下次进这个区域必须重新抽。
+    /// </summary>
+    public void ExitEventOverlay()
+    {
+        _eventOverlayActive = false;
+        DismissChooseMission();
     }
 
     /// <summary>只关闭面板、保留本次抽到的任务——供「返回」按钮使用。</summary>

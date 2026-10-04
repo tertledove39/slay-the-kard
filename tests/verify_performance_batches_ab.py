@@ -18,7 +18,7 @@ def main():
     arrow = (ROOT / "bin" / "Cardbase.cs").read_text(encoding="utf-8")
     store = (ROOT / "Store.cs").read_text(encoding="utf-8")
     death = method(battle, "async Task CheckIfAnyUnitDiedAsync()", "public async void OnNextTurnButtonPressed()")
-    turn = method(battle, "public async void OnNextTurnButtonPressed()", "void RefreshAllCardInField()")
+    turn = method(battle, "public async void OnNextTurnButtonPressed()", "void RefreshCardsInField(IsFriend side)")
     move = method(card, "async public Task MoveToPosition", "async public Task DiscardCard")
     results = [
         check("deathCheckRunning" in death and "deathCheckRequested" in death, "death checks use a coalescing gate"),

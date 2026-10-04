@@ -28,6 +28,7 @@
 | `&friendCommandPointMax` | 友方最大指挥点 |
 | `&friendHandCount` | 友方手牌数量 |
 | `&friendDeckRemainingCount` | 友方卡组剩余数量 |
+| `&hp` | 战役血量——**世界地图上心形图标后面那个数**，即「还能失败几次」（`BattleStateManager.Hp`，与 `WorldMap.RefreshHp()` 读的是同一个字段）。非战役模式（直接跑战场场景调试）没有血量概念，会停在 `InitialHp` |
 | `&theNumberOfSkirmisher` | 场上轻步兵单位的数量 |
 | `&任意名称` | 自定义内存变量（通过 `SetMemory()` 设置） |
 
@@ -131,7 +132,8 @@
 | `GetHandMax()` | 读取手牌上限存入result。上限是 `Player.maxHandSize` 常量，脚本读不到，写「抽到手牌满」的效果必须用它，不要写死数字 |
 | `AddPoint(n)` / `AddPointMax(n)` | 增加指挥点/最大点；`AddPointMax` 不会重复执行 `AddPoint`。`AddPoint` 的天花板是 `pointMaxMaxMax`(24) 而非当前上限 `pointMax`，即可把点数攒到本回合上限之上；逐回合的预算约束由回合开始的 `RefreshPoint()` 刷满提供 |
 | `losePointAtNextTurnBegin(n)` | 下回合开始时失去n点指挥点（不足则清零） |
-| `DiscardRandomly(n)` | 随机弃n张手牌 |
+| `DiscardRandomly(n)` | 随机弃n张手牌，**弃的是「效果来源卡那一方」的手牌**。玩家卡上写它就是「自己弃自己」（如「抽3张弃1张」） |
+| `DiscardPlayerRandomly(n)` | 随机弃**玩家**n张手牌，与来源阵营无关 |
 | `DiscardWithName(pattern, n)` | 弃ID含pattern的n张手牌 |
 | `GetCardsBeingTreated` | targets设为**最近入手的卡**（读 `Player.lastDrawnCards`） |
 | `GetCardBeingAddToHand` | targets设为最近入手的那一张（读 `battlefield_.lastCardAddedToHand`） |
@@ -242,24 +244,32 @@ cardsToShow = cardsToShow.Select(c => Copy(c)).Where(c => c != null).ToList();
 完整回合顺序：
 ```
 1. FriendlyTurnEnd  效果触发
-2. TurnEnd  效果触发
-3. 死亡检查
-4. EnemyTurnBegin  效果触发
-5. ⚠ IncrementLifeTime (ALL) — 第一次
-6. TurnBegin  效果触发
-7. FriendlyTurnBegin  效果触发
-8. ApplyTurnStartTraits (Mobilize+1+1、前线去烟幕、守护刷新)
-9. ⚠ IncrementLifeTime (ALL) — 第二次（疑为BUG，见BUGS.md）
-10. 死亡检查
-11. EnemyTurnAsync() (敌方AI行动)
-12. player1.DrawCard() + AddPointMaxNatural()
+2. 友方单位解除压制（Suppressed）
+3. TurnEnd  效果触发
+4. 死亡检查
+5. EnemyTurnBegin  效果触发
+6. ⚠ IncrementLifeTime（敌方单位）— 第一次
+7. TurnBegin  效果触发
+8. **`EnemyTurnAsync()`（敌方AI行动）**
+9. **`RefreshCardsInField(IsFriend.friend)` 刷新友方单位**
+10. FriendlyTurnBegin  效果触发
+11. TurnBegin  效果触发
+12. ApplyTurnStartTraits (Mobilize+1+1、前线去烟幕、守护刷新)
+13. ⚠ IncrementLifeTime（友方单位）— 第二次（疑为BUG，见BUGS.md）
+14. 死亡检查
+15. player1.DrawCard() + AddPointMaxNatural()
 ```
+
+> **第 9 步为什么必须在第 8 步之后、第 10 步之前**：行动能力是按阵营、在各自回合
+> 开头刷新的（见下）。敌方回合里被效果刷进场的单位（例如近卫步兵272团的亡计拉出
+> 的 IS-2），只有走到这一步才终于拿到 `attackAble/moveAble`。放到 FriendlyTurnBegin
+> 之后也不行——时点里要读的 `attackCountThisTurn` 依赖刷新已经做过（刷新会把它清零）。
 
 ### 敌方回合 (EnemyTurnAsync → EnemyPerformActionsAsync)
 
 位置：`battlefield_.cs` line 2195 / 2673
 
-1. `RefreshAllCardInField()` 刷新所有单位
+1. `RefreshCardsInField(IsFriend.enemy)` 刷新敌方单位
 2. `ApplyEnemyTurnStartTraits()` 敌方动员buff
 3. `ExecuteEnemyActionQueue()` 执行行动脚本（tN/everyNt/ADD/default）；固定`tN=ADD:`在触发时注册，并从当回合起每个敌方回合重复执行
 4. `EnemyPerformActionsAsync()` AI行动：
@@ -389,7 +399,7 @@ cardsToShow = cardsToShow.Select(c => Copy(c)).Where(c => c != null).ToList();
 | 冲击 | 不受反击，攻击后失去 | - |
 | 伏击 | - | 先造成反击伤害，杀死攻方则免伤；火炮/轰炸机攻击时不触发 |
 | 烟幕 | 攻击后失去烟幕 | 不可被选为目标 |
-| 守护 | - | 两侧有守护单位时不可被攻击 |
+| 守护 | - | 两侧有守护单位时不可被攻击；**火炮与轰炸机除外** |
 | 动员 | - | 受到伤害后消失 |
 | 同仇 | - | 被指向时，所有友方同仇+1+1 |
 
@@ -405,6 +415,85 @@ if (from.HasTrait(UnitTraits.Immunity)) counterDamage = 0;  // 1898，打人时�
 **亡语时点**：`Dead` 触发时 `sourceCard` 就是死亡单位本身，因此 `&source.attack` 可以读到它生前的攻击力。`&source.attack` 解析到 `sourceCard.ReadAttack()`（`battlefield_.cs:1379-1381`）。范例：`de_karl` 的 `Dead:myHq|damage(&source.attack)`。
 
 **一张卡可带多个时点**：`SplitEffectString` 同时跟踪 `()` 与 `[]` 的嵌套深度，因此 `[icon=...,description=...]` 元数据里的逗号不会把两个时点切开。
+
+### 守护的豁免：火炮与轰炸机
+
+判定集中在 `battlefield_.cs` 的 `IsTargetProtectedByGuardian(target, attacker)` 一处，
+玩家侧的 `Attack()` 与敌方 AI 选目标都调它，所以规则天然对称，不会出现
+「玩家能打、AI 不能打」。豁免本身写在 `cardBase_.IgnoresGuardian(CardTypes)`：
+
+```csharp
+return type == CardTypes.Artillery || type == CardTypes.Bomber;
+```
+
+**只看兵种、不看阵营**，且判定排在烟幕检查之前——排在后面的话，
+目标带烟幕时函数会先返回，豁免被绕过。新增同类兵种时改这一个函数即可。
+
+---
+
+## 拖拽的收尾必须能被外部打断
+
+位置：`battlefield_.cs` `CancelCurrentDrag()`
+
+拖拽是「按下进入、松开退出」的一对事件：按下时把卡置为 `caught` /
+`inplaceAndCaught` 并记进 `cardNowChoose`，松开时再落位。问题在于
+**松开那一半可能永远不来**——截图工具（系统截图、Snipaste、QQ 截图等）会抢走鼠标，
+Alt-Tab 会让窗口失焦。这时卡会永久停在 `caught`，而 `RefreshMyHand()` 对拖拽中的卡
+是 `continue` 跳过的，于是它再也不会归位，显示层级也跟着乱。
+
+所以收尾不能指望那个事件，改由外部主动撤。两条兜底：
+
+| 触发 | 位置 | 覆盖的情形 |
+|------|------|-----------|
+| `_Notification(NotificationApplicationFocusOut)` | `battlefield_.cs` | Alt-Tab、被截图工具抢焦点 |
+| 收到鼠标移动事件、但物理左键已不在按下状态 | `_Input` 开头 | 截图工具吃掉 mouse-up 但不抢焦点 |
+
+`_Input` 里那条**必须放在 `ReadControlState()` 之前**——收尾不能被「当前不允许操作」
+挡住，否则解锁前永远轮不到它。这与 `ShowCardChoice` 的模态点击同属一类：
+**凡是「等一个可能永远不来的事件」的收尾，都要能被打断。**
+
+---
+
+## 单位卡的弃置动画节奏
+
+位置：`battlefield_.cs` `DiscardUnitsWithStagger()` / `FinishUnitDiscard()`
+
+`cardBase_.DiscardCard()` 单张就要 3.5 秒（飞入 1s + 停留 1s + 飞出 1.5s）。
+从前 `ProcessDeadUnitsOnceAsync` 里是一张播完再播下一张，撤退 3 个单位就要干等 10 秒。
+
+现在改为**卡与卡之间错开 `DiscardStaggerSeconds`（0.5s）起飞**，动画互相重叠，
+最后 `Task.WhenAll` 统一等待——全部播完函数才返回，调用方的死亡检查时序不变。
+单张时不平白多等，行为与从前一致。
+
+关战斗能力（`DisableCombatAbility()`）在起飞**之前**一次性做完：动画期间这些卡还挂在
+`place` 上、`state` 仍是 `placed`，不能有任何一张处在「已宣布弃置、却仍可被攻击」的中间态。
+`isDiscarding` 也在这里置位，让刷新显示顺序跳过它们。
+
+---
+
+## 关卡的「开局效果」`battleStart=`
+
+位置：`cards/enemyTurn.ini` 每个 section 的可选键；执行在
+`battlefield_.cs` `RunBattleStartEffectAsync()`，由 `StartBattleAsync()` 在
+`_Ready` 末尾接进异步链。
+
+这是「游戏开始时，若 xxx 则 xxx」的通用入口：
+
+- **只结算一次**，不进 `enemyActionQueue`——队列里的每一条都会作为「敌方意图」
+  显示在左侧面板上，开局效果不是意图。因此它在 `LoadEnemyActionQueue` 里被单独摘出，
+  存进 `_battleStartEffect`（换关卡时一并清空）。
+- **来源卡固定为敌方总部**，所以 `enemyHq` 指敌方、`myHq` 指玩家，与其它效果一致。
+- **条件用效果脚本自己的 `if(...)` 跳转写**，不需要为关卡规则加特例代码。
+- **时序**：排在起手抽牌与换牌之前（`StartBattleAsync` 先 `RunBattleStartEffectAsync`
+  再 `StartOpeningHandAsync`），玩家在换牌界面上看到的就是最终数值。
+
+```ini
+[berlin_final_battle]
+name=攻克柏林
+battleStart=myHq|heal(&hp*10)[icon=heal,description=开局:每有1条命,友方总部额外获得10点防御力]
+```
+
+`&hp` 是战役血量，即世界地图上心形图标后面那个数。
 
 ---
 

@@ -28,8 +28,8 @@
 
 | 文件 | 行数 | 说明 |
 |------|------|------|
-| `battlefield_.cs` | ~5642 | **主战场类** — 最核心文件。包含：战场输入控制、卡牌管理、效果脚本解析执行、攻击/移动系统、敌方AI、回合流程。内含 `Player` 和 `CardMaganer` 内部类。 |
-| `cardBase_.cs` | ~1948 | **卡牌单位类** — 卡牌UI节点。管理卡牌属性（攻防费）、特性状态、动画（移动/弃牌/闪烁/悬停）、attribute图标面板。内含所有枚举定义和 `CardData`、`IconCache`、`EffectAttribute` 等辅助类型。 |
+| `battlefield_.cs` | ~6826 | **主战场类** — 最核心文件。包含：战场输入控制（含拖拽被打断时的兜底收尾 `CancelCurrentDrag`）、卡牌管理、效果脚本解析执行、攻击/移动系统、敌方AI、回合流程（行动能力按阵营在各自回合开头刷新）。内含 `Player` 和 `CardMaganer` 内部类。 |
+| `cardBase_.cs` | ~2167 | **卡牌单位类** — 卡牌UI节点。管理卡牌属性（攻防费）、特性状态、动画（移动/弃牌/闪烁/悬停）、attribute图标面板。内含所有枚举定义和 `CardData`、`IconCache`、`EffectAttribute` 等辅助类型。 |
 | `Cardbase.cs` | ~288 | **箭头渲染器** — `Node2D` 子类，用于绘制从卡牌到鼠标/目标之间的贝塞尔曲线箭头。 |
 | `place_.cs` | ~33 | **位置类** — `Node2D` 子类，表示战场上的一个放置格子。管理格子上卡牌的绑定/解绑。 |
 | `Player` 类 | 嵌入 battlefield_.cs (line ~4904) | **玩家类** — 管理手牌、卡组、指挥点。包含手牌布局引擎（弧形/悬停/缩放动画）。 |
@@ -91,3 +91,9 @@
 | `tests/verify_area_intensity.py` | 区域战斗烈度验证：areaTimes 解析与回退、烈度初始化与消耗、归零解锁、通关流程与对白资源 |
 | `tests/verify_campaign_reset.py` | 整局进度重置验证：卡组清空、区域与烈度复位、商店与统计清零、两个结束入口接入 |
 | `tests/verify_friendly_death_count.py` | 阵亡统计验证：计数只出现在 `ProcessDeadUnitAsync`，`RemoveCard` 不再计数 |
+| `tests/verify_hp_and_event_ui.py` | 事件选项资源点门槛与加卡预览、血量系统、UI 一律在场景里、任务面板返回按钮、商店买血 |
+| `tests/verify_guardian_trait.py` | 驻守（Garrison）特性：禁止主动移动与攻击、不影响反击、图标与描述同步点 |
+| `tests/verify_console_style.py` | 调试控制台外观：浅黑非圆角无边框、输入框三态覆盖、样式单一来源 |
+| `tests/verify_combat_action_timing.py` | 拖拽被打断后的兜底收尾、行动能力按阵营刷新、被撤退单位禁战、弃置动画错开 |
+| `tests/verify_enemy_scripts_and_spawn.py` | `DiscardPlayerRandomly` 语义、刷兵指令吃表达式、`battleStart=` 开局效果 |
+| `tests/verify_guardian_bypass_and_overlay.py` | 火炮/轰炸机无视守护、事件期间可开商店与卡组、标准弹药改打手牌+牌堆 |

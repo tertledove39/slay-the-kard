@@ -1,0 +1,72 @@
+有关战役开发制作的约定
+
+1)战役的行动相当于打出了一张无来源的指令卡
+2)每个战役行动后面必须要附带说明并根据其类型选择其icon.说明必须清楚无歧义并严格反映当前状态.icon可以选择normalUnit boss bigUnit heal damage填入
+3)出现成长/永久效果 可以考虑将其使用enemyHq|GetEffect("<effect>")效果附加到敌方总部上,这样玩家可以通过浮标查看,也可以通过tX=ADD:来做到类似的效果,但是这个将作为行动显示在左侧的意图列表中.如果意图太多,可以考虑前面的写法
+4)关卡要有一定的主题,最好是围绕玩家卡组的某个能力进行考察
+5)不必太关心历史 可以写的天马行空一点
+6)在一个关卡中最好不要引入过多的新机制单位(2-3个左右是可以的)
+7)需要注意这个关卡是否存在刷钱的可能性.假如敌人没什么成长,且一直在刷兵,那需要给关卡设置一个最后期限,否则玩家堵泉水直接把钱刷到114514了
+8)在一个area内 除了boss关卡 其他关卡不应有过大的难度差异(但是可以考察卡组的不同方面)
+9)boss关卡应该显著提升难度,但是要考虑到玩家卡组的强度
+10)最好少搞开幕雷击,因为卡兹启动相对慢一点,前3个回合最好控制一下水温
+11)一般关卡可以凑凑数 但是boss关卡一定要有一定的特色(如特殊的机制)
+
+
+下面是关于一个具体关卡的代码示例
+
+[berlin_final_battle]
+name=攻克柏林
+t1=addToEnemySupportLine(de_infantry),addToEnemySupportLine(de_infantry),addToEnemySupportLine(de_infantry),addToEnemySupportLine(de_infantry)[icon=bigUnit,description=部署第1步兵团*4]
+t3=addToEnemySupportLine(de_mg42),addToEnemySupportLine(de_mg42)[icon=normalUnit,description=部署火力小组*2]
+every4t=ADD:enemyHq|heal(2)[icon=heal,description=敌方总部获得2防御力]
+t4=ADD:GetRandomFriendUnit|damage(2)[icon=damage,description=对随机友方单位造成2点伤害]
+t5=addToEnemySupportLine(de_tigerKing)[icon=boss,description=部署虎王]
+t6=addToEnemySupportLine(de_tiger),addToEnemySupportLine(de_tiger)[icon=bigUnit,description=部署虎式重坦*2]
+t7=ADD:addToEnemySupportLine(de_tiger)[icon=bigUnit,description=部署虎式重坦]
+t8=enemyHq|heal(20)[icon=heal,description=敌方总部获得20点防御力]
+every6t=ADD|GetRandomEnemyTarget|heal(2)[icon=heal,description=随机敌方单位获得2点防御力]
+t12=ADD:addToEnemySupportLine(de_tiger)[icon=normalUnit,description=部署虎式重坦]
+t18=addToEnemySupportLine(de_ufo)[icon=boss,description=投入火星飞碟]
+t34=myHq|KillAllTargets[icon=boss,description=消灭友方总部]
+
+[section_name]<-这里面是这个战役的id 推荐使用英文id
+name <-这个表示其在用户界面上的名字是什么
+tX= <-在第X个回合开始时,触发此效果
+everyXt= <-每X个回合1次 触发xxx效果
+ADD: <-这是一个标签 加在效果前面表示从这个回合开始这个效果每个回合都会被执行
+battleStart= <-关卡开局效果,战斗开始时结算一次.不进行动队列,所以不会作为一条意图显示在左侧面板上.
+                来源卡固定是敌方总部,条件直接用通用的 if(...)跳转 写,可用的 &hp 是战役血量
+                (世界地图上心形图标后面那个数,即"还能失败几次").不写这个键就是没有开局效果.
+                例:battleStart=myHq|heal(&hp*10)  每有1条命,友方总部额外获得10防御力
+
+当你希望写出一个效果时,可以先简单看一下这几个前缀能否组合出你需要的效果
+如果做不到 先不要想着压力斑鸠,先想想
+能否将这个效果贴到总部上/刷出一个带有特殊机制的单位来解决
+因为单位允许更复杂的机制(如时点匹配)
+
+目前所有支持的时点及其翻译
+BeingAddedToField        任意单位被加入支援阵线(不区分敌我) 
+Deployed                 部署:
+FriendlyTankDeployed     友方坦克部署时(注意部署不等于加入战场!只有"加入"是加入战场 从你手中下到场上就是部署)
+FriendlyInfantryDeployed 友方步兵部署
+Moving                   此单位移动时(这个时点在哪个单位上,就只能在这个单位触发 下同)
+Attacking                此单位攻击时
+BeingAttacked            此目标被攻击时,在攻击之前结算
+BecomingAttackTarget     友方目标成为敌方成为攻击目标时,此时点在攻击结算前
+FightingInfantry         此单位攻击的目标时步兵时,后面懒得写了总之所有攻击时点不说默认攻击前
+AttackingHq              此单位攻击的目标为总部时
+FriendlyUnitAttacking    友方单位攻击时
+EnemyUnitAttacking       敌方单位攻击时(请注意 这里的友方/敌方是绝对的,你的卡永远是friendly 敌方的卡永远是enemy 比如敌方单位给敌方总部贴膜 写的也是enemyHq)
+FriendlyUnitBeingAttacked友方单位被攻击时 请注意此时点在被攻击后
+EnemyUnitBeingAttacked   敌方单位 同上
+Dead                     亡计
+FriendlyUnitDead         友方单位死亡时
+EnemyUnitDead            敌方单位死亡时
+FriendlyTurnEnd          友方回合结束
+TurnEnd                  回合结束(双方任一回合结束)
+EnemyTurnBegin           敌方回合开始
+TurnBegin                回合开始(双方任一回合开始)
+FriendlyTurnBegin        友方回合开始
+BePicked                 此目标被指向 被指向包含一下2种情况:被选为敌方单位的攻击目标 被友方需要选择目标的指令选择(请注意随机选择目标的指令和直接在指令中规定如何取目标的指令不触发此时点 如随机消灭一个单位 被消灭的单位不触发此时点 简单来说就是被对方攻击和你自己用箭头指向的时候才会触发)
+FriendlyCommandPlayed    友方指令打出

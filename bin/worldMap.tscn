@@ -6,12 +6,12 @@
 [ext_resource type="Texture2D" uid="uid://tijuuut6gmwa" path="res://assest/chooseThisAreaPresssed.png" id="3_kanex"]
 [ext_resource type="Texture2D" uid="uid://cl2c37lfu3l2y" path="res://assest/chooseThisAreaHover.png" id="4_ord10"]
 [ext_resource type="Texture2D" uid="uid://357opc6t10uq" path="res://assest/资源点.png" id="6_kanex"]
-[ext_resource type="Texture2D" path="res://assest/hearts.png" id="7_hearts"]
+[ext_resource type="Texture2D" uid="uid://cfi7vkyb2pxu5" path="res://assest/hearts.png" id="7_hearts"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_cs12g"]
 font_size = 43
 
-[node name="Control" type="Control"]
+[node name="Control2" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -135,8 +135,9 @@ position = Vector2(49, 55)
 texture = ExtResource("6_kanex")
 
 [node name="heartPic" type="Sprite2D" parent="."]
-modulate = Color(1, 0.35, 0.4, 1)
-position = Vector2(49, 148)
+modulate = Color(0.7335228, 0.21810421, 0.21165666, 1)
+position = Vector2(47, 145)
+scale = Vector2(0.578125, 0.578125)
 texture = ExtResource("7_hearts")
 
 [node name="hpNum" type="Label" parent="."]

@@ -145,6 +145,18 @@ public partial class cardBase_ : Control
         return (traits & ActionForbiddingTraits) != 0;
     }
 
+    /// <summary>
+    /// 本兵种是否无视「守护」——被守护的目标对它而言没有保护，可以照常攻击。
+    ///
+    /// 火炮与轰炸机属于越顶火力，前排的守护单位拦不住它们。
+    /// 判定只认攻击方兵种，与阵营无关，所以玩家侧 `Attack()` 与敌方 AI 选目标
+    /// 走的是同一条规则，不会出现「玩家能打、AI 不能打」的不一致。
+    /// </summary>
+    public static bool IgnoresGuardian(CardTypes type)
+    {
+        return type == CardTypes.Artillery || type == CardTypes.Bomber;
+    }
+
     public void RefreshUnit()
     {
         moveAble = 1;
@@ -750,6 +762,12 @@ public partial class cardBase_ : Control
     private async Task AnimateCostRoll(int fromValue, int toValue)
     {
         if (fromValue == toValue) return;
+
+        // 牌堆里的卡是「已实例化但不在场景树上」的对象（Player.deck），
+        // 对它们改费用是合法的，但纯视觉的滚动动画做不了——`GetTree()` 会返回 null。
+        // 不挡这一下，改牌堆费用的效果每张卡都会抛一次空引用。
+        if (!IsInsideTree()) return;
+
         var costLabel = GetNode<Label>("cost");
         if (costLabel == null) return;
 

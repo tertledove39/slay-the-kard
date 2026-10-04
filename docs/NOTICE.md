@@ -76,7 +76,7 @@
 | 配置 | 文件 |
 |------|------|
 | 卡牌属性 | `cards/card.ini` |
-| 敌方行动预设 | `cards/enemyTurn.ini` |
+| 敌方行动预设 + 关卡开局效果 `battleStart=` | `cards/enemyTurn.ini` |
 | 区域池 | `bin/AreaPool.ini` |
 | 玩家初始卡组 | `bin/deck.ini` |
 | 事件 | `bin/event.ini` |
@@ -110,6 +110,10 @@
 | `AttackInf` 是空桩 | 步兵攻击动画未实现 |
 | `GetCardMaganer` 拼写错误 | 多处使用此方法名（少了一个'a'），新增调用时保持一致性 |
 | `MouceEntered`/`MouceExited` 拼写错误 | 方法名拼写错误但 Godot 信号连接可能依赖此名称，不要轻易改名 |
+| **等一个可能永远不来的事件** | 凡是「按下进入、松开退出」这类成对的事件，收尾都不能指望后一半一定到达。截图工具抢鼠标、Alt-Tab 失焦都会让 mouse-up 送不进来，状态就此挂死（卡永久停在 `caught`）。正确做法是加外部兜底：`_Notification(NotificationApplicationFocusOut)` + 「收到鼠标移动但物理左键已不在按下状态」，且兜底必须放在控制锁判定**之前**。参考 `battlefield_.CancelCurrentDrag()`、回归见 `tests/verify_combat_action_timing.py` |
+| 按阵营刷新行动能力 | `RefreshCardsInField(IsFriend side)` 只在**各自回合开头**刷自己那一方（敌方在 `EnemyTurnAsync` 开头、友方在 `FriendlyTurnBegin` 时点之前）。它**不是**「一次性刷全部」——写成那样，敌方回合里被效果刷进场的单位（亡计召唤等）会整回合动不了。`_Ready()` 给的是 `attackAble = 0 / moveAble = 0`，只有闪击会自行补刷 |
+| `DiscardRandomly` 的阵营陷阱 | 它弃的是**效果来源卡那一方**的手牌。写在 `enemyTurn.ini` 里的行动来源卡是敌方总部，用它只会去弃敌方自己的（空）手牌，**不报任何错**。要让敌人弃玩家的牌必须用 `DiscardPlayerRandomly(n)` |
+| 牌堆里的卡不在场景树上 | `Player.deck` 里的卡是「已实例化但不在场景树」的对象：改它们的属性合法，但任何走 `GetTree()` 的纯视觉动画都会空引用（`AnimateCostRoll` 已加 `if (!IsInsideTree()) return;`）。给牌堆卡加效果时先对照这条 |
 | 输入事件漏校验 `ButtonIndex` | `_Input` 处理 `InputEventMouseButton` 时，「按下」与「抬起」是两个**兄弟分支**，任一分支的 `Pressed` 判断漏掉 `ButtonIndex == MouseButton.Left`，右键就会完整走进左键流程。战斗拖拽中后果尤其严重：`currentInputState` 被冲成 `nil` 后卡牌永久停在 `caught`，而 `RefreshMyHand()` 对拖拽中的卡 `continue` 跳过、不再归位，表现为**卡牌卡在场上**，且全部手牌悬停同时失效。正确写法参考 `Store.cs`、`MulliganScreen.cs`、`ChooseSomeCard.cs`；回归测试见 `tests/verify_drag_right_click.py` |
 
 ---

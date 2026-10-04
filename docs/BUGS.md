@@ -389,3 +389,151 @@ private void RecordCardsObtained(List<cardBase_> cards, IsFriend side)
 
 **回归**：`tests/verify_card_obtained_pointer.py`（17 条），其中断言
 `lastCardAddedToHand` 的赋值点全项目只有一处。
+
+---
+
+## 2026-10 实机反馈批次（拖拽/召唤/撤退/敌方脚本/守护/开局）
+
+### 37. 拖动卡牌时截图，卡永久卡在场上
+
+**现象**：拖着一张卡的时候用截图工具截屏，这张卡再也拖不动，显示优先级也乱了。
+
+**根因**：拖拽是「按下进入、松开退出」的一对事件。截图工具会把鼠标抢走，
+让「松开左键」永远送不到游戏里；窗口失焦也一样。`cardNowChoose` 与
+`state == caught` 就此挂住，而 `RefreshMyHand()` 对拖拽中的卡是 `continue` 跳过的，
+于是它再也不会归位。
+
+**修复**：新增 `CancelCurrentDrag()`，两条外部兜底——
+`_Notification(NotificationApplicationFocusOut)`，以及 `_Input` 里「收到鼠标移动但
+物理左键已不在按下状态」。后者**必须放在 `ReadControlState()` 之前**，
+否则解锁前永远轮不到它。
+
+**回归**：`tests/verify_combat_action_timing.py` ①。
+
+### 38. 亡计刷出来的 IS-2 下个回合不能行动
+
+**现象**：近卫步兵272团的亡计拉出的 IS-2，撑到友方回合还是动不了。
+
+**根因**：全场刷新只有 `RefreshAllCardInField()` 一处，且只在 `EnemyTurnAsync()` 开头调用。
+`cardBase_._Ready()` 给的是 `attackAble = 0 / moveAble = 0`，只有闪击会在入场时补刷。
+回合顺序是「敌方回合开头刷一遍 → 敌方行动中亡计刷出 IS-2 → 友方回合开始」，
+中间再没有刷新，于是它整回合都是 0/0。
+
+**修复**：拆成按阵营刷新 `RefreshCardsInField(IsFriend side)`——敌方在敌方回合开头、
+友方在友方回合开头各刷一次（友方那次排在 `FriendlyTurnBegin` 时点之前）。
+从手牌部署的召唤失调不受影响：部署发生在本次刷新之后。
+
+**顺带**：`BUGS.md` 第 32 条「撤退回手的单位没闪击就永久不能动」是同一个根因，一并解决。
+
+**回归**：`tests/verify_combat_action_timing.py` ②。
+
+### 39. 被撤退的敌方单位在删除前还能攻击
+
+**现象**：撤退敌方支援阵线的一个单位后马上结束回合，它已经在播撤退/移除动画了，
+却照样打了一下。
+
+**根因**：`RetreatUnit()` 只对「友方回手牌」那条分支调了 `DisableCombatAbility()`；
+敌方弃置分支只挂了个 `AddChange(ChangeType.DiscardCard,1)` 标记。这张卡要等死亡检查
+才真正 `RemoveCard`，在那之前它仍绑在 `place` 上、`state` 还是 `placed`，
+敌方 AI 照样能把它选去攻击。
+
+**修复**：敌方分支同样先 `DisableCombatAbility()`；顺带把裸的 `Task.Delay(100)`
+提成具名常量 `RetreatSettleDelayMs`。批量弃置也改成「起飞前统一关掉全部战斗能力」。
+
+**回归**：`tests/verify_combat_action_timing.py` ③。
+
+### 40. `DiscardRandomly` 写在敌人意图里完全无效
+
+**现象**：`[Orsha]` 的 t3/t6/t9/t12/t15 写着「随机弃置友方N张卡」，实际什么都不发生。
+
+**根因**：该指令按「效果来源卡的阵营」派发。写在 `enemyTurn.ini` 里的战役行动，
+来源卡是敌方总部，于是它去弃**敌方自己**的手牌——那是空的。既不报错也没有表现。
+
+**修复**：新增 `DiscardPlayerRandomly(n)`，固定弃置 `player1` 的手牌，与来源阵营无关。
+原来的 `DiscardRandomly` 保持「来源方自己弃自己」的语义不动（`card.ini` 里
+「抽3张弃1张」那张卡还要用它）。`enemyTurn.ini` 的 5 条行动改用新指令。
+
+**顺带**：t6 的说明写的是「弃2张」而代码是 1 张，按《战役约定》第 2 条
+（说明必须严格反映当前状态）把说明改回 1 张。若本意是 2 张，改 `DiscardPlayerRandomly(2)` 即可。
+
+**回归**：`tests/verify_enemy_scripts_and_spawn.py` ④。
+
+### 41. `改装` 指向单位后刷不出新单位
+
+**现象**：`[改装]` 指向 Su-85 之后没有刷出任何单位。
+
+**根因**：`addANewUnitToBattlefieldWithCostAndType` 的正则写死成
+`\(([^,]+),\s*(\d+)\)`，第二个参数只认**字面量数字**。而 `[改装]` 传的是 `&result`，
+正则整体不匹配 → 整条指令静默失效。（注：`ReplaceVariables` 在派发前已经把 `&result`
+换成了数字，但正则对「设计上要收表达式」这件事没有留余地，任何非纯数字实参都会被吞掉。）
+
+**修复**：改为捕获表达式并交给 `EvaluateExpression` 求值，同时给三条静默出路各加日志
+（参数解析失败 / 卡池无可用卡 / 支援阵线满员）。第三条是这条指令唯一会「什么都不做」的
+正当理由，但从前看不出来，和「效果写错了」分不开。
+
+**回归**：`tests/verify_enemy_scripts_and_spawn.py` ⑤。
+
+### 42. 火炮与轰炸机攻击不了被守护的目标
+
+**修复**：`cardBase_.IgnoresGuardian(CardTypes)` 把 `Artillery` 与 `Bomber` 排除在守护之外。
+判定只认攻击方兵种、不看阵营，且放在 `IsTargetProtectedByGuardian` 的**烟幕检查之前**
+（排在后面的话，目标带烟幕时函数会先返回，豁免被绕过）。玩家侧 `Attack()` 与
+敌方 AI 选目标都调这同一个函数，规则天然一致。
+
+**回归**：`tests/verify_guardian_bypass_and_overlay.py` ⑩。
+
+### 43. 事件期间看不到商店与卡组
+
+**修复**：进事件时只收起任务选择面板（`EnterEventOverlay` 走 `CloseMissionPanel`，
+**保留**本次抽到的一批），事件结算后才丢弃（`ExitEventOverlay`）。
+事件暗幕的 `MouseFilter` 由 `Stop` 改为 `Ignore`，世界地图上的商店/卡组按钮重新可点
+（商店在 CanvasLayer 10、卡组查看器在同层后加，天然盖在事件之上）。
+挡区域按钮的活改由 `WorldMap._eventOverlayActive` 在 `OnAreaPressed` 里管——
+暗幕不拦鼠标之后，不挡这一下，点到底下的区域会在事件背后又叠一个任务面板。
+
+**回归**：`tests/verify_guardian_bypass_and_overlay.py` ⑥。
+
+### 44. 多张单位卡弃置动画过慢
+
+**修复**：卡与卡之间错开 `DiscardStaggerSeconds`（0.5 秒）起飞，动画互相重叠，
+`Task.WhenAll` 统一等待。单张行为不变（不为单张平白加 0.5 秒）。
+详见 `docs/LOGIC.md`「单位卡的弃置动画节奏」。
+
+**回归**：`tests/verify_combat_action_timing.py` ④。
+
+### 45. `[标准弹药]` 只减了手牌的费用
+
+**修复**：改为打出时对 `${allCardInHand.friend}` 与 `${deck.friend}` 各 `subCost(1)`，
+并去掉原先「每抽 1 张再 -1」的持续效果。
+
+**顺带（必须一起修，否则牌堆那一段会逐张抛空引用）**：
+`cardBase_.AnimateCostRoll()` 里用了 `GetTree().CreateTimer(...)`，而牌堆里的卡是
+「已实例化但不在场景树上」的对象，`GetTree()` 返回 null。加了 `if (!IsInsideTree()) return;`
+（放在 `GetNode<Label>("cost")` 之前）。纯视觉的滚动动画对牌堆卡跳过，费用本身照改。
+
+**回归**：`tests/verify_guardian_bypass_and_overlay.py` ⑦。
+
+### 46. 新增 `battleStart=` 关卡开局效果
+
+「游戏开始时，若 xxx 则 xxx」的通用架构，详见 `docs/LOGIC.md`。
+柏林关用它实现「每有 1 条命，友方总部额外获得 10 点防御力」。
+
+**回归**：`tests/verify_enemy_scripts_and_spawn.py` ⑪。
+
+### 47.（待确认，未修）友方总部的效果浮标不显示
+
+用户报告「友方总部的效果浮标似乎没有正确显示」，但表示**先不解决、晚点详细测试**。
+
+已查清的事实：
+
+- 约定见 `docs/战役约定.txt` 第 3 条：永久/成长效果用 `enemyHq|GetEffect("<effect>")`
+  贴到**敌方总部**，玩家通过浮标查看。
+- `moscow`（友方总部）在 `card.ini` 里 `effect = ` 是空的，效果全靠运行时 `GetEffect` 挂。
+- `[柏林之路]` 的解析链已用 Python 原样复刻验证：`enemyHq` 拿到
+  `AttackingHq:…[icon=action,description=…]`（结尾是 `]`，`ParseEffectAttribute` 能解析）；
+  `myHq` 拿到 `FriendlyTurnBegin: SetMemory(enemyDmg,0)|SetMemory(enemyTriggered,0)`
+  （无 `[icon=…]`、结尾是 `)` → 返回 null → 不显示图标）。**后者是内部记账，符合约定。**
+- **用户明确要求：不要为此改 `card.ini` 的 `[柏林之路]`。**
+
+待确认：用户看到的到底是哪个总部。若为敌方总部（berlin）不显示，则需查
+`BuildAttributePanel` 的渲染链（图标位置、缓存比较、`RefreshState` 时机）。

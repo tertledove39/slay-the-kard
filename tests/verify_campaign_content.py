@@ -27,7 +27,9 @@ AREA_INI = ROOT / "bin" / "AreaPool.ini"
 CARD_INI = ROOT / "cards" / "card.ini"
 STATE_CS = ROOT / "bin" / "CardRestoration.cs"
 
-KEY_PATTERN = re.compile(r"^(t\d+|every\d+t|default|ADD)$")
+# battleStart 是关卡开局效果，只结算一次、不进行动队列（不会显示成敌方意图），
+# 所以它属于合法键名，但**不属于** ACTION_KEYS。
+KEY_PATTERN = re.compile(r"^(t\d+|every\d+t|default|ADD|battleStart)$")
 ACTION_KEYS = re.compile(r"^(t\d+|every\d+t|default)$")
 METADATA = re.compile(r"\[icon=[^\]]*?,\s*description=[^\]]*?\]")
 

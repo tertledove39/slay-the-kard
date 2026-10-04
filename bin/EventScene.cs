@@ -36,10 +36,18 @@ public partial class EventScene : CanvasLayer
     {
         var scene = new EventScene { Layer = 2 };
         parent.AddChild(scene);
+
+        // 事件期间收起任务选择面板，但**保留**本次抽到的那一批（走 CloseMissionPanel
+        // 而不是 Dismiss）：事件结束后玩家回到地图，看到的还是同样三个选项。
+        if (parent is WorldMap map)
+            map.EnterEventOverlay();
+
         bool campaignCompleted = await scene.Run(eventData, areaName);
         scene.QueueFree();
+
+        // 事件结算完毕才丢弃这一批——烈度已经被这次事件消耗掉了
         if (parent is WorldMap wm)
-            wm.DismissChooseMission();
+            wm.ExitEventOverlay();
 
         if (campaignCompleted)
             await CampaignVictory.ShowAndReturnToMenu(parent);
@@ -63,10 +71,14 @@ public partial class EventScene : CanvasLayer
             AddChild(_cardPreview);
         }
 
+        // 暗幕只负责压暗，**不拦截鼠标**：事件期间玩家要能点到世界地图上的
+        // 商店与卡组按钮（那两个弹层分别在 Layer 10 与 Layer 2 后加，天然盖在事件之上）。
+        // 挡点击的活交给 WorldMap.EnterEventOverlay()：它把区域按钮锁掉，
+        // 避免点到事件背后的区域又开一个任务面板。
         var bg = new ColorRect();
         bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         bg.Color = new Color(0, 0, 0, 0.75f);
-        bg.MouseFilter = Control.MouseFilterEnum.Stop;
+        bg.MouseFilter = Control.MouseFilterEnum.Ignore;
         AddChild(bg);
 
         var viewSize = GetViewport().GetVisibleRect().Size;

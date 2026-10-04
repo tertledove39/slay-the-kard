@@ -1,4 +1,5 @@
 {
     "godotTools.editorPath.godot4": "d:\\games\\Godot_v4.5-stable_mono_win64\\Godot_v4.5-stable_mono_win64\\Godot_v4.5-stable_mono_win64.exe",
-    "Codegeex.RepoIndex": true
+    "Codegeex.RepoIndex": true,
+    "dotnet.defaultSolution": "road_to_berlin.sln"
 }

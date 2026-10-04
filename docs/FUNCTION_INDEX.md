@@ -1,6 +1,9 @@
 # 函数索引目录
 
 > 按文件列出所有函数及其行数
+>
+> ⚠️ **本文档的行号已普遍过期**（例如早先记录的 `RetreatUnit` 4475、实际在 5408）。
+> 近期新增/改名的条目用的是当时的真实行号，其余条目请以 `rg` 现查为准。
 
 ## battlefield_.cs (bin/battlefield_.cs, ~5642 行)
 
@@ -117,7 +120,12 @@
 | 函数 | 行数 | 说明 |
 |------|------|------|
 | `OnNextTurnButtonPressed()` | 2902 | **下一回合按钮**（完整回合流程） |
-| `RefreshAllCardInField()` | 2945 | 刷新所有场上卡牌 |
+| `RefreshCardsInField(side)` | 3375 | 刷新**某一方**场上卡牌的行动能力。按阵营在各自回合开头调用——敌方在 `EnemyTurnAsync` 开头、友方在 `FriendlyTurnBegin` 时点之前。旧名 `RefreshAllCardInField()`（一次性刷全部）已废弃 |
+| `DiscardUnitsWithStagger(cards)` | 3199 | 批量弃置单位卡：卡与卡之间错开 `DiscardStaggerSeconds`(0.5s) 起飞 |
+| `FinishUnitDiscard(card)` | 3223 | 等一张单位卡的弃置动画播完后移出战场 |
+| `CancelCurrentDrag()` | 1115 | 安全取消当前拖拽并让卡归位（窗口失焦 / 鼠标被截图工具抢走时的兜底） |
+| `StartBattleAsync()` | 569 | 战斗开场：先结算关卡开局效果，再起手抽牌 |
+| `RunBattleStartEffectAsync()` | 586 | 执行 `enemyTurn.ini` 的 `battleStart=` 开局效果 |
 | `ApplyTurnStartTraits()` | 2956 | 应用友方回合开始trait |
 | `ApplyEnemyTurnStartTraits()` | 2990 | 应用敌方回合开始trait |
 
