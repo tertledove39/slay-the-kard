@@ -304,6 +304,37 @@ def main():
     results.append(check("GetMyPlace() == null" in move,
                          "isDeployedFromHand 判据：没有格子 = 从手牌来的"))
 
+    # ==================== ⑨ 抽卡音 ====================
+    # 五条变体（Draw_One_A~E）挂在 [sfx] 的 draw 槽位，靠该段本来就有的
+    # 「逗号分隔、每次随机抽一条」实现随机——不用写任何抽签代码。
+    # 难点在挂载：Player 里有**四条各自独立的抽牌实现**，得四处都挂。
+    print("\n--- ⑨ 抽卡音 ---")
+    results.append(check("private const string DrawSoundEffect = \"sfx(draw)\";" in battle,
+                         "抽卡音是个常量"))
+    results.append(check("public void PlayDrawSound() => StartEffect(DrawSoundEffect, null, null, null);" in battle,
+                         "抽卡音有公共入口（Player 调 battlefield 的这个）"))
+    results.append(check("draw" in slots, "[sfx] 段里配了 draw 槽位"))
+
+    draw_files = slots.get("draw", [])
+    results.append(check(len(draw_files) == 5, f"draw 是 5 条变体（实际 {len(draw_files)} 条）"))
+    for f in draw_files:
+        src = ROOT / f.replace("res://", "")
+        results.append(check(src.exists(), f"draw → {src.name} 存在"))
+        results.append(check(Path(str(src) + ".import").exists(),
+                             f"draw 的 {src.name} 已被 Godot 导入"))
+    results.append(check(all(re.search(r"Draw_One_[A-E]", f) for f in draw_files),
+                         "五条都是 Draw_One_A~E（随机由 [sfx] 段的逗号分隔机制负责，无需额外代码）"))
+
+    # 四处挂载点。Player 里四条抽牌实现都以 `deck.Remove*` 取牌，所以按这个定位：
+    # 每一次从牌堆取牌之后都应该在附近调 PlayDrawSound —— 以后新加第 5 种抽法而忘了挂，这条会红。
+    calls = battle.count("battlefield.PlayDrawSound();")
+    results.append(check(calls == 4, f"四条抽牌路径各挂一次（实际 {calls} 处）"))
+    takes = [m.start() for m in re.finditer(r"deck\.Remove(At)?\(", battle)]
+    missing = [battle[t:t + 160] for t in takes
+               if "battlefield.PlayDrawSound();" not in battle[t:t + 160]]
+    results.append(check(not missing,
+                         f"每一次「从牌堆取牌」之后都跟着抽卡音（漏挂 {len(missing)} 处）"))
+
     failed = results.count(False)
     print(f"\nResult: {len(results) - failed} passed, {failed} failed")
     return 1 if failed else 0

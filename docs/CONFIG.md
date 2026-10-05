@@ -137,6 +137,20 @@
 
 **加一句新语音只要两步**：`[sfx]` 段写一行、卡上写 `playEffect = sfx(名字)`。不用新建场景、不用改注册表。
 
+#### 抽卡音（`draw`）
+
+卡牌从牌堆被抽走时放 `[sfx]` 的 `draw` 槽位。该槽位写了 **5 条变体**（`Draw_One_A`~`E`），
+逗号分隔——`[sfx]` 段本来就是「**逗号分隔、每次随机抽一条**」，所以变化感由现成机制提供，
+代码里没有任何抽签逻辑。
+
+**挂载点在 `battlefield_.PlayDrawSound()`**，由 `Player` 的四条抽牌实现各调一次：
+`DrawCard()`、`DrawCardsWithName()`、`DrawCardsWithType()`、`DrawUnitCards()`。
+
+> **以后新加抽牌方式时记得也调 `PlayDrawSound()`**，否则那一种抽法会静默没声。
+> 那四条实现的下半截看着一样、其实有微妙差异（爆牌那条一个走 `CardDiscardAndRemove`、
+> 三个走 `DiscardCard + RemoveCard`），所以**没有合并**——合并是行为改动，不在加一声音的范围内。
+> `tests/verify_card_voice.py` 守着：每一处「从牌堆取牌」的后面都跟着抽卡音。
+
 两个静默失败的坑（都不报错、只是没声），`tests/verify_card_voice.py` 都守着：
 
 - **槽位名拼错**：交叉核对「卡里写的槽位」必须在 `[sfx]` 段里存在。

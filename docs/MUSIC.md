@@ -117,6 +117,7 @@ battleBGM_berlin_final_battle=res://assest/music/配乐3.mp3,res://assest/music/
 | `plane_flyby` | **飞机/轰炸机**（`assest/飞机飞过_效果.wav`） | 同上，**入场与移动**都放这一条，不分档 |
 | `katyusha_into_pos` | **喀秋莎进场/移动**（`assest/AU_Rocket_Art_Katyusha_IntoPos_01.wav`） | 挂在喀秋莎的 `playEffect` 上——**进场与移动共用这一行**（见 `CONFIG.md` 的「单位『移动』时的音」） |
 | `katyusha_fire` | **喀秋莎开火**（`assest/AU_Rocket_Art_Katyusha_fire_02.wav`） | 挂在喀秋莎的 `attackEffect` 上。带了它的攻击特效**不再叠通用机枪声**（`sfx` 在 `NoFiringSoundNames` 里） |
+| `draw` | **抽卡音**（`assest/Draw_One_A~E.wav`，**5 条变体**） | 卡牌从牌堆被抽走时由 `battlefield_.PlayDrawSound()` 放。同一段写了 5 个文件、逗号分隔，靠 `[sfx]` 段本来就有的「**随机抽一条**」实现变化——不用写任何抽签代码 |
 
 > 这几类素材**卡牌上都不需要写任何东西**，加新卡时自动就有声音。
 > 档位边界见 `battlefield_` 的 `DeploySound*Max`，槽位前缀见 `InfantryVoicePrefix` / `TankVoicePrefix`，

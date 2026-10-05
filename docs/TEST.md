@@ -948,6 +948,28 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 影响面只有喀秋莎自己（此前没有别的卡在 `attackEffect` 里用 `sfx`）。
 注意 `strafe` 仍然**不在**名单里——它打的就是子弹，那声机枪正是它要的。
 
+### 第十五轮调整（抽卡音）
+
+需求：新增 `Draw_One_A`~`E` 五条素材，抽卡时播放。
+
+**随机不用写代码**：`[sfx]` 段本来就是「逗号分隔、每次随机抽一条」，所以 `draw` 槽位里
+五个文件一列就有了变化感。实机跑过 12 次抽签，抽到了 4 个不同文件，确认生效。
+
+**难点在挂载**：`Player` 里有**四条各自独立的抽牌实现**——
+
+    DrawCard()            （主路径：回合抽牌 / 起手 / 换牌 / drawCard 指令都走它）
+    DrawCardsWithName()   （自己的循环）
+    DrawCardsWithType()   （自己的循环）
+    DrawUnitCards()       （自己的循环）
+
+四条都以 `deck.Remove*` 开头，下半截看着一样、其实有微妙差异（爆牌那条一个走
+`CardDiscardAndRemove`、三个走 `DiscardCard + RemoveCard`）。**没有合并它们**——
+合并是行为改动，不属于「加一声抽卡音」的范围；只在 `battlefield_` 加了一个公共入口
+`PlayDrawSound()`，四处各调一次。
+
+测试里那条结构检查值得记：**每一处 `deck.Remove*` 之后 160 字符内都必须有
+`PlayDrawSound()`**。以后谁新加第五种抽法却忘了挂音，这条会红——不然那种抽法就是静默没声。
+
 ### 场景里 export 的值要带中文注释
 
 `.tscn` 的导出值在 Inspector 里只显示英文字段名，看不出含义，所以约定在**上一行**写一行

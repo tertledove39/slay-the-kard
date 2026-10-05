@@ -178,6 +178,12 @@ public partial class battlefield_ : Control
     private const string PlaneFlybyEffect = "sfx(plane_flyby)";
 
     /// <summary>
+    /// 抽一张牌时的那一声。`[sfx]` 段的 `draw` 槽位写了 5 条变体（`Draw_One_A`~`E`），
+    /// 该段本来就是「逗号分隔、每次随机抽一条」，所以随机由 `MusicManager` 负责，这里不用管。
+    /// </summary>
+    private const string DrawSoundEffect = "sfx(draw)";
+
+    /// <summary>
     /// 自定义内存变量：在当前战场场景中持久保存
     /// </summary>
     private Dictionary<string, int> memoryVariables = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -950,6 +956,19 @@ private const int OpeningHandSize = 5;
                     : "large";
         return $"sfx({family}_{tier})";
     }
+
+    /// <summary>
+    /// 抽一张牌时的音（`Player` 抽牌时调）。
+    ///
+    /// `Player` 里有**四条各自独立的抽牌实现**（`DrawCard` / `DrawCardsWithName` /
+    /// `DrawCardsWithType` / `DrawUnitCards`），所以这一声要在四处各调一次。
+    /// 那四段的下半截看着一样、其实有微妙差异（爆牌那条一个走 `CardDiscardAndRemove`、
+    /// 三个走 `DiscardCard + RemoveCard`），所以**没有合并**——合并是行为改动，
+    /// 不属于「加一声抽卡音」的范围。
+    ///
+    /// 以后**新加抽牌方式时要记得也调这里**，否则那一种抽法会静默没声。
+    /// </summary>
+    public void PlayDrawSound() => StartEffect(DrawSoundEffect, null, null, null);
 
     /// <summary>
     /// 单位在场上**挪位置**（支援阵线 → 前线）时的音。一次移动只响一声：
@@ -6791,6 +6810,7 @@ public class Player
         {
             var card = deck[0];
             deck.RemoveAt(0);
+            battlefield.PlayDrawSound();
             if (cardsInHand.Count >= maxHandSize)
             {
                 battlefield.AddToBattleField(card);
@@ -6903,6 +6923,7 @@ public class Player
             if (card != null)
             {
                 deck.Remove(card);
+                battlefield.PlayDrawSound();
                 if (cardsInHand.Count >= maxHandSize)
                 {
                     await card.DiscardCard();
@@ -6932,6 +6953,7 @@ public class Player
                 if (card != null)
                 {
                     deck.Remove(card);
+                    battlefield.PlayDrawSound();
                     if (cardsInHand.Count >= maxHandSize)
                     {
                         battlefield.AddToBattleField(card);
@@ -6963,6 +6985,7 @@ public class Player
             if (card != null)
             {
                 deck.Remove(card);
+                battlefield.PlayDrawSound();
                 if (cardsInHand.Count >= maxHandSize)
                 {
                     battlefield.AddToBattleField(card);
