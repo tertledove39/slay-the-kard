@@ -20,32 +20,35 @@ using System.Threading.Tasks;
 ///
 /// 每段的时长都直接填秒数（不再按总时长的百分比切），因为「摆动 4 秒一个周期」
 /// 这种要求用百分比表达不出来。参数全部 Export 在 `effects/flying_effect.tscn` 上。
+///
+/// 中间那段（`StayAsync`）是 `virtual` 的，子类可以在停留期间捎带做别的事——
+/// `AirStrikeEffect` 就是靠覆写它做到「边盘旋边投弹」的，见那个类的说明。
 /// </summary>
 public partial class FlyingEffect : Effect
 {
     /// <summary>往上升多少像素。</summary>
-    [Export] public float RiseHeight = 46f;
+    [Export] public float RiseHeight = 20f;
 
     /// <summary>漂浮期间放大到原来的多少倍（1.18 = 放大 18%）。</summary>
-    [Export] public float RiseScale = 1.18f;
+    [Export] public float RiseScale = 1.05f;
 
     /// <summary>在「已经指向目标」的基础上，左右摆动的幅度（度）。</summary>
-    [Export] public float SwayDegrees = 5f;
+    [Export] public float SwayDegrees = 3f;
 
     /// <summary>摆动**一个来回**要几秒。</summary>
-    [Export] public float SwaySecondsPerCycle = 4f;
+    [Export] public float SwaySecondsPerCycle = 2f;
 
     /// <summary>摆动几个来回。</summary>
     [Export] public float SwayCycles = 1f;
 
     /// <summary>升起（含同时进行的转向）用几秒。</summary>
-    [Export] public float RiseDuration = 1.5f;
+    [Export] public float RiseDuration = 1f;
 
     /// <summary>落回桌上用几秒。</summary>
     [Export] public float LandDuration = 1.5f;
 
     /// <summary>漂浮期间用的 ZIndex，要高于其他卡的 10 / 手牌的 20。</summary>
-    [Export] public int TopZIndex = 200;
+    [Export] public int TopZIndex = 15;
 
     /// <summary>飞掠音效所在的槽位名，对应 configs/music.ini 的 [sfx] 段。</summary>
     [Export] public string SfxSlot = "flyby";
@@ -88,7 +91,7 @@ public partial class FlyingEffect : Effect
         try
         {
             await RiseAndAimAsync(source, basePosition, baseScale, aimRotation, RiseDuration * scale);
-            await SwayAroundAimAsync(source, aimRotation, SwaySecondsPerCycle * SwayCycles * scale);
+            await StayAsync(source, positions, aimRotation, SwaySecondsPerCycle * SwayCycles * scale, count);
             await LandAsync(source, basePosition, baseScale, baseRotation, LandDuration * scale);
         }
         finally
@@ -138,6 +141,21 @@ public partial class FlyingEffect : Effect
              .SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
         await ToSignal(tween, Tween.SignalName.Finished);
     }
+
+    /// <summary>
+    /// **停留**阶段——升到最高点之后、落回桌面之前的那段时间，也是子类唯一需要改的一段。
+    ///
+    /// 默认实现就是原地左右摆动。子类可以覆写它，在停留期间捎带做别的事：
+    /// `AirStrikeEffect` 就是「一边盘旋一边投弹」，而**不需要**复制任何一段运动代码。
+    ///
+    /// 三段（起飞 / 停留 / 降落）之所以在这里切出来，就是因为「停留时还能干什么」
+    /// 是会变的，而「怎么升起来、怎么落回去」不会变。
+    /// </summary>
+    /// <param name="stayDuration">停留总时长（秒），已按 `Play(time)` 缩放。</param>
+    /// <param name="count">调用方给的数量（攻击力）。默认实现用不上，留给子类。</param>
+    protected virtual Task StayAsync(cardBase_ card, IReadOnlyList<Vector2> positions,
+                                     float aimRotation, float stayDuration, int count)
+        => SwayAroundAimAsync(card, aimRotation, stayDuration);
 
     /// <summary>
     /// 在**已经指向目标**的角度上左右摆动若干度。

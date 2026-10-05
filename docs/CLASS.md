@@ -75,7 +75,22 @@
 
 ### `BulletEffect` : Effect (core_logic/BulletEffect.cs)
 
-攻击子弹效果控制器，保持原有每次攻击发射10发随机间隔子弹的表现。
+「从 A 点向 B 点打出一串弹体」的效果控制器，一个脚本、两个场景：`bullet`（固定 10 发）与 `bombing`（`ProjectileCount = 0` 表示用调用方给的弹数，即攻击力）。每发弹体飞完全程的秒数由 `ProjectileFlightSeconds` 决定（子弹 0.3、航弹 1.5），调用方通过 `Play(time)` 传了则以调用方为准。
+
+### `FlyingEffect` : Effect (core_logic/FlyingEffect.cs)
+
+飞掠效果：让**触发它的那张卡**升起（含转向）-> 停留 -> 落回，把卡的 Position / Scale / Rotation / ZIndex 全接管，播完在 `finally` 里逐项还原。三段顺序在 `Play` 里显式可见，其中**停留**是钩子：
+
+| 成员 | 说明 |
+|------|------|
+| `Play(...)` | 起飞 `RiseAndAimAsync` -> 停留 `StayAsync` -> 降落 `LandAsync` |
+| `protected virtual Task StayAsync(card, positions, aimRotation, stayDuration, count)` | 停留阶段，默认就是原地左右摆动。子类覆写它即可在这段时间里捎带做别的事 |
+
+### `AirStrikeEffect` : FlyingEffect (core_logic/AirStrikeEffect.cs)
+
+空袭特效：轰炸机攻击时**先飞起来，在盘旋的过程中把航弹扔下去，投完再落回桌面**。投弹夹在飞掠中间，所以拼接写法（`attackEffect = flying,bombing`）做不到，必须由一个特效自己掌握节奏。
+
+只覆写 `StayAsync`：`Task.WhenAll(盘旋, 投弹)`，两件事同时开跑、谁后结束等谁。投弹本身不在这里实现，而是把 `StrikeEffectName`（默认 `bombing`）当**子特效**播一遍，弹数、飞行时长、错开间隔仍然配在 `effects/bombing_effect.tscn` 里。起飞/降落/转向/还原/飞掠音效全部沿用父类——「卡飘起来」这套运动只有一份实现。
 
 ### `SmokeEffect` : Effect (core_logic/SmokeEffect.cs)
 

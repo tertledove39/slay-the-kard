@@ -31,7 +31,10 @@ public static class EffectRegistry
         // bombing 与 bullet 共用 BulletEffect 脚本，差别只在场景里 Export 出去的
         // 「弹体场景」与「弹数」——所以这里是两个场景、不是两个类。
         ["bombing"] = "res://effects/bombing_effect.tscn",
-        ["flying"] = "res://effects/flying_effect.tscn"
+        ["flying"] = "res://effects/flying_effect.tscn",
+        // airstrike = 飞掠 + 盘旋时投弹。脚本继承 FlyingEffect，只覆写「停留」那一段，
+        // 所以这里没有第三个实现，只是换了一套 Export。
+        ["airstrike"] = "res://effects/air_strike_effect.tscn"
     };
 
     public static Effect Create(string name)

@@ -13,6 +13,13 @@
   · `bombing` 与 `bullet` **共用 BulletEffect 脚本**，差别只在场景里 Export 出去的
     「弹体场景」与「弹数」——不写第二个类。
   · 弹体池按场景路径分池：子弹与航弹混在一个队列里会串味。
+  4) 新增 `airstrike`：投弹要**夹在飞掠中间**（起飞 → 投弹 → 降落）。
+     拼接写法做不到这一点，所以 `AirStrikeEffect` 继承 `FlyingEffect`
+     并只覆写「停留」那一段，运动代码仍只有一份。
+
+关于中文注释的落点：`.tscn` 里的 `;` 注释**留不住**——在 Godot 编辑器里保存一次
+就会被整段抹掉，取值恰好等于 C# 默认值的属性也会被省略。所以本测试把中文说明
+钉在 C# 的 `/// <summary>` 上，场景注释只作提示、不作失败。
 """
 import re
 import sys
@@ -26,6 +33,9 @@ EFFECT = ROOT / "core_logic" / "Effect.cs"
 BULLET_EFFECT = ROOT / "core_logic" / "BulletEffect.cs"
 POOL = ROOT / "core_logic" / "BattleEffectPool.cs"
 FLYING = ROOT / "core_logic" / "FlyingEffect.cs"
+AIRSTRIKE = ROOT / "core_logic" / "AirStrikeEffect.cs"
+AIRSTRIKE_SCENE = ROOT / "effects" / "air_strike_effect.tscn"
+CARD_INI = ROOT / "cards" / "card.ini"
 BULLET = ROOT / "bin" / "Bullet.cs"
 SMOKE = ROOT / "core_logic" / "SmokeEffect.cs"
 BATTLE = ROOT / "bin" / "battlefield_.cs"
@@ -70,6 +80,49 @@ def uncommented_exports(scene_text, names):
                 missing.append(name)
             break
     return missing
+
+
+# .tscn 里「引擎自带」的属性，不算手写的导出项。
+ENGINE_PROPS = {
+    "script", "layout_mode", "anchors_preset", "anchor_left", "anchor_top",
+    "anchor_right", "anchor_bottom", "offset_left", "offset_top", "offset_right",
+    "offset_bottom", "grow_horizontal", "grow_vertical", "mouse_filter", "visible",
+    "z_index", "bus", "stream", "autoplay", "volume_db", "pitch_scale",
+    "size_flags_horizontal", "size_flags_vertical", "focus_mode", "name",
+}
+
+
+def unknown_scene_props(scene_text, export_names):
+    """场景里显式赋值的、既不是该类 Export 也不是引擎属性的名字。
+
+    Godot 对 .tscn 里拼错的属性名是**静默忽略**的：`SwayDegree = 5`（少个 s）
+    不会报任何错，只表现成「改了没反应」。这条断言就是拿来堵这种静默失败的。
+    """
+    known = set(export_names) | ENGINE_PROPS
+    unknown = []
+    for line in scene_text.split("\n"):
+        match = re.match(r"([A-Za-z_]\w*)\s*=", line)
+        if match and match.group(1) not in known:
+            unknown.append(match.group(1))
+    return unknown
+
+
+def lacking_chinese_doc(cs_text, export_names):
+    """返回「上方没有中文 /// 注释」的 Export 名。
+
+    为什么不查 .tscn 里的 `;` 注释：那个**留不住**。实测在 Godot 编辑器里保存一次，
+    注释会被整段抹掉，取值恰好等于 C# 默认值的属性也会被省略不写
+    （所以「场景里必须写全每个 Export」这个要求本身就做不到）。
+    C# 的 `/// <summary>` 才是中文说明唯一可靠的落点，也正是编辑器里悬停能看到的那份。
+    """
+    lacking = []
+    for name in export_names:
+        pattern = re.compile(r"((?:^[ \t]*///.*\n)+)[ \t]*\[Export\][^;\n]*?\b"
+                             + re.escape(name) + r"\s*=", re.MULTILINE)
+        match = pattern.search(cs_text)
+        if match is None or not re.search(r"[一-鿿]", match.group(1)):
+            lacking.append(name)
+    return lacking
 
 
 def scene_paths(text):
@@ -126,6 +179,7 @@ def main():
     paths = scene_paths(effect)
     results.append(check("bombing" in paths, "注册了 bombing"))
     results.append(check("flying" in paths, "注册了 flying"))
+    results.append(check("airstrike" in paths, "注册了 airstrike"))
     for name, path in sorted(paths.items()):
         results.append(check((ROOT / path.replace("res://", "")).exists(),
                              f"注册表里的 {name} → {path} 真实存在"))
@@ -182,9 +236,11 @@ def main():
     results.append(check('tween.TweenProperty(card, "rotation", aimRotation, step)' in sway,
                          "最后停在瞄准角上（落回才不会斜着停住）"))
 
-    flying_scene_vals = (ROOT / "effects" / "flying_effect.tscn").read_text(encoding="utf-8")
-    results.append(check("SwayDegrees = 5.0" in flying_scene_vals, "摆幅 ±5°"))
-    results.append(check("SwaySecondsPerCycle = 4.0" in flying_scene_vals, "摆动一个来回 4 秒"))
+    # 手感数值（摆幅、周期、升降时长）由主人在编辑器里调，测试**不钉具体数字**：
+    # 钉了就会「调一次手感红一次」，那种红灯最后没人看。这里只钉两件不会变的事。
+    flying_scene = (ROOT / "effects" / "flying_effect.tscn").read_text(encoding="utf-8")
+    unknown = unknown_scene_props(flying_scene, exports_of(flying))
+    results.append(check(not unknown, f"flying 场景里写的属性名都真实存在（可疑: {unknown}）"))
 
     results.append(check("source.isUnderCardEffect = true;" in flying, "漂浮期间标记「特效在管这张卡」"))
     results.append(check("source.ZIndex = TopZIndex;" in flying, "抬高层级压住其他卡"))
@@ -198,12 +254,9 @@ def main():
     results.append(check("MusicManager.Instance?.PickSfx(SfxSlot)" in flying, "音效走 [sfx] 槽位"))
     results.append(check('SfxSlot = "flyby"' in flying, "默认槽位名 flyby"))
 
-    flying_scene = (ROOT / "effects" / "flying_effect.tscn").read_text(encoding="utf-8")
     results.append(check('path="res://core_logic/FlyingEffect.cs"' in flying_scene, "场景挂了 FlyingEffect"))
     results.append(check("AudioStreamPlayer" in flying_scene and 'bus = &"SFX"' in flying_scene,
                          "场景里有一个 SFX 总线上的播放器"))
-    results.append(check(re.search(r'Duration = [\d.]+', flying_scene) is not None,
-                         "场景里写明了可调参数（值在场景里，不在代码里）"))
 
     # 卡牌侧的两个配合点
     results.append(check("public bool isUnderCardEffect = false;" in card_base, "cardBase_ 有该标记"))
@@ -220,6 +273,12 @@ def main():
                          "弹数填 0 时改用调用方给的数量（= 攻击力）"))
     results.append(check("AcquireProjectile(ProjectileScenePath, scene)" in bullet_effect,
                          "按场景路径取弹体"))
+    results.append(check("[Export] public float ProjectileFlightSeconds" in bullet_effect,
+                         "飞行时长是 Export（不再写死在 Bullet 里的 0.3）"))
+    results.append(check("float? flightSeconds = time ?? (ProjectileFlightSeconds > 0f ? ProjectileFlightSeconds : null);" in bullet_effect,
+                         "调用方没传时长时用场景配的值"))
+    results.append(check("PlayAndReleaseBullet(bullet, positions, flightSeconds)" in bullet_effect,
+                         "把飞行时长传给每一发弹体"))
     results.append(check("[Export] public int StaggerMaxMs" in bullet_effect, "错开间隔也是 Export"))
 
     # 命中音效：每发各响一声，且要能叠着响
@@ -245,8 +304,12 @@ def main():
     results.append(check('ProjectileScenePath = "res://bin/bomb.tscn"' in bombing_scene,
                          "bombing 用航弹弹体"))
     results.append(check("ProjectileCount = 0" in bombing_scene, "bombing 弹数交给攻击力决定"))
-    results.append(check('ImpactSfxSlot = "dead"' in bombing_scene, "bombing 每发命中配爆炸音效"))
-    results.append(check("ImpactSfxVolume = 0.7" in bombing_scene, "爆炸音效音量 70%"))
+    results.append(check('ImpactSfxSlot = ""' in bombing_scene,
+                         "bombing 不播命中音效（槽位留空）"))
+    results.append(check("ImpactSfxVolume = 0.7" in bombing_scene,
+                         "音量 0.7 留着，方便以后恢复音效时不用重调"))
+    results.append(check("ProjectileFlightSeconds = 1.5" in bombing_scene,
+                         "航弹飞行 1.5 秒（原来写死 0.3，太快）"))
     bullets_scene = (ROOT / "effects" / "bullet_effect.tscn").read_text(encoding="utf-8")
     results.append(check('ImpactSfxSlot = ""' in bullets_scene,
                          "bullet 的命中音效槽位显式留空（不播，行为与从前一致）"))
@@ -262,25 +325,82 @@ def main():
 
     # ==================== 场景里每个 Export 都要有中文注释 ====================
     print("\n--- 场景里 export 的内容必须带中文注释 ---")
-    for scene_rel, cs_path in [("effects/flying_effect.tscn", FLYING),
-                               ("effects/bullet_effect.tscn", BULLET_EFFECT),
-                               ("effects/bombing_effect.tscn", BULLET_EFFECT)]:
-        names = exports_of(cs_path.read_text(encoding="utf-8"))
+    # 一个场景能写哪些 Export，看的是整条继承链，不是单个文件：
+    # air_strike 的场景就合法地写了继承自 FlyingEffect 的 SwayDegrees。
+    for scene_rel, cs_paths in [("effects/flying_effect.tscn", [FLYING]),
+                                ("effects/air_strike_effect.tscn", [AIRSTRIKE, FLYING]),
+                                ("effects/bullet_effect.tscn", [BULLET_EFFECT]),
+                                ("effects/bombing_effect.tscn", [BULLET_EFFECT])]:
+        cs_text = "\n".join(p.read_text(encoding="utf-8") for p in cs_paths)
         scene_text = (ROOT / scene_rel).read_text(encoding="utf-8")
+        names = exports_of(cs_text)
 
-        # ① 每一项都得在场景里显式写出来，否则 Inspector 里根本看不到、也谈不上注释
-        absent = [n for n in names if not re.search(rf"(?m)^{re.escape(n)}\s*=", scene_text)]
-        results.append(check(not absent,
-                             f"{scene_rel}：{len(names)} 个 Export 全部在场景里显式赋值（缺 {len(absent)} 项）"))
-        for n in absent:
-            print(f"       场景里没写: {n}")
+        # ① 中文说明钉在 C# 的 `/// <summary>` 上——这是唯一留得住的地方。
+        #    场景里的 `;` 注释在编辑器保存一次之后会被抹掉（已实测），钉它等于钉一个假的绿。
+        lacking = lacking_chinese_doc(cs_text, names)
+        results.append(check(not lacking,
+                             f"{scene_rel}：{len(names)} 个 Export（含继承）都有中文 /// 说明（缺 {len(lacking)} 项）"))
+        for n in lacking:
+            print(f"       没有中文说明: {n}")
 
-        # ② 每个赋值行的正上方都得有一行中文 `;` 注释
-        missing = uncommented_exports(scene_text, names)
-        results.append(check(not missing,
-                             f"{scene_rel}：每个 Export 上方都有中文注释（缺 {len(missing)} 项）"))
-        for n in missing:
-            print(f"       没有中文注释: {n}")
+        # ② 场景里写的属性名必须真实存在（拼错的话 Godot 静默忽略，最难查）
+        unknown = unknown_scene_props(scene_text, names)
+        results.append(check(not unknown, f"{scene_rel}：属性名都真实存在（可疑: {unknown}）"))
+
+        # ③ 场景上的 `;` 注释**只提示、不作为失败**：它属于「编辑器还没碰过这个文件」的
+        #    临时状态，下一次在 Godot 里保存就会消失，拿去当断言只会制造假的红灯。
+        leftover = uncommented_exports(scene_text, names)
+        if leftover:
+            print(f"       [提示] {scene_rel} 里暂时没有 `;` 注释的项（编辑器保存后本来就会没）: {leftover}")
+
+    # ==================== ④ airstrike ====================
+    # 需求：投弹要夹在飞掠中间（起飞 → 投弹 → 降落），不是「飞完全程再投弹」。
+    # 靠 `attackEffect = flying,bombing` 拼不出来——那种写法只能一个演完接一个，
+    # 所以另开一个**继承 FlyingEffect** 的空袭特效，只覆写「停留」那一段。
+    print("\n--- ④ airstrike 空袭（飞掠 + 盘旋投弹）---")
+    airstrike = AIRSTRIKE.read_text(encoding="utf-8")
+    airstrike_scene = AIRSTRIKE_SCENE.read_text(encoding="utf-8")
+
+    results.append(check("class AirStrikeEffect : FlyingEffect" in airstrike,
+                         "继承 FlyingEffect（运动代码只有一份，不复制）"))
+    results.append(check("protected override async Task StayAsync(" in airstrike,
+                         "只覆写「停留」那一段"))
+    results.append(check("Task sway = base.StayAsync(" in airstrike
+                         and "Task strike = StrikeAsync(" in airstrike
+                         and "await Task.WhenAll(sway, strike);" in airstrike,
+                         "边盘旋边投弹（两件事同时开跑，谁后结束等谁）"))
+    results.append(check("RiseAndAimAsync" not in airstrike and "LandAsync" not in airstrike
+                         and "SwayAroundAimAsync" not in airstrike,
+                         "起飞/降落/摆动的实现没有搬过来（搬了就是第二份实现）"))
+
+    # 父类必须留出这个钩子，而且三段顺序要显式可见
+    stay_hook = method(flying, "protected virtual Task StayAsync(", "private async Task SwayAroundAimAsync(")
+    results.append(check("=> SwayAroundAimAsync(card, aimRotation, stayDuration);" in stay_hook,
+                         "父类默认实现仍是左右摆动"))
+    results.append(check("protected virtual Task StayAsync(" in flying, "父类的停留阶段是 virtual"))
+    play_body = method(flying, "await RiseAndAimAsync(source", "await LandAsync(source")
+    results.append(check("await StayAsync(source, positions, aimRotation," in play_body,
+                         "三段顺序：起飞 → 停留 → 降落"))
+
+    # 投弹是「子特效」，弹数/时长仍在 bombing 场景里配，这里只决定何时开投
+    results.append(check('EffectRegistry.Create(StrikeEffectName)' in airstrike,
+                         "投弹复用已注册的 bombing 特效，不重写弹道"))
+    results.append(check("await strike.Play(positions, null, null, count);" in airstrike,
+                         "count（= 攻击力）原样传给投弹"))
+    results.append(check("[Export] public string StrikeEffectName" in airstrike,
+                         "子特效名是 Export"))
+    results.append(check('StrikeEffectName = "bombing"' in airstrike, "默认投的是 bombing"))
+    results.append(check("EffectRegistry.Release(strike)" in airstrike, "子特效用完回收"))
+
+    results.append(check('path="res://core_logic/AirStrikeEffect.cs"' in airstrike_scene,
+                         "场景挂了 AirStrikeEffect"))
+    results.append(check('bus = &"SFX"' in airstrike_scene, "场景里有一个 SFX 总线上的播放器"))
+
+    card_ini = CARD_INI.read_text(encoding="utf-8-sig")
+    il2 = method(card_ini, "[伊尔2m]", "[伊尔10]")
+    results.append(check("attackEffect = airstrike" in il2, "伊尔2M 改用 airstrike"))
+    results.append(check("flying,bombing" not in card_ini,
+                         "全项目不再有 flying,bombing 这种拼接写法"))
 
     # ==================== 弹体池 ====================
     print("\n--- 弹体池按场景路径分池 ---")

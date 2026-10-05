@@ -109,7 +109,7 @@ battleBGM_berlin_final_battle=res://assest/music/配乐3.mp3,res://assest/music/
 | 槽位 | 用途 | 调用方 |
 |------|------|--------|
 | `dead` | 单位阵亡的爆炸音效（`assest/爆炸3.wav`～`爆炸21.wav`，下划线开头的未采用版本不列入） | `battlefield_.PlayDeadSound()`，槽位名常量 `DeadSfxSlot` |
-| `flyby` | 飞掠音效（`assest/飞机飞过_单位.wav`） | `FlyingEffect`（`effects/flying_effect.tscn` 的 `SfxSlot`） |
+| `flyby` | 飞掠音效（`assest/飞机飞过_单位.wav`） | `FlyingEffect`（`effects/flying_effect.tscn` 的 `SfxSlot`）；`AirStrikeEffect` 继承它，共用这一声 |
 
 > 素材约定：`assest/` 下**下划线开头**的音频是「未采用版本」，不要写进配置。
 

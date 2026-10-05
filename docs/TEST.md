@@ -554,12 +554,13 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
   `机枪_高.wav`），Godot 只在控制台报一行 `Resource file not found`，游戏照跑，
   很容易被忽略。
 
-## attackEffect 多效果与 flying / bombing 特效
+## attackEffect 多效果与 flying / bombing / airstrike 特效
 
-测试脚本：`tests/verify_attack_effects.py`（80 条）。
+测试脚本：`tests/verify_attack_effects.py`（116 条）。
 
 需求：① `attackEffect` 里能填多个效果；② 新增 `flying`（卡牌飘起来→左右摆→落回，配
-飞机飞过_单位 音效）；③ 新增 `bombing`（用 航弹.png 做类 bullet 的效果，攻击力多少扔多少发）。
+飞机飞过_单位 音效）；③ 新增 `bombing`（用 航弹.png 做类 bullet 的效果，攻击力多少扔多少发）；
+④ 新增 `airstrike`（投弹要夹在飞掠**中间**：起飞 → 投弹 → 降落）。
 
 **设计上的关键取舍**（测试把这些取舍钉住了，改坏会红）：
 
@@ -576,6 +577,32 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 - **刷 ZIndex 的那套会打架**：`RefreshAllCardDisplayOrder` 对场上卡一律 `ZIndex = 10`，
   所以漂浮期间要么被跳过、要么抬起来的层级下一帧就被打回去。断言那条 `continue`
   同时看 `isDiscarding || isUnderCardEffect`。
+- **「夹在中间」拼不出来，只能继承**。要的是「起飞 → 投弹 → 降落」，而
+  `attackEffect = flying,bombing` 只能做到两段各自开跑（总时长取较长者）。
+  所以 `AirStrikeEffect : FlyingEffect`，**只覆写「停留」那一段**（`StayAsync`）=
+  `Task.WhenAll(盘旋, 投弹)`。测试同时钉住反面：`AirStrikeEffect` 里
+  **不得出现** `RiseAndAimAsync` / `LandAsync` / `SwayAroundAimAsync`——
+  出现任何一个就说明运动代码被抄了第二份。
+- **投弹是子特效，不是第二套弹道**。`airstrike` 通过
+  `EffectRegistry.Create(StrikeEffectName)` 播一遍已注册的 `bombing`，弹数
+  （`count` = 攻击力）、飞行时长、错开间隔都还留在 `bombing` 场景里。
+
+### 两个「钉错了地方」的断言，已经改掉
+
+原先的写法是「场景里必须写全每个 `[Export]` 的值，且每个值上方都有一行中文 `;` 注释」。
+这是**钉不住的**——在 Godot 编辑器里保存一次，注释被整段抹掉，取值等于 C# 默认值的属性
+也被省略（实测 `flying_effect.tscn` 的 9 项只剩 2 项）。这种断言只会制造「每次调完手感就红」
+的假红灯，最后没人看。
+
+改成钉三件真的不会变的事：
+
+1. 每个 `[Export]`（**含继承链上的**）上方都有中文 `/// <summary>`——C# 里那份留得住，
+   也正是编辑器里悬停能看到的；
+2. 场景里写的属性名必须真实存在（Godot 对拼错的属性名**静默忽略**，最难查）；
+3. 场景里的 `;` 注释只打印提示、**不作失败**。
+
+顺带一条测试自身的原则：**手感数值（摆幅、周期、升降时长）不钉具体数字**。
+那些是主人在编辑器里调的，钉了就会「调一次红一次」。
 
 参数（升起高度、放大倍率、摆幅、时速、音效槽位）全部 Export 在 `effects/flying_effect.tscn` 上，
 调手感不必改代码——测试断言这些字段都是 `[Export]`。

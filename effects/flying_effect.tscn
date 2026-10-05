@@ -1,30 +1,14 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=2 format=3 uid="uid://c45uapp63i4ka"]
 
-[ext_resource type="Script" path="res://core_logic/FlyingEffect.cs" id="1"]
+[ext_resource type="Script" uid="uid://dxpkige6lpdf4" path="res://core_logic/FlyingEffect.cs" id="1"]
 
 [node name="FlyingEffect" type="Control"]
 layout_mode = 3
 anchors_preset = 0
 mouse_filter = 2
 script = ExtResource("1")
-; 往上升多少像素
-RiseHeight = 46.0
-; 漂浮期间放大到原来的多少倍（1.18 = 放大 18%）
-RiseScale = 1.18
-; 在「已指向目标」的基础上，左右摆动的幅度（度）
-SwayDegrees = 5.0
-; 摆动一个来回要几秒
-SwaySecondsPerCycle = 4.0
-; 摆动几个来回
-SwayCycles = 1.0
-; 升起用几秒。转向与升起同时进行，所以升到顶时方向已经对准目标
-RiseDuration = 1.5
-; 落回桌上用几秒（位置 / 缩放 / 角度一起还原）
-LandDuration = 1.5
-; 漂浮期间用的层级，要高于场上其他卡的 10 与手牌的 20，才能压住它们
-TopZIndex = 200
-; 飞掠音效的槽位名，对应 configs/music.ini 的 [sfx] 段
-SfxSlot = "flyby"
+SwayDegrees = 2.0
+SwaySecondsPerCycle = 1.0
 
 [node name="Sfx" type="AudioStreamPlayer" parent="."]
 bus = &"SFX"

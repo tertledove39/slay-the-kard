@@ -26,6 +26,12 @@ public partial class BulletEffect : Effect
     [Export] public int StaggerMaxMs = 100;
 
     /// <summary>
+    /// 每发弹体飞完全程要几秒。航弹要「显著慢」才有投弹的感觉，所以这是 Export 而不是
+    /// 写死在 `Bullet` 里（那边只是默认值）。调用方若通过 `Play(time)` 传了时长，以它为准。
+    /// </summary>
+    [Export] public float ProjectileFlightSeconds = 0.3f;
+
+    /// <summary>
     /// **每发命中时**播放的音效槽位（空字符串 = 不播）。对应 configs/music.ini 的 [sfx] 段。
     /// `bullet` 不填（保持原样），`bombing` 填 `dead` 让每发航弹落地各炸一声。
     /// </summary>
@@ -93,6 +99,9 @@ public partial class BulletEffect : Effect
             return;
         }
 
+        // 飞行时长：调用方传了就用它，否则用场景里配的（航弹比子弹慢得多）。
+        float? flightSeconds = time ?? (ProjectileFlightSeconds > 0f ? ProjectileFlightSeconds : null);
+
         var tasks = new List<Task>(shots);
         for (int index = 0; index < shots; index++)
         {
@@ -100,7 +109,7 @@ public partial class BulletEffect : Effect
                             ?? scene.Instantiate() as Bullet;
             if (bullet == null) continue;
             AddChild(bullet);
-            tasks.Add(PlayAndReleaseBullet(bullet, positions, time));
+            tasks.Add(PlayAndReleaseBullet(bullet, positions, flightSeconds));
 
             int delay = StaggerMaxMs > 0 ? Random.Shared.Next(0, StaggerMaxMs) : 0;
             if (delay > 0)
