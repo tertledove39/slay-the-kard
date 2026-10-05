@@ -731,6 +731,36 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 这条已经写进 `docs/NOTICE.md` 的层级约定里，`verify_card_layering.py` 加了两条守着
 （必须标脏、必须不自己写死层级）。
 
+### 第七轮调整（航弹加速 / 盘旋减半 / 死卡不可选）
+
+**① 航弹飞行逐渐加速、不减速，到最快时消失；盘旋时间减半。**
+`bin/Bullet.cs` 加了 `[Export] Tween.EaseType FlightEase`，默认 `InOut`——
+**子弹（机枪）保持原来的收尾减速，行为一点没变**；只有 `bin/bomb.tscn` 设 `FlightEase = 0`（`In`）。
+`In` 的最快点正好是 tween 结束那一刻，而 `OnMoveFinished()` 就挂在那一刻，
+所以「速度最大时直接消失」不需要额外代码，它本来就是那个时机。
+
+> `0` 到底是不是 `In` **用 Godot 自己实测过**（临时 GDScript 读 `Tween.EASE_IN` 与
+> 场景实例的 `FlightEase`），因为 `.tscn` 里的属性名/枚举值写错是**静默生效**的——
+> 这种地方不能靠记忆。
+
+`effects/air_strike_effect.tscn` 的 `SwaySecondsPerCycle` `1.0 → 0.5`（盘旋减半）。
+
+**② 阵亡但暂留在场上的卡能被选为攻击/指令目标。**
+四个漏洞，修法是**一个判据 `CanBeSelected()`，四处引用**：
+
+| 位置 | 原来为什么漏 |
+|---|---|
+| `IsValidTarget()` | 不检查状态。它是目标高亮 / 目标计数 / 指令落点校验的**共同入口** |
+| 攻击落点分支 | **根本不走 `IsValidTarget`**（那是给指令用的目标类型筛选），只比阵营 |
+| `CheckCardClick()` | 遍历 `cardInPlaces` 无状态过滤；点中尸卡会把 `cardNowChoose` 换成它 |
+| `HighlightValidTargets()` | 只遍历 `placed`，尸卡不变灰——周围全灰它保持原色，看着像「这个能打」 |
+
+新增 `tests/verify_dead_unit_targeting.py`（15 条）。写这个测试时踩到的坑值得记一笔：
+`case InputState.P_InPlaceUnit:` 在文件里**有两个**（按下的 switch 与释放的 switch），
+按 `case` 标号切会切到错的那个；`CheckCardClick` 里第二行就有一句
+`if(cardInPlaces== null) return null;`，按 `return null;` 切会当场截断。
+**切片要按内容定位，或者干脆取固定长度窗口。**
+
 ### 场景里 export 的值要带中文注释
 
 `.tscn` 的导出值在 Inspector 里只显示英文字段名，看不出含义，所以约定在**上一行**写一行

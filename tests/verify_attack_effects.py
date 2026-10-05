@@ -332,6 +332,24 @@ def main():
     results.append(check('path="res://bin/Bullet.cs"' in bomb_scene, "航弹复用 Bullet 脚本（运动方式照 bullet）"))
     results.append(check("航弹.png" in bomb_scene, "航弹弹体用 航弹.png"))
 
+    # 飞行缓动：航弹要「一直加速、不减速，到最快那一刻消失」。
+    # 缓动曲线做成 Export 而不是在 Bullet 里改死——子弹（机枪）仍要保持原来的 InOut。
+    results.append(check("[Export] public Tween.EaseType FlightEase" in bullet,
+                         "缓动曲线是 Export（子弹与航弹各用各的）"))
+    results.append(check(".SetEase(FlightEase)" in bullet, "Play 里真的用了这个缓动"))
+    results.append(check("FlightEase = Tween.EaseType.InOut;" in bullet,
+                         "默认仍是 InOut —— 不写这个 Export 的场景（子弹）行为不变"))
+    results.append(check("FlightEase = 0" in bomb_scene,
+                         "航弹场景设成 0 = EaseType.In（已经用 Godot 实测过 0 就是 In）"))
+    results.append(check("FlightEase" not in
+                         (ROOT / "bin" / "bullet.tscn").read_text(encoding="utf-8"),
+                         "子弹场景不设这个项，吃默认的 InOut（机枪的收尾减速保持不变）"))
+    # 「速度最大时直接消失」= In 缓动的最快点在 tween 末尾，而隐藏正好挂在末尾
+    play_tail = method(bullet, "await ToSignal(_currentTween, Tween.SignalName.Finished);",
+                       "public override void PrepareForUse()")
+    results.append(check("OnMoveFinished();" in play_tail,
+                         "tween 一结束就隐藏 —— In 缓动下那就是速度最大的那一刻"))
+
     # 航弹要看得见：净尺寸 = 根节点 scale × Sprite2D scale。
     # 原先是 3 × 0.6 = 1.8，实机反馈太小；现在 3 × 1.2 = 3.6，翻了一倍。
     bomb_root = re.search(r"scale = Vector2\(([\d.]+), ([\d.]+)\)\nscript", bomb_scene)
@@ -434,6 +452,8 @@ def main():
     results.append(check('path="res://core_logic/AirStrikeEffect.cs"' in airstrike_scene,
                          "场景挂了 AirStrikeEffect"))
     results.append(check('bus = &"SFX"' in airstrike_scene, "场景里有一个 SFX 总线上的播放器"))
+    results.append(check("SwaySecondsPerCycle = 0.5" in airstrike_scene,
+                         "盘旋时间减半（1.0 -> 0.5 秒）"))
 
     card_ini = CARD_INI.read_text(encoding="utf-8-sig")
     il2 = method(card_ini, "[伊尔2m]", "[伊尔10]")

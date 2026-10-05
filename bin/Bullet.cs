@@ -9,6 +9,15 @@ public partial class Bullet : Effect
     private Tween _currentTween;
 
     /// <summary>
+    /// 飞行的缓动曲线。默认 `InOut`（起步慢、中间快、**收尾减速**），
+    /// 这是子弹从前的表现，没动。
+    ///
+    /// 航弹要的是 `In`（一直加速、**到最快那一瞬间消失**，不做减速收尾）——
+    /// 所以它是 Export，由 `bin/bomb.tscn` 单独设，而不是在这里改死。
+    /// </summary>
+    [Export] public Tween.EaseType FlightEase = Tween.EaseType.InOut;
+
+    /// <summary>
     /// 从一点飞向另一点
     /// </summary>
     /// <param name="from"></param>
@@ -31,8 +40,10 @@ public partial class Bullet : Effect
         this.Visible = true;
         _currentTween = CreateTween();
         _currentTween.TweenProperty(this, "global_position", to + GetOffset(60), duration)
-                    //.SetEase(Tween.EaseType.In) // 关键：设置为 Out，实现逐渐加速
+                    .SetEase(FlightEase)
                     .SetTrans(Tween.TransitionType.Cubic); // 可选：使用二次方加速曲线，也可以是 Cubic, Back 等
+        // 缓动曲线为 In（航弹）时，**最快的那一刻正好是 tween 结束的那一刻**，
+        // 所以下面这一句就是「速度最大时直接消失」。
         await ToSignal(_currentTween, Tween.SignalName.Finished);
         OnMoveFinished();
     }

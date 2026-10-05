@@ -67,11 +67,12 @@
 
 ### `Bullet` : Effect (bin/Bullet.cs)
 
-单发飞弹动画，从一个全局位置飞向另一个全局位置。
+单发飞弹动画，从一个全局位置飞向另一个全局位置。`bullet.tscn`（机枪子弹）与 `bomb.tscn`（航弹）共用本脚本。
 
-| 方法 | 说明 |
+| 成员 | 说明 |
 |------|------|
 | `Play(positions, time)` | 异步动画：使用前两个位置和可选时长播放飞弹 |
+| `[Export] Tween.EaseType FlightEase` | 飞行缓动。默认 `InOut`（起步慢、中间快、收尾减速）= 子弹原来的样子；`bomb.tscn` 设成 `In`（一直加速、不减速），`In` 的最快点正好是 tween 结束那一刻，而 `OnMoveFinished()` 就挂在那一刻，所以表现是「速度最大时直接消失」 |
 
 ### `BulletEffect` : Effect (core_logic/BulletEffect.cs)
 

@@ -391,7 +391,9 @@ public partial class battlefield_ : Control
         var aa = cardInPlaces.AsEnumerable().ToList();
         foreach (var card in aa)
         {
-            if (card.GetGlobalRect().HasPoint(mousePosition))
+            // 阵亡后暂留在场上的卡点不中：它已经死了，只是还没消失。
+            // 放它过去的话，cardNowChoose 会变成那张尸卡，层级还会被抬到 100。
+            if (CanBeSelected(card) && card.GetGlobalRect().HasPoint(mousePosition))
             {
                 // 点击到了卡牌
                 return card;
@@ -1487,7 +1489,11 @@ InputState currentInputState = InputState.nil;
                             cardNowChoose = null;
                             break;
                         }
-                    else if(result.GetMyCard().GetIsFriend() != cardNowChoose.GetIsFriend())
+                    // 攻击落点**不走 IsValidTarget**（那边是给指令用的目标类型筛选），
+                    // 所以这里要自己挡一次：阵亡后暂留在场上的卡不能当攻击目标。
+                    // 挡不住就能对着一具还没消失的尸体开火。
+                    else if(CanBeSelected(result.GetMyCard())
+                            && result.GetMyCard().GetIsFriend() != cardNowChoose.GetIsFriend())
                         {
                             Attack(cardNowChoose, result.GetMyCard());
                             cardNowChoose = null;
@@ -3848,7 +3854,10 @@ InputState currentInputState = InputState.nil;
     /// </summary>
     public void HighlightValidTargets(TargetType targetType)
     {
-        foreach (var card in cardInPlaces.Where(x=>x.getState()==CardState.placed).ToList())
+        // 阵亡后暂留在场上的卡（destroyed，但节点还在）也要一起变灰：
+        // 它已经不是合法目标，单独留着原色会被看成「这个能打」。
+        foreach (var card in cardInPlaces
+                     .Where(x => x.getState() is CardState.placed or CardState.destroyed).ToList())
         {
             if (IsValidTarget(card, targetType))
             {
@@ -3883,10 +3892,30 @@ InputState currentInputState = InputState.nil;
     }
 
     /// <summary>
-    /// 检查卡牌是否匹配指定的TargetType
+    /// 这张卡还能不能被玩家选中 / 当成目标。
+    ///
+    /// 阵亡的卡会在场上**停留 `DeathPresentationDelaySeconds` 秒才消失**
+    /// （见 `PlayDeathPresentationAsync`）：那一拍里它的状态已经是 `destroyed`，
+    /// 但节点**还挂在 `cardInPlaces` 和它自己的格子上**。手快就能点中它——
+    /// 能当攻击目标、能当指令目标，还会被算进「合法目标有几个」。
+    /// 它实际上已经死了，不该再参与任何选择。
+    ///
+    /// 判据只写这一处：`IsValidTarget`、`CheckCardClick`、攻击落点校验、
+    /// 目标高亮全都引用它，免得同一个规则在四个地方各写一遍（规范 E）。
+    /// </summary>
+    private static bool CanBeSelected(cardBase_ card)
+        => card != null && card.getState() != CardState.destroyed;
+
+    /// <summary>
+    /// 检查卡牌是否匹配指定的TargetType。
+    ///
+    /// 「能不能被选中」也归这里管（第一句）：高亮、目标计数、指令落点校验
+    /// 全都走本函数，那是唯一一处能一次堵住三个口子的地方。
     /// </summary>
     private bool IsValidTarget(cardBase_ card, TargetType targetType)
     {
+        if (!CanBeSelected(card)) return false;
+
         switch (targetType)
         {
             case TargetType.aPlace:

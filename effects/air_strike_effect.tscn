@@ -7,7 +7,7 @@ layout_mode = 3
 anchors_preset = 0
 mouse_filter = 2
 script = ExtResource("1")
-SwaySecondsPerCycle = 1.0
+SwaySecondsPerCycle = 0.5
 
 [node name="Sfx" type="AudioStreamPlayer" parent="."]
 bus = &"SFX"

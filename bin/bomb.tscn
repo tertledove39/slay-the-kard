@@ -21,6 +21,8 @@ grow_vertical = 2
 ; 整体缩放（与子弹一致）
 scale = Vector2(3, 3)
 script = ExtResource("1_bomb")
+; 飞行缓动。0 = In（一直加速、不减速，到最快那一刻消失）；子弹那边保持默认的 InOut
+FlightEase = 0
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 ; 贴图相对弹体中心的偏移

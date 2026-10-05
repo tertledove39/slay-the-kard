@@ -699,3 +699,31 @@ if (isFriendly)
 `shouldBeRemoved` / `isDiscarding` / `isUnderCardEffect`，唯独漏了 `ZIndex`）。
 目前靠「上场/进手牌都会把显示顺序标脏」自愈；要根治得在 `SetCardInformation` 里一起归零，
 但那会给新卡一个 0 的瞬态层级（可能有一帧沉到背景后面），所以这次没动。
+
+### 55. 阵亡但还留在场上的单位能被选为攻击/指令目标
+
+**症状**：实机反馈「被破坏但是暂留在场上的单位可能因为手快而被选为攻击/指令的目标，
+这些单位实际上已经死了，不该再被选为目标，筛选器也不应该选到他们」。
+
+**背景**：第 53 条给阵亡加了 1 秒停留（卡先留在场上，再消失 + 爆炸）。
+那一拍里它的状态已经是 `destroyed`，但**节点还挂在 `cardInPlaces` 和它自己的格子上**。
+
+**四个漏洞**：
+
+| 位置 | 问题 |
+|---|---|
+| `IsValidTarget()` | 不检查状态。它是**目标高亮、目标计数、指令落点校验**的共同入口，一处漏三处漏 |
+| 攻击落点校验（`P_InPlaceUnit` 分支） | **根本不走 `IsValidTarget`**（那边是给指令用的目标类型筛选），只比了阵营——可以直接攻击尸卡 |
+| `CheckCardClick()` | 遍历 `cardInPlaces` 不检查状态。点中尸卡会让 `cardNowChoose` 变成它，层级被抬到 100 |
+| `HighlightValidTargets()` | 只遍历 `placed`，所以尸卡**不会被变灰**——周围全灰它却保持原色，看起来像「这个能打」 |
+
+**修复**：加**一个**判据 `CanBeSelected(card)`（`state != CardState.destroyed`），四处引用它：
+
+1. `IsValidTarget()` 第一句 `if (!CanBeSelected(card)) return false;` —— 一次堵住高亮 / 计数 / 指令落点；
+2. 攻击落点分支加 `CanBeSelected(result.GetMyCard())`；
+3. `CheckCardClick()` 的命中判断前面加 `CanBeSelected(card)`；
+4. `HighlightValidTargets()` 的筛选条件加上 `CardState.destroyed`，让尸卡跟着一起变灰。
+
+判据只写一处是这个修法的重点——同一个规则在四个地方各写一遍，下次改状态机必然漏一个。
+
+**回归**：`tests/verify_dead_unit_targeting.py`（15 条）。
