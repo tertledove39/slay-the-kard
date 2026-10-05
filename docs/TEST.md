@@ -587,6 +587,19 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
   `EffectRegistry.Create(StrikeEffectName)` 播一遍已注册的 `bombing`，弹数
   （`count` = 攻击力）、飞行时长、错开间隔都还留在 `bombing` 场景里。
 
+### 实机反馈：投弹时听到机枪「哒哒」声
+
+那不是投弹音效，是**每次攻击都放**的通用开火声（`battleSound`）。飞机掠过时再叠一层
+机枪声就串味了。
+
+修法是按**攻击者的 `attackEffect` 是否自带音效**决定放不放：
+`EffectRegistry.SelfVoicedNames`（`flying` / `airstrike`）+ `ReplacesFiringSound()`，
+调用点在 `battlefield_.cs` 的 `Attack()` 里、`PlayBattleSound(1)` 那一行。
+
+判定**不写到卡上、也不按 `CardTypes.Bomber` 判**——那两条都会让同一个特效配在不同卡上
+行为不一致。测试除了断言这条判断存在，还会**交叉核对**表里每个名字对应的场景确实挂了
+`AudioStreamPlayer`：否则这张表会变成一句假话（写了名字却根本不发声，等于白静音一场）。
+
 ### 两个「钉错了地方」的断言，已经改掉
 
 原先的写法是「场景里必须写全每个 `[Export]` 的值，且每个值上方都有一行中文 `;` 注释」。

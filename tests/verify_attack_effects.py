@@ -409,6 +409,30 @@ def main():
     results.append(check("flying,bombing" not in card_ini,
                          "全项目不再有 flying,bombing 这种拼接写法"))
 
+    # ==================== ⑤ 自带音效的特效不叠通用开火声 ====================
+    # 实机反馈：轰炸机投弹时听到「哒哒」的开火声。那是 `battleSound` 的机枪声，
+    # 每次攻击都放；飞机掠过时再叠一层就串味了。
+    print("\n--- ⑤ 飞机攻击不放机枪「哒哒」声 ---")
+    results.append(check("public static bool ReplacesFiringSound(string effectNames)" in effect,
+                         "注册表提供「这串特效名里有没有自带音效的」查询"))
+    results.append(check("HashSet<string> SelfVoicedNames" in effect, "自带音效的特效名是一张单独的表"))
+    results.append(check("if (!EffectRegistry.ReplacesFiringSound(from.attackEffect)) PlayBattleSound(1);" in battle,
+                         "攻击时按**攻击者**的攻击特效决定放不放开火声"))
+    results.append(check("PlayBattleSound(1);" not in
+                         battle.replace("if (!EffectRegistry.ReplacesFiringSound(from.attackEffect)) PlayBattleSound(1);", ""),
+                         "没有漏掉其它无条件放战斗音效的地方"))
+
+    # 交叉核对：表里的名字必须真的指向一个挂了 AudioStreamPlayer 的场景。
+    # 否则这张表会变成一句假话——写了名字却根本不发声，等于白静音一场。
+    self_voiced = re.findall(r'"(\w+)"', method(effect, "HashSet<string> SelfVoicedNames",
+                                                "public static bool ReplacesFiringSound"))
+    results.append(check(bool(self_voiced), f"自带音效表非空（{self_voiced}）"))
+    for name in self_voiced:
+        rel = scene_paths(effect).get(name)
+        results.append(check(rel is not None
+                             and "AudioStreamPlayer" in (ROOT / rel.replace("res://", "")).read_text(encoding="utf-8"),
+                             f"{name} 确实自带播放器（不是写了个空名字）"))
+
     # ==================== 弹体池 ====================
     print("\n--- 弹体池按场景路径分池 ---")
     results.append(check("Dictionary<string, Queue<Bullet>> projectilePools" in pool,

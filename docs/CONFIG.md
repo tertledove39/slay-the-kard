@@ -51,6 +51,16 @@
 
 单位当前攻击力为0时，主动攻击、普通反击和伏击均不会播放`attackEffect`。攻击力大于0但伤害被重甲或免疫修正为0时仍会播放。
 
+#### 通用开火声与`SelfVoicedNames`
+
+每次攻击都会放一声通用的开火声（`battleField.tscn` 的`battleSound`，机枪「哒哒」）。但**攻击特效自带音效时不再叠这一声**——飞机掠过时再来一层机枪声会串味。
+
+判定表在`EffectRegistry.SelfVoicedNames`（当前是`flying`、`airstrike`），通过`EffectRegistry.ReplacesFiringSound(attackEffect)`查询，调用点在`battlefield_.cs`的`Attack()`里、`PlayBattleSound(1)`那一行。
+
+- 判定按**攻击者**的`attackEffect`走，不看防守方。
+- 判定放在注册表而不是卡上或`CardTypes.Bomber`上：写到卡上、或按兵种判，都会让同一个特效配在不同卡上行为不一致。
+- 新增自带音效的特效要加进`SelfVoicedNames`。`tests/verify_attack_effects.py`会交叉核对表里每个名字对应的场景**确实挂了`AudioStreamPlayer`**，防止这张表变成假话。
+
 ### cards/enemyTurn.ini
 定义敌方关卡预设的回合行动脚本。
 

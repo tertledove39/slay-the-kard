@@ -1,4 +1,5 @@
 using Godot;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -36,6 +37,38 @@ public static class EffectRegistry
         // 所以这里没有第三个实现，只是换了一套 Export。
         ["airstrike"] = "res://effects/air_strike_effect.tscn"
     };
+
+    /// <summary>
+    /// **自带音效**的特效名。这些特效响的时候，`Attack()` 不再叠那声通用的开火声
+    /// （`battleSound` 的机枪「哒哒」）——飞机掠过时再叠一层机枪声会串味。
+    ///
+    /// 判定放在注册表里，是因为「这个特效是什么」本来就是这张表在管：
+    /// 写到卡上、或按 `CardTypes.Bomber` 判，都会让同一个特效配在不同卡上行为不一致。
+    ///
+    /// 新增自带音效的特效时记得加进来。`tests/verify_attack_effects.py` 会交叉核对
+    /// 表里每个名字对应的场景**确实挂了 `AudioStreamPlayer`**，防止这张表变成假话。
+    /// </summary>
+    private static readonly HashSet<string> SelfVoicedNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "flying",
+        "airstrike"
+    };
+
+    /// <summary>
+    /// 这串特效名（`attackEffect` 的原文，可以是逗号分隔的多个）里有没有自带音效的。
+    /// 有一个就算——`attackEffect = flying,bullet` 那种写法下，飞机声和机枪声已经串了，
+    /// 再补一声开火声只会更糊。
+    /// </summary>
+    public static bool ReplacesFiringSound(string effectNames)
+    {
+        if (string.IsNullOrWhiteSpace(effectNames)) return false;
+
+        foreach (string raw in effectNames.Split(','))
+        {
+            if (SelfVoicedNames.Contains(raw.Trim())) return true;
+        }
+        return false;
+    }
 
     public static Effect Create(string name)
     {

@@ -2176,7 +2176,9 @@ InputState currentInputState = InputState.nil;
                 attackPresentationTimer ??= GetTree().CreateTimer(0.5);
         }
 
-        PlayBattleSound(1);
+        // 通用开火声（机枪「哒哒」）只在攻击特效不自带音效时放：
+        // 攻击者是飞机时那句"掠过"的声音已经在了，再叠一层机枪声就串味。
+        if (!EffectRegistry.ReplacesFiringSound(from.attackEffect)) PlayBattleSound(1);
 
         // 标记单位已经攻击，减少可攻击次数
         from.HaveAttacked();
