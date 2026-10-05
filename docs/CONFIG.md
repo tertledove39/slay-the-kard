@@ -101,6 +101,28 @@
 | 朱可夫 | `朱可夫` | `assest/朱可夫.wav` |
 | 拖拉机厂 | `拉伸` | `assest/拉伸.wav` |
 | 预备役 | `预备役` | `assest/预备役.wav` |
+| 美国军事研发 / 苏联军事研发 / 皇家研发 | `research_1` | `assest/MACHINE_Air_Compressor_100L_5_5HP_Stop_stereo.wav` |
+| 扩展美国研发 / 扩展军事研发 / 扩展皇家研发 | `research_2` | `assest/TOOL_Wrench_Long_RR1_stereo.wav` |
+| 高级美国研发 / 高级苏联研发 / 高级皇家研发 | `research_3` | `assest/TOOL_Wrench_Long_RR2_stereo.wav` |
+| 斯大林管风琴（含衍生卡 `makeKatyusha`） | `stalins_organ` | `assest/AU_StalinsOrgan_03.wav` |
+| 曼哈顿计划（含衍生卡 `makeManhattan`） | `manhattan` | `assest/AU_Order_ManhattanProj_02.wav` |
+
+**研发卡三档怎么对上的**：素材是按**档位**给的（空压机 / 棘轮 R1 / 棘轮 R2），不是按国家，
+所以**三家共用同一条槽位**。而「初级 / 2 级 / 3 级」在卡名里看不出来（三家叫法还不一样），
+唯一统一的判据是**卡面 `price`**：
+
+| 档 | `price` | 卡名前缀 | 槽位 |
+|----|---------|---------|------|
+| 初级 | 3 | （无） | `research_1` |
+| 2 级 | 6 | 扩展 | `research_2` |
+| 3 级 | 9 | 高级 | `research_3` |
+
+`tests/verify_card_voice.py` 按这张表**反查**每一张卡：填错档会直接红
+（卡名看不出档位，这是唯一能机器校验的判据）。
+
+> `makeKatyusha` / `makeManhattan` 是 cost 0 的衍生卡（由 `Choose(...)` 或
+> `AddToHand(...)` 生成），显示名与本体**完全相同**，所以给它们配同一个槽位——
+> 否则同一张卡从两条路进手牌，打出来会响两声不一样的。
 
 #### 没写 `playEffect` 时的兜底
 

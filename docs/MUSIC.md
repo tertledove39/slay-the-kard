@@ -122,6 +122,8 @@ battleBGM_berlin_final_battle=res://assest/music/配乐3.mp3,res://assest/music/
 | `flyby` | 飞掠音效（`assest/飞机飞过_单位.wav`） | `FlyingEffect`（`effects/flying_effect.tscn` 的 `SfxSlot`）；`AirStrikeEffect` 继承它，共用这一声 |
 | `严冬` / `战略重心` / `红色旗帜` / `嘿` / `阿嘿` / `朱可夫` / `拉伸` / `预备役` | 卡牌语音（`assest/同名.wav`） | `SoundEffect`，槽位由卡上的 `playEffect = sfx(槽位名)` 给出。清单与对照表见 `CONFIG.md` 的「卡牌语音」 |
 | `咚` | **指令卡默认音**（`assest/咚.wav`） | 同上，但**卡上不用写**——指令卡没写 `playEffect` 时由 `battlefield_.PlayCardEffect` 兜底 |
+| `research_1` / `research_2` / `research_3` | **研发卡三档**（`assest/MACHINE_Air_Compressor_*.wav` / `TOOL_Wrench_Long_RR1_stereo.wav` / `..._RR2_stereo.wav`） | 三家（美/苏/英）**共用**同一档的槽位——素材是按档给的，不是按国家。档位按卡面 `price`：3 / 6 / 9。见 `CONFIG.md` 的「研发卡三档怎么对上的」 |
+| `stalins_organ` / `manhattan` | **两张终极指令卡**（`assest/AU_StalinsOrgan_03.wav` / `AU_Order_ManhattanProj_02.wav`） | 挂在「斯大林管风琴」与「曼哈顿计划」上，**含各自的 cost 0 衍生卡**（同一个显示名 → 同一个音） |
 | `infantry_small` / `infantry_medium` / `infantry_large` | **步兵进场音**（`assest/AU_Infantry_*.wav`） | 同上，卡上也不用写——步兵按 `attack + defence` 分三档自动选 |
 | `tank_small` / `tank_medium` / `tank_large` | **坦克与火炮进场音**（`assest/Tank_Light/Medium/Heavy_Move_Fx.wav`） | 同上，同一套三档规则，只是换一套素材 |
 | `plane_deploy` / `plane_flyby` | **飞机（战斗机与轰炸机）的部署 / 移动音**（`assest/AU_depl_Fighter_small_01~02` / `AU_Flyby_Fighter_small_v2_01~02`） | 同上，卡上不用写，不分档。**两条按时机分**、互不通用，挂载点 `battlefield_.PlaneFallbackEffect` |

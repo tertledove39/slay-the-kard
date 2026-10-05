@@ -1233,3 +1233,44 @@ GDScript 传给 `call()` 会编组失败，所以这次用 C# 写临时测试）
 （`load` + `instantiate` 都正常，只是不进树）。**已确认与本次改动无关** ——
 把 `Store.cs` 的两处改动整段撤掉再跑，一样死。真机商店是能用的，所以更像是合成场景
 本身的问题，记在 `BUGS.md` #57 里，**商店那三个按钮需要主人实机确认**。
+
+### 第二十一轮（研发卡语音：三档 + 两张终极卡）
+
+主人给了 5 个素材，对应关系是：
+
+    MACHINE_Air_Compressor_100L_5_5HP_Stop_stereo.wav  初级研发（美国/苏联/皇家）
+    TOOL_Wrench_Long_RR1_stereo.wav                    2 级研发（扩展 ×3）
+    TOOL_Wrench_Long_RR2_stereo.wav                    3 级研发（高级 ×3）
+    AU_StalinsOrgan_03.wav                             斯大林管风琴
+    AU_Order_ManhattanProj_02.wav                      曼哈顿计划
+
+**一行 C# 都没改**。这正是规范 A 想看到的：卡牌语音那一套（`playEffect = sfx(槽位名)` +
+`[sfx]` 段配文件）早就有了，加新语音本来就是「配置两处」的事。9 张研发卡 + 4 张终极卡
+（含两个 cost 0 衍生卡）插一行 `playEffect`，`[sfx]` 段加 5 行，收工。
+
+**素材是按档位给的，不是按国家给的** —— 所以三家共用一条槽位，而不是一家一条。这一点
+如果按「美/苏/英 各一条」去写，配置会变成 9 条槽位指向 3 个文件，是同一个数据配了三处。
+
+**档位怎么机器校验**：卡名里看不出档位（三家叫法还不一样：军事研发 / 扩展 / 高级），
+唯一统一的判据是卡面 `price`：3 = 初级、6 = 2 级、9 = 3 级。测试按这张表**反查**
+每一张研发卡，填错档会直接红：
+
+    [PASS] 美国军事研发（cost 3）→ research_1，与档位表一致
+    [PASS] 扩展军事研发（cost 6）→ research_2，与档位表一致
+    [PASS] 高级苏联研发（cost 9）→ research_3，与档位表一致
+    … 共 9 张
+
+**两张终极卡为什么要连衍生卡一起配**：`makeKatyusha` / `makeManhattan` 是 cost 0 的
+「加入手牌」用卡（`AddToHand(斯大林管风琴,3)` / `Choose(makePenicillin,makeManhattan)`），
+显示名与本体**逐字相同**。只给本体配的话，同一张卡从两条路进手牌，打出来会响两声不一样的。
+
+**动的文件的写法**：`cards/card.ini` 插在 `targetType` 之后、`traits` 之前，
+`playEffect  = ` 两个空格对齐（与既有 10 张逐字一致）；**保持无 BOM + CRLF**
+（NOTICE.md 里记过：用 `utf-8-sig` 写回会加 BOM，一次弄红两个测试）。
+插完实测：无 BOM、CRLF 2753 = LF 2753、186 个段落、23 张卡有 `playEffect`（10 旧 + 13 新）。
+
+验证：
+
+- 实机逐个 `PickSfx`：5 个槽位全部取到对应 `AudioStream`
+- `tests/verify_card_voice.py` 302 → **359** 项（新增研发档位反查 + 5 个槽位的文件与 `.import` 核对）
+- 全量回归：52 脚本全绿，8 个既有失败脚本与基线一致，无新增失败

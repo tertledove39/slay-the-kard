@@ -147,10 +147,22 @@ def main():
 
     # 喀秋莎也在列：它的 playEffect 是「进入阵地」，进场与移动共用（见 ⑧ 与 ⑦）。
     # 严冬 被两张卡共用（冬季攻势 与 冬季战争）—— 一个槽位可以被多张卡引用，这是允许的。
+    # 研发卡三档 + 两张终极指令卡。**一档一个槽位、三家共用** —— 素材是按档位给的
+    # （空压机 / 棘轮 R1 / 棘轮 R2），不是按国家给的。
     expected = {"冬季攻势": "严冬", "冬季战争": "严冬", "战略重心": "战略重心",
                 "五年计划": "红色旗帜", "塔曼斯卡亚": "嘿", "方面军": "阿嘿",
                 "朱可夫": "朱可夫", "拖拉机厂": "拉伸", "预备役": "预备役",
-                "喀秋莎": "katyusha_into_pos"}
+                "喀秋莎": "katyusha_into_pos",
+                # 初级研发（卡面 cost 3）
+                "美国军事研发": "research_1", "苏联军事研发": "research_1", "皇家研发": "research_1",
+                # 2 级研发（卡面 cost 6，卡名带「扩展」）
+                "扩展美国研发": "research_2", "扩展军事研发": "research_2", "扩展皇家研发": "research_2",
+                # 3 级研发（卡面 cost 9，卡名带「高级」）
+                "高级美国研发": "research_3", "高级苏联研发": "research_3", "高级皇家研发": "research_3",
+                # 终极指令卡。cost 0 的 makeXxx 是「加入手牌」用的衍生卡，显示名与本体相同
+                # → 同一个音，否则同一张卡从两条路进来会响两声不一样的。
+                "斯大林管风琴": "stalins_organ", "makeKatyusha": "stalins_organ",
+                "曼哈顿计划": "manhattan", "makeManhattan": "manhattan"}
     for card, slot in sorted(expected.items()):
         results.append(check(wired.get(card) == slot, f"{card} → sfx({slot})"))
 
@@ -159,6 +171,29 @@ def main():
         results.append(check(slot in slots, f"{card} 用的槽位「{slot}」在 [sfx] 段里存在"))
     results.append(check(len(wired) == len(expected),
                          f"接线的卡数与预期一致（实际 {len(wired)}，预期 {len(expected)}）"))
+
+    # ---- 研发三档：**槽位要跟着卡面 cost 走** ----
+    # 「初级 / 2级 / 3级」在卡名里看不出来（三家叫法还不一样：军事研发 / 扩展 / 高级），
+    # 唯一统一的判据是 cost。所以按 cost 反查一遍，防止某张卡填错档。
+    print("\n--- 研发三档与卡面 cost 对齐 ---")
+    tier_by_cost = {3: "research_1", 6: "research_2", 9: "research_3"}
+    research_cards = {c: s for c, s in wired.items() if s.startswith("research_")}
+    sections = {sec.split("]")[0].strip(): sec
+                for sec in re.split(r"(?m)^\[", card_ini) if sec.strip()}
+    for card, slot in sorted(research_cards.items()):
+        m = re.search(r"(?m)^price\s*=\s*(\d+)", sections.get(card, ""))
+        cost = int(m.group(1)) if m else -1
+        results.append(check(tier_by_cost.get(cost) == slot,
+                             f"{card}（cost {cost}）→ {slot}，与档位表一致"))
+    results.append(check(len(research_cards) == 9,
+                         f"研发卡共 9 张（三家 × 三档），实际 {len(research_cards)} 张"))
+    for slot in ("research_1", "research_2", "research_3", "stalins_organ", "manhattan"):
+        results.append(check(slot in slots, f"[sfx] 配了槽位「{slot}」"))
+        for f in slots.get(slot, []):
+            src = ROOT / f.replace("res://", "")
+            results.append(check(src.exists(), f"{slot} → {src.name} 存在"))
+            results.append(check(Path(str(src) + ".import").exists(),
+                                 f"{slot} 的 {src.name} 已被 Godot 导入"))
 
     # 打出卡牌的路径确实会调用 playEffect
     results.append(check("PlayCardEffect(commandCard);" in battle, "指令卡打出时播 playEffect"))
