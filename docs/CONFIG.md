@@ -89,6 +89,14 @@
 | 拖拉机厂 | `拉伸` | `assest/拉伸.wav` |
 | 预备役 | `预备役` | `assest/预备役.wav` |
 
+**指令卡的默认音**：指令卡（`cardType = Command`）**没写 `playEffect`** 时，默认播一声「咚」（`[sfx]` 的 `咚` 槽位 = `assest/咚.wav`）。
+
+- 常量在 `battlefield_.cs`：`DefaultCommandPlayEffect = "sfx(咚)"`，判定在 `PlayCardEffect` 里。
+- **上面那 8 张带语音的以卡为准**，不走默认。
+- 单位卡不受影响（部署音是另一回事）。
+- 做成默认值而不是在 86 张指令卡上各写一行：那是同一个值抄 86 遍（规范 E），而且以后每加一张指令卡都要记得补——漏了就静默没声。
+- 音效文件本身仍只配在 `[sfx]` 段一处。
+
 **加一句新语音只要两步**：`[sfx]` 段写一行、卡上写 `playEffect = sfx(名字)`。不用新建场景、不用改注册表。
 
 两个静默失败的坑（都不报错、只是没声），`tests/verify_card_voice.py` 都守着：

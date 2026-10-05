@@ -839,6 +839,29 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 而该文件本来没有 BOM，用 `encoding="utf-8"` 读它的两个测试（`configparser`）
 当场 `MissingSectionHeaderError`。已去 BOM；这条写进了 `NOTICE.md`。
 
+### 第十一轮调整（指令卡默认音「咚」）
+
+需求：新增了「咚」音效，让**所有没标注打出效果的指令卡**播它。
+
+94 张指令卡里只有 8 张自带语音，**剩下 86 张**要默认音。做成**默认值**而不是在 86 张卡上
+各写一行 `playEffect = sfx(咚)`：
+
+- 同一串值抄 86 遍正是规范 (E)「同一数据应只在一处配置」要挡的；
+- 以后每加一张指令卡都要记得补那行，**漏了就静默没声**，没人会发现。
+
+落在 `battlefield_.cs` 的 `DefaultCommandPlayEffect = "sfx(咚)"` + `PlayCardEffect` 里的一句兜底：
+
+    string effect = card.playEffect;
+    if (string.IsNullOrWhiteSpace(effect) && card.cardType == CardTypes.Command)
+        effect = DefaultCommandPlayEffect;
+
+- **8 张自带语音的以卡为准**（卡上写了就不兜底）；
+- **只有指令卡**兜底，单位卡不受影响（`PlayCardEffect` 也服务单位部署，见 `AddCardToPlace`）；
+- 音效文件仍然只配在 `[sfx]` 段一处：`咚=res://assest/咚.wav`。
+
+测试补 7 条，其中一条是交叉核对：**常量里写的槽位名必须在 `[sfx]` 段里存在**——
+拼错的话整批 86 张指令卡一起静默没声。
+
 ### 场景里 export 的值要带中文注释
 
 `.tscn` 的导出值在 Inspector 里只显示英文字段名，看不出含义，所以约定在**上一行**写一行

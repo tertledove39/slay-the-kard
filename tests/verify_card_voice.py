@@ -159,7 +159,37 @@ def main():
 
     # 打出卡牌的路径确实会调用 playEffect
     results.append(check("PlayCardEffect(commandCard);" in battle, "指令卡打出时播 playEffect"))
-    results.append(check("StartEffect(card.playEffect," in battle, "playEffect 走 StartEffect"))
+    results.append(check("PlayCardEffect(card);" in battle, "自动/敌方打出指令走同一条"))
+
+    # ==================== ⑤ 指令卡的默认音「咚」 ====================
+    # 94 张指令卡里只有 8 张自带语音，其余 86 张要一个默认音。
+    # 做成**默认值**而不是在 86 张卡上各写一行：那是同一个值抄 86 遍（规范 E），
+    # 而且以后每加一张指令卡都要记得补——漏了就静默没声。
+    print("\n--- ⑤ 指令卡默认音「咚」 ---")
+    results.append(check("private const string DefaultCommandPlayEffect = \"sfx(咚)\";" in battle,
+                         "默认音是一个常量（不在方法里裸写字符串）"))
+    play_card = method(battle, "private void PlayCardEffect(cardBase_ card)", "\n}")
+    results.append(check("string effect = card.playEffect;" in play_card,
+                         "先取卡上写的 playEffect（自带语音的那 8 张以卡为准）"))
+    results.append(check("if (string.IsNullOrWhiteSpace(effect) && card.cardType == CardTypes.Command)" in play_card
+                         and "effect = DefaultCommandPlayEffect;" in play_card,
+                         "只在「指令卡 + 没写 playEffect」时兜底"))
+    results.append(check("StartEffect(effect," in play_card, "最终播的是兜底后的那一份"))
+    results.append(check("咚" in slots, "[sfx] 段里配了「咚」槽位"))
+    # 交叉核对：常量里写的槽位必须真的在 [sfx] 段里 —— 拼错就整批指令卡静默没声
+    m = re.search(r'DefaultCommandPlayEffect = "sfx\((.+?)\)"', battle)
+    results.append(check(m is not None and m.group(1) in slots,
+                         f"常量指向的槽位「{m.group(1) if m else '?'}」在 [sfx] 段里存在"))
+    # 默认值这条路要真的被用上：得有指令卡确实没写 playEffect
+    defaulted = 0
+    for section in re.split(r"(?m)^\[", card_ini):
+        if not section.strip():
+            continue
+        if not re.search(r"(?m)^cardType\s*=\s*Command\s*$", section):
+            continue
+        if not re.search(r"(?m)^playEffect\s*=", section):
+            defaulted += 1
+    results.append(check(defaulted > 0, f"确实有指令卡没写 playEffect（{defaulted} 张走默认音）"))
 
     failed = results.count(False)
     print(f"\nResult: {len(results) - failed} passed, {failed} failed")

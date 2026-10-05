@@ -147,6 +147,18 @@ public partial class battlefield_ : Control
     private const float DeathPresentationDelaySeconds = 1f;
 
     /// <summary>
+    /// **指令卡**没在 `cards/card.ini` 里写 `playEffect` 时，默认播的效果（一声「咚」）。
+    ///
+    /// 做成默认值而不是在那 86 张卡上各写一行：那是同一个值抄 86 遍（规范 E），
+    /// 而且以后每加一张指令卡都要记得补——漏了就静默没声，没人会发现。
+    ///
+    /// 卡上写了自己的 `playEffect`（那 8 张带语音的）就以卡为准，这条不生效。
+    /// 单位卡不走这里（部署音是另一回事）。
+    /// 音效文件本身仍只配在 `configs/music.ini` 的 `[sfx]` 段：`咚=res://assest/咚.wav`。
+    /// </summary>
+    private const string DefaultCommandPlayEffect = "sfx(咚)";
+
+    /// <summary>
     /// 自定义内存变量：在当前战场场景中持久保存
     /// </summary>
     private Dictionary<string, int> memoryVariables = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -863,7 +875,14 @@ private const int OpeningHandSize = 5;
     private void PlayCardEffect(cardBase_ card)
     {
         if (card == null || !IsInstanceValid(card)) return;
-        StartEffect(card.playEffect, new List<Vector2> { GetCardCenter(card) }, null, card);
+
+        // 指令卡默认喊一声「咚」：卡上没写 playEffect 时用它。
+        // 卡上写了的（8 张带语音的）以卡为准，所以这里只在**指令卡 + 没写**时才兜底。
+        string effect = card.playEffect;
+        if (string.IsNullOrWhiteSpace(effect) && card.cardType == CardTypes.Command)
+            effect = DefaultCommandPlayEffect;
+
+        StartEffect(effect, new List<Vector2> { GetCardCenter(card) }, null, card);
     }
 
     private bool PlayAttackEffect(cardBase_ from, cardBase_ to)
