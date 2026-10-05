@@ -82,7 +82,28 @@
 
 ### `BulletEffect` : Effect (core_logic/BulletEffect.cs)
 
-「从 A 点向 B 点打出一串弹体」的效果控制器，一个脚本、两个场景：`bullet`（固定 10 发）与 `bombing`（`ProjectileCount = 0` 表示用调用方给的弹数，即攻击力）。每发弹体飞完全程的秒数由 `ProjectileFlightSeconds` 决定（子弹 0.3、航弹 1.5），调用方通过 `Play(time)` 传了则以调用方为准。
+「从 A 点向 B 点打出一串弹体」的效果控制器，**一个脚本、三个场景**：
+
+| 场景 | 弹体 | 弹数 | 飞行秒数 | 命中音 |
+|------|------|------|---------|--------|
+| `bullet` | `bin/bullet.tscn` | 固定 10 | 0.3 | 无 |
+| `bombing` | `bin/bomb.tscn` | `0` = 用调用方给的弹数（攻击力） | 1.5 | 无 |
+| `TankAttack` | `bin/tank_shell.tscn` | 固定 1 | 0.6 | **有**（槽位从参数来） |
+
+调用方通过 `Play(time)` 传了时长则以调用方为准。
+
+**命中音是可选能力**：槽位由**特效名的参数**给出——`TankAttack(artillery_large_impact)` 拆出
+`artillery_large_impact` 交给 `Configure`，声部在那一刻才建。**不传参数就一个播放器都不建**，
+所以 `bullet` / `bombing` 结构上仍然完全无声。
+
+| 成员 | 说明 |
+|------|------|
+| `Configure(argument)` | 收下命中音槽位并按 `ImpactVoiceCount` 懒建声部（声部要 `AddChild`，而 `Configure` 正是在 `AddChild` 之后调的）。传空则**整段命中音不存在** |
+| `ImpactSfxVolume` / `ImpactVoiceCount` | 音量（线性）与声部数。多个声部**轮换**用，连发时后一声不掐前一声 |
+| `PlayAndReleaseBullet(...)` | `await bullet.Play(...)` **是在弹体飞抵目标那一刻返回的**，命中音就挂在那之后——不必再往 `Bullet` 里塞回调 |
+
+> 这套机制历史上被整段删过一次：航弹连发时每发各炸一声会糊成一片。问题从来不是这个能力本身、
+> 而是**默认值**——所以它现在回来了，但默认关闭、由调用方按需开启。
 
 ### `FlyingEffect` : Effect (core_logic/FlyingEffect.cs)
 

@@ -382,7 +382,15 @@ cardsToShow = cardsToShow.Select(c => Copy(c)).Where(c => c != null).ToList();
 11. **攻击伤害**：攻击方存活时才对防守方执行 `LoseDefence`；受伤后移除动员
 12. 移除烟幕（攻击后）
 13. **普通反击**：无冲击且未触发伏击时，按兵种限制执行普通反击
-14. 飞弹动画+音效
+14. 飞弹动画+音效（**一处选完，三种可能**）：
+    - 攻击特效里带了自定义音效（`flying` / `airstrike` / `sfx(...)`）→ 它自己会响，不放别的；
+    - 是 `TankAttack`（坦克与火炮）→ 放一声**按口径分档的开火音**，`PlayBattleSound(1)` 不响；
+      命中音**不在这里**，等炮弹飞到了由 `BulletEffect` 自己响；
+    - 其余 → 通用开火声（机枪「哒哒」）。
+
+    判定读的是 `ResolveAttackEffect(from)` **解析后**的串而不是 `card.attackEffect` 原文：
+    坦克/火炮卡上根本没写 `attackEffect`（吃默认），读原文会拿到空串，于是又叠一层机枪声。
+    全文件只有一处 `PlayBattleSound(1);`。
 15. `HaveAttacked()` 标记 + `IncrementAttackCountThisTurn()`
 16. trait闪烁
 17. 战后移动限制（非坦克单位攻击后禁止移动，奋战例外）

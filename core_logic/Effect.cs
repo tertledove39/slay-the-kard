@@ -50,7 +50,10 @@ public static class EffectRegistry
         ["strafe"] = "res://effects/strafe_effect.tscn",
         // 只放音效、不画任何东西。槽位由**特效名的参数**指定：`playEffect = sfx(严冬)`
         // ——所以卡牌语音不需要一场景一音效，全项目共用这一个。
-        ["sfx"] = "res://effects/sound_effect.tscn"
+        ["sfx"] = "res://effects/sound_effect.tscn",
+        // 坦克与火炮的攻击特效：打一发炮弹（`bin/tank_shell.tscn`）。
+        // 名字沿用需求方给的大小写 `TankAttack`，**这张表是大小写敏感的**，写错了会报未知特效名。
+        ["TankAttack"] = "res://effects/tank_attack_effect.tscn"
     };
 
     /// <summary>
@@ -116,6 +119,26 @@ public static class EffectRegistry
             // （曾经就是这么错的：喀秋莎的机枪声一直没被静音。）
             ParseName(raw, out string name, out _);
             if (NoFiringSoundNames.Contains(name)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 这串特效名（`attackEffect` 的原文，可以是逗号分隔的多个）里有没有指定的那一个。
+    ///
+    /// **按拆好的名字比对，参数会被扔掉**——`TankAttack,sfx(x)` 里找 `TankAttack` 要能命中，
+    /// 而在 `sfx(katyusha_fire)` 里找 `TankAttack` 要能落空。
+    /// 别用 `string.Contains`：那会把 `sfx(TankAttack)` 这种参数也算进去
+    /// （`ReplacesFiringSound` 就是栽在这上面，见 `BUGS.md` #56）。
+    /// </summary>
+    public static bool Contains(string effectNames, string name)
+    {
+        if (string.IsNullOrWhiteSpace(effectNames) || string.IsNullOrWhiteSpace(name)) return false;
+
+        foreach (string raw in effectNames.Split(','))
+        {
+            ParseName(raw, out string parsed, out _);
+            if (string.Equals(parsed, name, StringComparison.OrdinalIgnoreCase)) return true;
         }
         return false;
     }

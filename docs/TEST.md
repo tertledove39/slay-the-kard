@@ -1009,3 +1009,56 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 
 > 反向验证过一次：故意删掉 `; 摆动几个来回` 后测试立刻报 `没有中文注释: SwayCycles` 并失败；
 > 补回来后恢复全绿——确认这条守卫不是空跑。
+
+### 第十七轮（坦克炮弹：TankAttack + 分档开火音 + 抵达后的命中音）
+
+需求（主人的原话，分两次给）：
+
+> 新增了 tank_projetile.png 和一系列坦克开火音效
+> 1) 新增一个类似于航弹的开火动画 2) 播放速度更快 3) 图片用刚给的 4) 适当大一点
+> 5) attackEffect 可以填 TankAttack，或者坦克类单位不写 attackEffect 默认用这个
+
+> 抱歉 修改一下指令 **impact 是抛射体动画到达目标位置之后播放的** 我又新增了一系列火炮音效
+> **火炮单独用自己的**
+
+**第一版理解错了**：把 `impact` 当成了「轻型的开火音」（因为坦克只有 medium/heavy 两套
+开火素材），于是凭空拼出一个 `tank_cannon_small` 槽位去指 impact 的三条。实际是**时机**问题，
+不是档位问题——`impact` 是**弹体落地那一声**。两轮的实现放在一起看，差别只在「这一声什么时候响」。
+
+**它响在哪，决定了槽位怎么传。** `BulletEffect.PlayAndReleaseBullet` 里那句
+`await bullet.Play(positions, time);` **正是在弹体飞抵目标那一刻返回的**，
+所以命中音挂它后面就行，不必往 `Bullet` 里塞回调。
+
+但**槽位从哪来**成了问题：口径取决于**攻击者**（火炮按身材三档、坦克不分档），
+而特效自己不知道是谁打的。场景 Export 只能写死一个，那就得给每个口径各做一个场景。
+于是走了**特效名的参数**：`attackEffect = TankAttack(artillery_large_impact)`，
+由 `battlefield_.TankAttackEffectFor()` 算好拼进去，`BulletEffect.Configure` 拆出来。
+
+**这套机制历史上被整段删过一次**（航弹连发时每发各炸一声会糊成一片，见第十四轮）。
+它现在回来了，因为**问题从来不是这个能力本身、而是默认值**：航弹不该响，坦克炮弹该响。
+所以测试钉的不是「代码里没有音效」，而是 **`Configure` 里「不传参数就直接 return」那一句**
+——`bullet` / `bombing` 一个播放器都不建，结构上仍然无声。
+
+**判档抽成了 `SizeTier(card)`**：进场音、开火音、命中音三处共用同一个判据，边界只写一遍。
+这次改动让原来散在两处的 `size <= DeploySoundSmallMax ? ... : ...` 收成了一处（规范 E）。
+
+**28 张坦克/火炮卡的 `attackEffect = bullet` 已清空**，改吃默认——新卡不写也不会漏。
+喀秋莎是**刻意的例外**：它的 `bullet,sfx(katyusha_fire)` 是火箭炮的组合，保留原样。
+测试因此**按 `fullmatch("bullet")` 判**而不是 `startswith`，否则喀秋莎会被误伤。
+
+新增 `tests/verify_tank_cannon.py`（90 项），三档都覆盖：
+
+- **冒烟**：两个新场景存在、`effect` 注册表登记了 `TankAttack`、贴图带 `.import`；
+- **基本**：炮弹 0.6s 比航弹 1.5s 快（需求②）、固定 1 发、默认特效只在没写时才生效；
+- **边界（白盒）**：把常量读出来在 Python 里**重放一遍分档规则**，
+  1/1、2/2、3/3（都在 ≤4 或 ≤8 里）、5/5（刚过 8）逐个验；
+  **每张坦克/火炮卡按它自己的 attack/defence 算出的两个槽位，都必须真的在 `[sfx]` 段里、
+  文件存在、`.wav.import` 也在**——拼错一个就整批卡静默没声。
+
+> 踩过的坑：`card.ini` 是 CRLF，而 `^attackEffect\s*=\s*(.*)$` 里 `\s` **连换行一起匹配**，
+> 于是空值那一行会把**下一行的 `键 =`** 当自己的值（`attackEffect` 读成 `"description ="`）。
+> 判断「这行是不是空的」必须用 `[ \t]*`。这个坑同时出现在新写的解析和一条改写的断言里。
+
+> 实机等价验证用临时 GDScript 跑过（跑完即删）：`Configure("")` 建出 **0** 个 `AudioStreamPlayer`、
+> `Configure("artillery_large_impact")` 建出 **4** 个且 bus 都是 `&"SFX"`；
+> 9 个新槽位逐个 `PickSfx` 都取到了 `AudioStream`。

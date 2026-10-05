@@ -202,8 +202,13 @@ def main():
     tier_fn = method(battle, "private static string DeployMoveEffect(cardBase_ card)", "\n    }")
     results.append(check("if (card.isHq == HQ.hq) return null;" in tier_fn,
                          "排除总部（总部的 cardType 也是 Infantry）"))
-    results.append(check("card.ReadAttack() + card.ReadDefence()" in tier_fn,
-                         "按 attack + defence 判档"))
+    # 判档本身已经抽成 SizeTier：进场音、开火音、命中音三处共用同一个判据，
+    # 边界只写一遍（规范 E）。所以这里查的是那条判据存在，而不是它长在哪个函数里。
+    size_fn = method(battle, "private static string SizeTier(cardBase_ card)", "\n    }")
+    results.append(check("card.ReadAttack() + card.ReadDefence()" in size_fn,
+                         "按 attack + defence 判档（判据在 SizeTier 里，只有一份）"))
+    results.append(check("return $\"sfx({family}_{SizeTier(card)})\";" in tier_fn,
+                         "进场音调 SizeTier 拿档位，不自己再算一遍边界"))
     results.append(check("CardTypes.Infantry => InfantryVoicePrefix" in tier_fn,
                          "步兵用 infantry 那一套素材"))
     results.append(check("CardTypes.Tank or CardTypes.Artillery => TankVoicePrefix" in tier_fn,

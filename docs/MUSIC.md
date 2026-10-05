@@ -118,6 +118,14 @@ battleBGM_berlin_final_battle=res://assest/music/配乐3.mp3,res://assest/music/
 | `katyusha_into_pos` | **喀秋莎进场/移动**（`assest/AU_Rocket_Art_Katyusha_IntoPos_01.wav`） | 挂在喀秋莎的 `playEffect` 上——**进场与移动共用这一行**（见 `CONFIG.md` 的「单位『移动』时的音」） |
 | `katyusha_fire` | **喀秋莎开火**（`assest/AU_Rocket_Art_Katyusha_fire_02.wav`） | 挂在喀秋莎的 `attackEffect` 上。带了它的攻击特效**不再叠通用机枪声**（`sfx` 在 `NoFiringSoundNames` 里） |
 | `draw` | **抽卡音**（`assest/Draw_One_A~E.wav`，**5 条变体**） | 卡牌从牌堆被抽走时由 `battlefield_.PlayDrawSound()` 放。同一段写了 5 个文件、逗号分隔，靠 `[sfx]` 段本来就有的「**随机抽一条**」实现变化——不用写任何抽签代码 |
+| `tank_cannon_medium` / `tank_cannon_large` | **坦克开火音**（`assest/AU_Tank_cannon_medium_fire_01~04` / `_heavy_fire_01~03`） | 炮弹**出膛**那一刻由 `battlefield_.TankCannonSoundEffect()` 放。素材只有中/大两套，**小的也归 medium** |
+| `tank_cannon_impact` | **坦克命中音**（`assest/AU_Tank_cannon_impact_01~03`） | 炮弹**飞抵目标之后**由特效自己放。**不分档** |
+| `artillery_{small\|medium\|large}_fire` | **火炮开火音**（`assest/AU_Artillery_{档}_fire_01a~d`） | 与坦克同一时机，但**三档齐全**、与坦克不同源 |
+| `artillery_{small\|medium\|large}_impact` | **火炮命中音**（`assest/AU_Artillery_{档}_impact_01a~c`） | 与坦克同一时机，**三档齐全** |
+
+> 坦克/火炮这一组是**两声**：**开火**在出膛那一刻（`Attack()` 里），**命中**在炮弹飞到之后
+> （`BulletEffect` 里）。槽位怎么算、为什么命中音走「特效名的参数」而不是场景 Export，
+> 见 `CONFIG.md` 的「坦克与火炮的炮声」。档位判据是共用的 `SizeTier`。
 
 > 这几类素材**卡牌上都不需要写任何东西**，加新卡时自动就有声音。
 > 档位边界见 `battlefield_` 的 `DeploySound*Max`，槽位前缀见 `InfantryVoicePrefix` / `TankVoicePrefix`，

@@ -34,15 +34,17 @@
 | 名称 | 场景 | 说明 |
 |------|------|------|
 | `bullet` | `effects/bullet_effect.tscn` | 从攻击者向目标打出一串子弹，固定 10 发（`ProjectileFlightSeconds = 0.3`） |
-| `bombing` | `effects/bombing_effect.tscn` | 航弹，**弹数 = 攻击力**（场景里 `ProjectileCount = 0` 表示用调用方给的数量）；`ProjectileFlightSeconds = 1.5`，比子弹慢得多才有投弹感；**不发声**（`BulletEffect` 里没有任何音效代码，不是靠配置关掉的） |
+| `bombing` | `effects/bombing_effect.tscn` | 航弹，**弹数 = 攻击力**（场景里 `ProjectileCount = 0` 表示用调用方给的数量）；`ProjectileFlightSeconds = 1.5`，比子弹慢得多才有投弹感；**不发声**（名字不带参数 → 命中音那条路根本不会建，不是靠配置关掉的） |
 | — | `bin/bomb.tscn` | 航弹弹体。`Sprite2D` 的 `scale` 定大小（净尺寸 = 根 `scale` × 它，当前 `3 × 1.2 = 3.6`）；`FlightEase = 0` 定飞行曲线 |
+| `TankAttack` | `effects/tank_attack_effect.tscn` | **坦克与火炮**打的那一发炮弹：固定 1 发、`ProjectileFlightSeconds = 0.6`（比航弹快），**飞抵目标时响一声命中音**。命中音的槽位写在**参数**里：`TankAttack(artillery_large_impact)` |
+| — | `bin/tank_shell.tscn` | 坦克炮弹弹体，用 `assest/tank_projetile.png`。`Sprite2D` 的 `scale` 定大小（原图只有 3×9，所以倍数比航弹大得多） |
 | `smoke` | `effects/smoke_effect.tscn` | 在指定位置冒一下烟 |
 | `flying` | `effects/flying_effect.tscn` | 让**触发它的那张卡**升起（`RiseDuration`，只移动位置 + 轻微放大）-> 原地悬停 `SwaySecondsPerCycle × SwayCycles` 秒 -> 落回（`LandDuration`，连角度一起还原），期间抬高层级压住其他卡；音效取 `[sfx] flyby`。**全程不转角度**（`SwayDegrees` 默认 0 = 完全静止悬停；调大才在卡自己的原始角度上左右摆） |
 | `airstrike` | `effects/air_strike_effect.tscn` | **空袭 = 飞掠 + 投弹**：**刚开始起飞就把航弹扔出去** -> 悬停（`SwaySecondsPerCycle = 0.5`，比 `flying` 那个短一半）-> 降落。投的是 `bombing` 子特效，所以弹数仍是攻击力；`StrikeEffectName` 留空则退化成纯飞掠 |
 | `strafe` | `effects/strafe_effect.tscn` | **扫射 = 飞掠 + 打枪**：与 `airstrike` **是同一个脚本、同一套节奏**，只把 `StrikeEffectName` 换成 `bullet`（起飞即打出 10 发子弹）。毛驴用这个 |
 | `sfx` | `effects/sound_effect.tscn` | **只放一段音效**，不画任何东西。放什么由**特效名的参数**指定：`playEffect = sfx(严冬)`。所以全项目共用这一个场景，卡牌语音不必一音效一场景 |
 
-`bombing`与`bullet`共用`BulletEffect`脚本，差别只在场景 Export 出去的「弹体场景」与「弹数」——生成、随机错开、回池那套逻辑不写第二遍。
+`bullet`、`bombing`、`TankAttack`**三个场景共用 `BulletEffect` 脚本**，差别只在场景 Export 出去的「弹体场景 / 弹数 / 飞行时长」，以及**名字带不带参数**——生成、随机错开、回池那套逻辑不写第二遍。
 
 **弹体的飞行曲线**在 `bin/Bullet.cs` 的 `FlightEase`（`Tween.EaseType`）：
 
@@ -72,7 +74,16 @@
 - 解析在`EffectRegistry.ParseName`，它和`Create`放在一起是因为**特效名的格式本来就是注册表定的**。
 - 调用顺序是`AddChild` → `Configure` → `PrepareForUse`：先让节点进树（`_Ready` 跑完、子节点就绪），参数里才可能安全地`GetNode`。
 
-目前只有`sfx`用得上它。
+用得上它的目前有两个：
+
+| 特效 | 参数是什么 | 例子 |
+|------|-----------|------|
+| `sfx` | 要放哪个 `[sfx]` 槽位 | `playEffect = sfx(严冬)` |
+| `TankAttack` | **命中音**的 `[sfx]` 槽位 | `attackEffect = TankAttack(artillery_large_impact)` |
+
+> `TankAttack` 的槽位为什么走参数而不是场景 Export：**口径取决于攻击者**（火炮按身材分三档、
+> 坦克不分档），而特效自己不知道是谁打的。由 `battlefield_` 算好了传进去，场景就不必为每个口径各做一份。
+> 名字不带括号时（`attackEffect = TankAttack`）只是**没有命中音**，炮弹照打。
 
 #### 卡牌语音
 
@@ -174,6 +185,29 @@
 
 - 判定按**攻击者**的`attackEffect`走，不看防守方。
 - 判定放在注册表而不是卡上或`CardTypes.Bomber`上：写到卡上、或按兵种判，都会让同一个特效配在不同卡上行为不一致。
+- 判定读的是`ResolveAttackEffect(from)`**解析后**的串，不是卡上的原文——坦克/火炮卡上根本没写`attackEffect`（吃默认），读原文会拿到空串，于是又叠一层机枪声。
+
+#### 坦克与火炮的炮声（**开火**一声 + **命中**一声）
+
+坦克和火炮**没写 `attackEffect` 时默认用 `TankAttack`**（`TankAttackName`），打一发炮弹。
+除了通用的开火声那一套，它们还各有一声**按口径分档**的炮声，而且**分两个时刻**：
+
+| 时机 | 谁放 | 槽位 |
+|------|------|------|
+| 炮弹**出膛**那一刻（`Attack()` 里） | `battlefield_.TankCannonSoundEffect()` | 见下表 |
+| 炮弹**飞抵目标**之后（`BulletEffect.PlayAndReleaseBullet` 里） | 特效自己，槽位来自**特效名的参数** | 见下表 |
+
+| 兵种 | 开火音（`_fire`） | 命中音（`_impact`） |
+|------|------------------|---------------------|
+| **坦克** | 只有 **medium / large** 两套素材，**小的也归 `tank_cannon_medium`**（需求方指定） | 不分档：`tank_cannon_impact` |
+| **火炮** | 三档齐全：`artillery_{小\|中\|大}_fire` | 三档齐全：`artillery_{小\|中\|大}_impact` |
+
+档位判据是 `SizeTier(card)`（`attack + defence`，边界见上面的三档进场音表），
+**进场音、开火音、命中音三处共用同一个判据**，边界只写一遍。
+
+- 每档都是**多条素材、逗号分隔、每次随机抽一条**——与 `dead` / `draw` 同一套机制，代码里没有抽签逻辑。
+- 喀秋莎写了自己的 `attackEffect = bullet,sfx(katyusha_fire)`，**既不走坦克炮也吃不到这两声**（它有专属的火箭炮音）。
+- 火炮**不分档的例外一个都没有**；坦克的例外只有「小档并入中档」这一条。
 - 改这张表之前先想清楚上面那条依据。`tests/verify_attack_effects.py`守着两件事：表里每个名字对应的场景**确实挂了`AudioStreamPlayer`**（防止表变成假话），以及**`strafe`必须不在表里**（"顺手统一一下"加进去会立刻红）。
 
 ### cards/enemyTurn.ini
@@ -284,6 +318,15 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 
 - `dead`：单位阵亡时的爆炸音效。素材范围是`assest/爆炸3.wav`～`爆炸21.wav`，**下划线开头的未采用版本不列入**（`_爆炸16`/`_爆炸17`/`_爆炸19`）
 - `flyby`：`flying` 特效的飞掠音效（`assest/飞机飞过_单位.wav`）。调用方是特效自己（`effects/flying_effect.tscn` 的 `SfxSlot`），不经过 `battlefield_`。`airstrike` 继承`FlyingEffect`，所以起飞时也响这一声
+- `plane_flyby`：飞机与轰炸机的**进场与移动**音（`assest/飞机飞过_效果.wav`），不分档
+- `katyusha_fire` / `katyusha_into_pos`：喀秋莎的**攻击**音与**进入阵地**音，分别挂在 `attackEffect` 与 `playEffect` 上
+- `draw`：抽卡音，5 条变体（`Draw_One_A`~`E`），随机抽一条
+- `tank_cannon_medium` / `tank_cannon_large` / `tank_cannon_impact`：坦克的**开火音**（两档，小的并入 medium）与**命中音**（不分档）
+- `artillery_{small|medium|large}_fire` / `artillery_{small|medium|large}_impact`：火炮的开火音与命中音，**三档齐全**
+
+> 坦克/火炮这两组是本轮新增的。**每个槽位都写了多条素材**（`AU_Tank_cannon_medium_fire_01`~`04`、
+> `AU_Artillery_large_impact_01a`~`b` 等），逗号分隔、每次随机抽一条。
+> 新增素材时**只要往同一行末尾追加**，不用改代码。
 
 调用方：`battlefield_.PlayDeadSound()`，槽位名常量是`DeadSfxSlot`。抽不到（槽位没配/加载失败）时保留场景里原有的那条，不会变成没声音。
 

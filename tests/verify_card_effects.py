@@ -44,7 +44,26 @@ def main():
         check("BulletEffectCapacity = 4" in pool and "SmokeEffectCapacity = 8" in pool and "BulletCapacity = 40" in pool, "battle pool retains effect roots and projectiles"),
         check("AcquireEffect" in effect and "Release(Effect effect)" in effect and "EffectRegistry.Release(effect)" in battle, "effect registry transparently acquires and releases pooled effects"),
         check("Random.Shared" in bullet and "Random.Shared" in controller and "new Random()" not in bullet and "new Random()" not in controller, "bullet effects use shared random generation"),
-        check(bool(units) and all("attackEffect = bullet" in part for part in units), "existing unit cards use the bullet attack effect"),
+        # 单位卡分三种：卡上自己写了特效的（伊尔2m 的 airstrike、毛驴的 strafe……）、
+        # **坦克与火炮**（留空吃默认的 TankAttack），以及**还没配完的占位卡**
+        # （雷泽诺夫/库可夫/沃尔科夫，图标至今还是 test.png，改动前就没有 attackEffect）。
+        # 第三种是既有欠账、不算到本次头上，所以放行；等它们换上真图标，
+        # 这条会立刻红——那正是该给它们补特效的时候。
+        check(bool(units) and all(
+            re.search(r"^attackEffect[ \t]*=[ \t]*\S", part, re.MULTILINE)
+            or re.search(r"^cardType[ \t]*=[ \t]*(Tank|Artillery)[ \t]*\r?$", part, re.MULTILINE)
+            or "test.png" in part
+            for part in units
+        ), "every unit card names its own attack effect, or is a Tank/Artillery (default TankAttack), or is a test.png placeholder"),
+        # 坦克与火炮**不许**再留一个光秃秃的 `bullet`：那会让它们退回机枪弹道，
+        # 等于把这次新增的坦克炮弹整段绕过去。
+        # 判的是 `fullmatch` 而不是 `startswith` —— 喀秋莎写的是
+        # `bullet,sfx(katyusha_fire)`，那是**刻意保留**的火箭炮组合，不该被这条打中。
+        check(all(not re.fullmatch(r"bullet", match.group(1).strip())
+                  for part in units
+                  if re.search(r"^cardType[ \t]*=[ \t]*(Tank|Artillery)[ \t]*\r?$", part, re.MULTILINE)
+                  for match in [re.search(r"^attackEffect[ \t]*=[ \t]*(.*)$", part, re.MULTILINE)] if match),
+              "no Tank/Artillery card still fires a bare machine-gun bullet effect"),
         check(bool(commands) and all("attackEffect" not in part for part in commands), "cards without attack effects remain effect-free"),
     ]
     failed = results.count(False)

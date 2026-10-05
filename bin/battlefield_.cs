@@ -166,6 +166,14 @@ public partial class battlefield_ : Control
     private const int DeploySoundMediumMax = 8;
 
     /// <summary>
+    /// 档位名，与 `[sfx]` 槽位里的后缀逐字一致（`infantry_small`、`artillery_large_fire`…）。
+    /// 写成常量是为了让「档位」这个词在代码里只有一种拼法。
+    /// </summary>
+    private const string TierSmall = "small";
+    private const string TierMedium = "medium";
+    private const string TierLarge = "large";
+
+    /// <summary>
     /// 进场音的**槽位前缀**，与档位后缀拼成 `[sfx]` 里的槽位名（如 `infantry_small`、`tank_large`）。
     /// 步兵与坦克/火炮各一套三档素材，所以前缀不同；音频文件配在 `configs/music.ini` 的 `[sfx]` 段。
     /// </summary>
@@ -182,6 +190,31 @@ public partial class battlefield_ : Control
     /// 该段本来就是「逗号分隔、每次随机抽一条」，所以随机由 `MusicManager` 负责，这里不用管。
     /// </summary>
     private const string DrawSoundEffect = "sfx(draw)";
+
+    /// <summary>
+    /// **坦克与火炮**没在 `cards/card.ini` 里写 `attackEffect` 时，默认打的那一发炮弹。
+    /// 卡上写了就以卡为准（喀秋莎写了自己的 `bullet,sfx(katyusha_fire)`）。
+    /// 做成默认值而不是在 28 张卡上各写一行，理由与进场音那几处一样（规范 E）。
+    ///
+    /// 这只是**名字那一段**：真正写进特效串的是 `TankAttack(命中音槽位)`，见 `TankAttackEffectFor`。
+    /// </summary>
+    private const string TankAttackName = "TankAttack";
+
+    /// <summary>
+    /// 坦克炮的 `[sfx]` 槽位。**开火音只有中/大两套素材，小的也归 medium**（需求方指定）；
+    /// 命中音完全不分档。
+    /// </summary>
+    private const string TankCannonMediumFireSlot = "tank_cannon_medium";
+    private const string TankCannonLargeFireSlot = "tank_cannon_large";
+    private const string TankCannonImpactSlot = "tank_cannon_impact";
+
+    /// <summary>
+    /// 火炮的 `[sfx]` 槽位：`artillery_{档}_fire` 与 `artillery_{档}_impact`。
+    /// 这套素材三档是齐的，所以**不分档的例外一个都没有**——与坦克不同。
+    /// </summary>
+    private const string ArtillerySlotPrefix = "artillery";
+    private const string FireSlotSuffix = "fire";
+    private const string ImpactSlotSuffix = "impact";
 
     /// <summary>
     /// 自定义内存变量：在当前战场场景中持久保存
@@ -950,11 +983,21 @@ private const int OpeningHandSize = 5;
         };
         if (family == null) return null;
 
+        return $"sfx({family}_{SizeTier(card)})";
+    }
+
+    /// <summary>
+    /// `attack + defence` 落在哪一档：≤`DeploySoundSmallMax` 小、到 `DeploySoundMediumMax` 为止是中、
+    /// 再往上是大。取的是**当前值**（进场音要的就是进场那一刻的卡面值）。
+    ///
+    /// **进场音、开火音、命中音共用这一个判据**——档位边界只写这一处（规范 E）。
+    /// </summary>
+    private static string SizeTier(cardBase_ card)
+    {
         int size = card.ReadAttack() + card.ReadDefence();
-        string tier = size <= DeploySoundSmallMax ? "small"
-                    : size <= DeploySoundMediumMax ? "medium"
-                    : "large";
-        return $"sfx({family}_{tier})";
+        return size <= DeploySoundSmallMax ? TierSmall
+             : size <= DeploySoundMediumMax ? TierMedium
+             : TierLarge;
     }
 
     /// <summary>
@@ -998,6 +1041,70 @@ private const int OpeningHandSize = 5;
         StartEffect(effect, new List<Vector2> { GetCardCenter(card) }, null, card);
     }
 
+    /// <summary>
+    /// 这次攻击**实际**要播的特效串：卡上写了就用卡上的，没写就用兵种默认
+    /// （**坦克与火炮 = `TankAttack(命中音槽位)`**，打一发炮弹；其余兵种没有默认，返回空）。
+    ///
+    /// 抽出来是因为**有两处要用**：`PlayAttackEffect` 拿它去播，
+    /// `Attack()` 拿它决定放哪种开火声。两处都读 `card.attackEffect` 的话，
+    /// 「没写」的那一格里外会不一致。
+    /// </summary>
+    private static string ResolveAttackEffect(cardBase_ from)
+    {
+        if (from == null) return null;
+        if (!string.IsNullOrWhiteSpace(from.attackEffect)) return from.attackEffect;
+
+        return TankAttackEffectFor(from);
+    }
+
+    /// <summary>
+    /// 坦克/火炮那一发炮弹的**完整特效名**，把命中音槽位当参数带上：
+    /// `TankAttack(artillery_large_impact)`。不是坦克/火炮返回 `null`。
+    ///
+    /// 命中音槽位为什么走**参数**而不是场景 Export：**口径取决于攻击者**
+    /// （火炮按身材分三档、坦克不分档），而特效自己不知道是谁打的。由调用方算好了传进去，
+    /// 场景就不必为每个口径各做一份——见 `BulletEffect.Configure`。
+    /// </summary>
+    private static string TankAttackEffectFor(cardBase_ from)
+    {
+        string impact = ImpactSlot(from);
+        return impact == null ? null : $"{TankAttackName}({impact})";
+    }
+
+    /// <summary>命中音槽位：坦克不分档，火炮按身材三档。都不是则 `null`。</summary>
+    private static string ImpactSlot(cardBase_ from)
+    {
+        return from.cardType switch
+        {
+            CardTypes.Tank => TankCannonImpactSlot,
+            CardTypes.Artillery => $"{ArtillerySlotPrefix}_{SizeTier(from)}_{ImpactSlotSuffix}",
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// 坦克/火炮这一炮的**开火声**（按口径分档，在炮弹出膛那一刻响）。
+    /// 返回 `null` 表示「不该放这个」——这次攻击的特效里根本没有 `TankAttack`
+    /// （比如喀秋莎打的是自己的 `sfx(katyusha_fire)`），那就退回通用开火声。
+    ///
+    /// 与命中音的分工：**开火音这时候响，命中音等炮弹飞到了由 `BulletEffect` 响**。
+    /// </summary>
+    private static string TankCannonSoundEffect(cardBase_ from, string attackEffect)
+    {
+        // 先判特效名再碰 from.cardType：`from` 为 null 时 `ResolveAttackEffect` 已返回 null，
+        // 这里会直接短路掉，不必再补一个 null 检查。
+        if (!EffectRegistry.Contains(attackEffect, TankAttackName)) return null;
+
+        string slot = from.cardType switch
+        {
+            // 坦克只有 medium / heavy 两套开火素材，**小的也归 medium**（需求方指定）。
+            CardTypes.Tank => SizeTier(from) == TierLarge ? TankCannonLargeFireSlot : TankCannonMediumFireSlot,
+            CardTypes.Artillery => $"{ArtillerySlotPrefix}_{SizeTier(from)}_{FireSlotSuffix}",
+            _ => null
+        };
+        return slot == null ? null : $"sfx({slot})";
+    }
+
     private bool PlayAttackEffect(cardBase_ from, cardBase_ to)
     {
         if (from == null || to == null || !IsInstanceValid(from) || !IsInstanceValid(to)) return false;
@@ -1007,7 +1114,7 @@ private const int OpeningHandSize = 5;
         // 把攻击者与攻击力一起交给特效：
         // - `source` 给 flying 用（要动的是这张卡本身，光有坐标拿不到节点）；
         // - `count` 给 bombing 用（扔几发航弹 = 攻击力，特效自己不知道攻击力多少）。
-        return StartEffect(from.attackEffect,
+        return StartEffect(ResolveAttackEffect(from),
                            new List<Vector2> { GetCardCenter(from), GetCardCenter(to) },
                            null, from, attack);
     }
@@ -2330,9 +2437,20 @@ InputState currentInputState = InputState.nil;
                 attackPresentationTimer ??= GetTree().CreateTimer(0.5);
         }
 
-        // 通用开火声（机枪「哒哒」）只在攻击特效不自带音效时放：
-        // 攻击者是飞机时那句"掠过"的声音已经在了，再叠一层机枪声就串味。
-        if (!EffectRegistry.ReplacesFiringSound(from.attackEffect)) PlayBattleSound(1);
+        // 攻击声一共三种可能，优先级从上到下：
+        // 1. 攻击特效里带了自定义音效（flying / airstrike / sfx(...)）——它自己会响，不放别的；
+        // 2. 坦克与火炮打的是 TankAttack —— 换成对应口径的炮声（小的也用 medium，坦克没有小档素材）；
+        // 3. 其余照旧放通用开火声（机枪「哒哒」）。
+        // 注意这里只是**出膛**那一声；命中音等炮弹飞到目标由 BulletEffect 自己响。
+        string resolvedAttackEffect = ResolveAttackEffect(from);
+        if (!EffectRegistry.ReplacesFiringSound(resolvedAttackEffect))
+        {
+            string cannon = TankCannonSoundEffect(from, resolvedAttackEffect);
+            if (cannon != null)
+                StartEffect(cannon, new List<Vector2> { GetCardCenter(from) }, null, from);
+            else
+                PlayBattleSound(1);
+        }
 
         // 标记单位已经攻击，减少可攻击次数
         from.HaveAttacked();

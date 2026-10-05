@@ -202,6 +202,7 @@ def main():
     results.append(check("bombing" in paths, "注册了 bombing"))
     results.append(check("flying" in paths, "注册了 flying"))
     results.append(check("airstrike" in paths, "注册了 airstrike"))
+    results.append(check("TankAttack" in paths, "注册了 TankAttack（大小写照需求方给的写）"))
     for name, path in sorted(paths.items()):
         results.append(check((ROOT / path.replace("res://", "")).exists(),
                              f"注册表里的 {name} → {path} 真实存在"))
@@ -307,16 +308,30 @@ def main():
                          "把飞行时长传给每一发弹体"))
     results.append(check("[Export] public int StaggerMaxMs" in bullet_effect, "错开间隔也是 Export"))
 
-    # 弹体**完全不发声**。
-    # 曾经有过一套「每发命中各播一声」的机制（ImpactSfxSlot/Volume/VoiceCount），
-    # 但航弹连发时每发各炸一声会糊成一片，已整段删除。现在钉的不是「槽位留空」
-    # ——那种「靠配置关掉」的做法随时会被谁填回去——而是**代码里根本没有这条路**。
-    results.append(check(not re.search(r"ImpactSfx|ImpactVoice|AudioStreamPlayer", code_only(bullet_effect)),
-                         "BulletEffect 里没有任何音效代码（结构上就不会响）"))
+    # 命中音是**可选能力**，槽位由特效名的参数给出，不传就整条路都不存在。
+    #
+    # 这套机制历史上被整段删过一次（航弹连发时每发各炸一声糊成一片）。它现在回来了，
+    # 因为问题从来不是这个能力本身、而是**默认值**：航弹不该响，坦克炮弹该响。
+    # 所以这里钉的不是「代码里没有音效」，而是**不传参数就一定不响**——
+    # `Configure` 里那句提前 return 才是真正要守住的东西（bullet / bombing 都走这条）。
+    results.append(check("public override void Configure(string argument)" in bullet_effect,
+                         "命中音槽位走**特效名的参数**（口径取决于攻击者，场景里配不出来）"))
+    configure = method(bullet_effect, "public override void Configure(", "private void PlayImpactSfx(")
+    results.append(check("impactSfxSlot = argument;" in configure
+                         and "if (string.IsNullOrWhiteSpace(impactSfxSlot)) return;" in configure,
+                         "**不传参数就直接返回**：一个播放器都不建，bullet/bombing 结构上仍然无声"))
+    results.append(check("impactVoices == null || impactVoices.Length == 0) return;" in bullet_effect,
+                         "没建过声部时 PlayImpactSfx 直接返回（不靠别的分支兜）"))
+    results.append(check("[Export] public float ImpactSfxVolume" in bullet_effect
+                         and "[Export] public int ImpactVoiceCount" in bullet_effect
+                         and "nextImpactVoice = (nextImpactVoice + 1) % impactVoices.Length;" in bullet_effect,
+                         "音量与声部数是 Export，多个声部轮换（连发时后一声不掐前一声）"))
     release = method(bullet_effect, "private async Task PlayAndReleaseBullet(", "\n}")
     results.append(check("await bullet.Play(positions, time);" in release
-                         and "PlayImpactSfx" not in release,
-                         "飞抵目标那一刻只做回收，不放任何声音"))
+                         and "PlayImpactSfx();" in release
+                         and release.index("await bullet.Play(positions, time);")
+                         < release.index("PlayImpactSfx();"),
+                         "命中音响在**弹体飞抵目标之后**（`bullet.Play` 正是在那一刻返回的）"))
 
     bombing_scene = (ROOT / "effects" / "bombing_effect.tscn").read_text(encoding="utf-8")
     results.append(check('path="res://core_logic/BulletEffect.cs"' in bombing_scene,
@@ -379,7 +394,8 @@ def main():
     for scene_rel, cs_paths in [("effects/flying_effect.tscn", [FLYING]),
                                 ("effects/air_strike_effect.tscn", [AIRSTRIKE, FLYING]),
                                 ("effects/bullet_effect.tscn", [BULLET_EFFECT]),
-                                ("effects/bombing_effect.tscn", [BULLET_EFFECT])]:
+                                ("effects/bombing_effect.tscn", [BULLET_EFFECT]),
+                                ("effects/tank_attack_effect.tscn", [BULLET_EFFECT])]:
         cs_text = "\n".join(p.read_text(encoding="utf-8") for p in cs_paths)
         scene_text = (ROOT / scene_rel).read_text(encoding="utf-8")
         names = exports_of(cs_text)
@@ -477,11 +493,19 @@ def main():
                          "表名按结果命名（不放通用开火声的特效名）——不叫「自带音效」，那个说法已经不成立"))
     results.append(check("SelfVoicedNames" not in code_only(effect),
                          "旧名 SelfVoicedNames 已彻底移除（留着就是两个说法打架）"))
-    results.append(check("if (!EffectRegistry.ReplacesFiringSound(from.attackEffect)) PlayBattleSound(1);" in battle,
+    # 判定读的是 `ResolveAttackEffect(from)` 而**不是** `from.attackEffect`：
+    # 坦克/火炮卡上根本没写 attackEffect（吃默认），读原文会拿到空串，
+    # `ReplacesFiringSound(null)` 返回 false，于是又叠一层通用机枪声。
+    results.append(check("string resolvedAttackEffect = ResolveAttackEffect(from);" in battle,
+                         "攻击声判定用的是**解析后**的特效串，不是卡上的原文"))
+    results.append(check("if (!EffectRegistry.ReplacesFiringSound(resolvedAttackEffect))" in battle,
                          "攻击时按**攻击者**的攻击特效决定放不放开火声"))
-    results.append(check("PlayBattleSound(1);" not in
-                         battle.replace("if (!EffectRegistry.ReplacesFiringSound(from.attackEffect)) PlayBattleSound(1);", ""),
-                         "没有漏掉其它无条件放战斗音效的地方"))
+    sound_block = method(battle, "// 攻击声一共三种可能", "// 标记单位已经攻击")
+    results.append(check(sound_block.count("PlayBattleSound(1);") == 1
+                         and "TankCannonSoundEffect(from, resolvedAttackEffect)" in sound_block,
+                         "三种攻击声在**一处**分支里选完（通用机枪声只留一个出口）"))
+    results.append(check(battle.count("PlayBattleSound(1);") == 1,
+                         "全文件只有一处放通用开火声（没有漏掉的第二处）"))
 
     # 交叉核对：静音名单里的名字必须真的指向一个挂了 AudioStreamPlayer 的场景。
     # 否则这张表会变成一句假话——写了名字却根本不发声，等于白静音一场。

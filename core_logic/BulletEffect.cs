@@ -6,18 +6,21 @@ using System.Threading.Tasks;
 /// <summary>
 /// 「从 A 点向 B 点打出一串弹体」的特效。
 ///
-/// 一个脚本、两个场景，靠 Export 出来的两个值区分：
+/// 一个脚本、三个场景，靠 Export 出来的几个值区分：
 /// - `effects/bullet_effect.tscn` → 子弹，固定 10 发，0.3 秒飞完全程；
 /// - `effects/bombing_effect.tscn` → 航弹，弹数填 0 表示**用调用方给的数量**
-///   （即攻击力，见 `Effect.Play` 的 `count`），飞行时长远长于子弹。
+///   （即攻击力，见 `Effect.Play` 的 `count`），飞行时长远长于子弹；
+/// - `effects/tank_attack_effect.tscn` → 坦克炮弹，固定 1 发、0.6 秒，
+///   并且**飞抵目标时响一声命中音**。
 ///
-/// 之所以不做成两个类：生成、随机错开、回池这一整套逻辑完全一样，
-/// 分开写就是两份会各自长歪的实现。
+/// 之所以不做成三个类：生成、随机错开、回池这一整套逻辑完全一样，
+/// 分开写就是三份会各自长歪的实现。
 ///
-/// **这个特效不发声。** 曾经有过一套「每发命中各播一声」的机制
-/// （`ImpactSfxSlot` / `ImpactSfxVolume` / `ImpactVoiceCount`），但航弹连发时
-/// 每发各炸一声会糊成一片，已整段删除——现在「不播音效」是结构上的事实，
-/// 而不是靠场景里把某个槽位留空。要恢复的话见 git 历史 `0a75da7` 之前的版本。
+/// **命中音是可选能力**：槽位由**特效名的参数**给出（`TankAttack(artillery_large_impact)`），
+/// 不传就不响——所以 `bullet` / `bombing` 照旧完全无声。
+///
+/// （历史上这里曾有一套写死的命中音，航弹连发时每发各炸一声会糊成一片，被整段删掉了。
+/// 现在它回来了，但**默认关闭、由调用方按需开启**——问题从来不是这个能力，而是默认值。）
 /// </summary>
 public partial class BulletEffect : Effect
 {
@@ -36,12 +39,73 @@ public partial class BulletEffect : Effect
     /// </summary>
     [Export] public float ProjectileFlightSeconds = 0.3f;
 
+    /// <summary>命中音的音量（线性，1 = 原音量）。没有命中音槽位时不起作用。</summary>
+    [Export] public float ImpactSfxVolume = 1f;
+
+    /// <summary>
+    /// 命中音的声部数。多发弹体是先后命中的，只用一个播放器会让后一声掐掉前一声。
+    /// 没有命中音槽位时不起作用。
+    /// </summary>
+    [Export] public int ImpactVoiceCount = 4;
+
+    /// <summary>音效播放器所在的音频总线（与战场里既有的战斗音效一致）。</summary>
+    private const string SfxBus = "SFX";
+
+    /// <summary>命中音槽位，来自**特效名的参数**；为空则整段命中音都不存在。</summary>
+    private string impactSfxSlot;
+
+    private AudioStreamPlayer[] impactVoices;
+    private int nextImpactVoice;
+
+    /// <summary>
+    /// 收下命中音槽位（`TankAttack(artillery_large_impact)` 里的那一段）。
+    ///
+    /// 为什么不放场景 Export：**口径取决于攻击者**（火炮按身材分三档，坦克不分档），
+    /// 而特效自己不知道攻击者是谁——由调用方算好了当参数传进来最简单。
+    ///
+    /// 声部在这里**懒建**：`Configure` 是在 `AddChild` 之后调的，那时 `_Ready` 已经跑过了。
+    /// </summary>
+    public override void Configure(string argument)
+    {
+        impactSfxSlot = argument;
+        if (string.IsNullOrWhiteSpace(impactSfxSlot)) return;
+
+        int voices = Mathf.Max(1, ImpactVoiceCount);
+        float volumeDb = Mathf.LinearToDb(Mathf.Clamp(ImpactSfxVolume, 0.0001f, 1f));
+        impactVoices = new AudioStreamPlayer[voices];
+        for (int index = 0; index < voices; index++)
+        {
+            var voice = new AudioStreamPlayer { Bus = SfxBus, VolumeDb = volumeDb };
+            AddChild(voice);
+            impactVoices[index] = voice;
+        }
+    }
+
+    /// <summary>一发命中：轮换一个空闲声部放音效，让连续命中能叠着响。</summary>
+    private void PlayImpactSfx()
+    {
+        if (impactVoices == null || impactVoices.Length == 0) return;
+
+        AudioStream stream = MusicManager.Instance?.PickSfx(impactSfxSlot);
+        if (stream == null)
+        {
+            GD.PushWarning($"BulletEffect: 命中音槽位 '{impactSfxSlot}' 取不到"
+                         + "（检查 configs/music.ini 的 [sfx] 段）");
+            return;
+        }
+
+        AudioStreamPlayer voice = impactVoices[nextImpactVoice];
+        nextImpactVoice = (nextImpactVoice + 1) % impactVoices.Length;
+        voice.Stream = stream;
+        voice.Play();
+    }
+
     public override async Task Play(IReadOnlyList<Vector2> positions = null, float? time = null,
                                     cardBase_ source = null, int count = 0)
     {
         if (positions == null || positions.Count < 2) return;
 
-        // 弹数：场景里写了正数就用它（bullet 固定 10 发），
+        // 弹数：场景里写了正数就用它（bullet 固定 10 发、坦克炮固定 1 发），
         // 填 0 则用调用方给的数量（bombing = 攻击力）。
         int shots = ProjectileCount > 0 ? ProjectileCount : count;
         if (shots <= 0) return;
@@ -73,12 +137,16 @@ public partial class BulletEffect : Effect
         await Task.WhenAll(tasks);
     }
 
-    /// <summary>等一发弹体飞完再回收（`bullet.Play` 是在**飞抵目标那一刻**返回的）。</summary>
+    /// <summary>
+    /// 等一发弹体飞完再回收。`bullet.Play` 是在**飞抵目标那一刻**返回的，
+    /// 所以命中音挂在这里的时机正好，不必再往 `Bullet` 里塞回调。
+    /// </summary>
     private async Task PlayAndReleaseBullet(Bullet bullet, IReadOnlyList<Vector2> positions, float? time)
     {
         try
         {
             await bullet.Play(positions, time);
+            PlayImpactSfx();
         }
         finally
         {

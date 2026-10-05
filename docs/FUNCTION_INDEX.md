@@ -81,8 +81,16 @@
 | `GetAllowedTargets(attacker)` | 2450 | 获取合法攻击目标 |
 | `CanDestroyTarget(attacker, target)` | 2441 | 判断是否能一击摧毁 |
 | `FlyBullets(from, to)` | 765 | 飞弹视觉动画 |
-| `PlayBattleSound(id)` | 822 | 战斗音效 |
+| `PlayBattleSound(id)` | 822 | 战斗音效（**全文件唯一的调用点**在 `Attack()` 里，且受 `ReplacesFiringSound` 与坦克炮声两道分支把守） |
 | `PlayDeadSound(id)` | 834 | 死亡音效 |
+| `SizeTier(card)` | 977 | 按 `attack + defence` 判档（`small`/`medium`/`large`）。**进场音、开火音、命中音三处共用这一个判据**，边界只写一遍 |
+| `DeployMoveEffect(card)` | 987 | 卡进场时的兜底音（步兵/坦克火炮/飞机，总部与指令卡返回 null） |
+| `PlayDrawSound()` | 1019 | 抽卡音，`Player` 的四条抽牌实现各调一次 |
+| `PlayMoveEffect(card)` | 1035 | 单位在场上挪位置时的音（卡上 `playEffect` 优先，飞机兜底） |
+| `ResolveAttackEffect(from)` | 1052 | 这次攻击**实际**要播的特效串（卡上写了用卡上的，坦克/火炮默认 `TankAttack(...)`） |
+| `TankAttackEffectFor(from)` | 1068 | 拼出 `TankAttack(命中音槽位)`；不是坦克/火炮返回 null |
+| `ImpactSlot(from)` | 1075 | 命中音槽位：坦克不分档、火炮按身材三档 |
+| `TankCannonSoundEffect(from, attackEffect)` | 1092 | 坦克/火炮的**开火音**（出膛那一刻响）；不是 `TankAttack` 则返回 null，退回通用开火声 |
 
 ### 目标高亮
 

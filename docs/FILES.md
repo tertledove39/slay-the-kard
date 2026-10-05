@@ -28,7 +28,9 @@
 | core_logic/SoundEffect.cs | **只放一段音效**的特效（卡牌语音）。槽位从**特效名的参数**来：`playEffect = sfx(严冬)` → `Configure("严冬")` → `MusicManager.PickSfx`。`Play` 会**等音效放完**才返回，否则调用方回收节点时会把声音一起掐掉 |
 | effects/sound_effect.tscn | 上述音效特效的场景。**全项目共用这一个**——语音不必一音效一场景 |
 | bin/bomb.tscn | 航弹弹体（复用 `bin/Bullet.cs`，贴图 `assest/航弹.png`），供 `bombing` 特效用 |
+| bin/tank_shell.tscn | 坦克炮弹弹体（复用 `bin/Bullet.cs`，贴图 `assest/tank_projetile.png`，原图只有 3×9 所以 `Sprite2D.scale` 给得比航弹大得多），供 `TankAttack` 特效用 |
 | effects/bombing_effect.tscn | `bombing` 特效：复用 `BulletEffect` 脚本，`ProjectileScenePath=bin/bomb.tscn`、`ProjectileCount=0`（0 = 用攻击力）、`ProjectileFlightSeconds=1.5` |
+| effects/tank_attack_effect.tscn | `TankAttack` 特效：复用 `BulletEffect` 脚本，`ProjectileScenePath=bin/tank_shell.tscn`、`ProjectileCount=1`、`ProjectileFlightSeconds=0.6`（比航弹快）。**只有它带命中音**，槽位由特效名的参数给出 |
 | effects/flying_effect.tscn | 上述飞掠特效的场景（一个 Control + SFX 总线上的 AudioStreamPlayer） |
 | effects/air_strike_effect.tscn | `airstrike` 特效的场景（同上结构，脚本换 `AirStrikeEffect.cs`，`StrikeEffectName = "bombing"`） |
 | effects/strafe_effect.tscn | `strafe` 特效的场景：**与 `air_strike_effect.tscn` 只差 `StrikeEffectName = "bullet"`**（同一个脚本，不是第二套实现） |
