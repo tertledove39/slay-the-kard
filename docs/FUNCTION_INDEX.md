@@ -85,6 +85,7 @@
 | `PlayDeadSound(id)` | 834 | 死亡音效 |
 | `SizeTier(card)` | 977 | 按 `attack + defence` 判档（`small`/`medium`/`large`）。**进场音、开火音、命中音三处共用这一个判据**，边界只写一遍 |
 | `DeployMoveEffect(card)` | 987 | 卡进场时的兜底音（步兵/坦克火炮/飞机，总部与指令卡返回 null） |
+| `PlaneFallbackEffect(card, forDeploy)` | 995 | 飞机的兜底音：「哪些兵种算飞机、这一刻放哪条」只有这一处（部署与移动**不是同一条**） |
 | `PlayDrawSound()` | 1019 | 抽卡音，`Player` 的四条抽牌实现各调一次 |
 | `PlayMoveEffect(card)` | 1035 | 单位在场上挪位置时的音（卡上 `playEffect` 优先，飞机兜底） |
 | `ResolveAttackEffect(from)` | 1052 | 这次攻击**实际**要播的特效串（卡上写了用卡上的，坦克/火炮默认 `TankAttack(...)`） |

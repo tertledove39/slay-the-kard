@@ -213,8 +213,44 @@ def main():
                          "步兵用 infantry 那一套素材"))
     results.append(check("CardTypes.Tank or CardTypes.Artillery => TankVoicePrefix" in tier_fn,
                          "**坦克与火炮**共用 tank 那一套素材"))
-    results.append(check("card.cardType is CardTypes.Plane or CardTypes.Bomber) return PlaneFlybyEffect;" in tier_fn,
-                         "飞机与轰炸机**不分档**，直接返回那一条飞过声"))
+    # 飞机的兜底音抽成了 PlaneFallbackEffect：「哪些兵种算飞机、这一刻放哪条」只有那一张表。
+    # 部署与移动两个调用点都走它，分开各写一遍就会出现两个说法。
+    plane_fn = method(battle, "private static string PlaneFallbackEffect(cardBase_ card, bool forDeploy)",
+                      "\n    }")
+    results.append(check("PlaneFallbackEffect(card, forDeploy: true)" in tier_fn,
+                         "部署路径走 PlaneFallbackEffect（飞机不分档这一条仍然成立）"))
+    results.append(check("if (card.cardType is not (CardTypes.Plane or CardTypes.Bomber)) return null;" in plane_fn,
+                         "战斗机与轰炸机**都**走这张表（主人后来说轰炸机也用这两条）"))
+    results.append(check("return forDeploy ? PlaneDeployEffect : PlaneFlybyEffect;" in plane_fn,
+                         "**部署与移动是两条不同的槽位**，按时机选而不是按兵种"))
+
+    # 在 Python 里按源码那张表**重放一遍**——测的是规则，不是文本。
+    slots_of = {c: re.search(rf'{c} = "sfx\((.+?)\)";', battle).group(1)
+                for c in ("PlaneDeployEffect", "PlaneFlybyEffect")}
+
+    def plane_fallback(card_type, for_deploy):
+        if card_type not in ("Plane", "Bomber"):
+            return None
+        return slots_of["PlaneDeployEffect" if for_deploy else "PlaneFlybyEffect"]
+
+    for card_type, for_deploy, want, note in [
+        ("Plane", True, slots_of["PlaneDeployEffect"], "战斗机**部署**用 depl 那组"),
+        ("Plane", False, slots_of["PlaneFlybyEffect"], "战斗机**移动**用 flyby 那组"),
+        ("Bomber", True, slots_of["PlaneDeployEffect"], "轰炸机**部署**同战斗机"),
+        ("Bomber", False, slots_of["PlaneFlybyEffect"], "轰炸机**移动**同战斗机"),
+        ("Infantry", True, None, "步兵不归它管"),
+        ("Infantry", False, None, "步兵不归它管"),
+    ]:
+        results.append(check(plane_fallback(card_type, for_deploy) == want,
+                             f"{card_type} {'部署' if for_deploy else '移动'} -> {want or '不播'}（{note}）"))
+
+    # 兜底要**真的轮得到**这 13 张卡：只要有一张飞机写了 playEffect，
+    # 那张卡就会绕过整张表，改兜底等于对它无效。
+    planes_with_own_voice = [p.split("\n")[0] for p in re.split(r"(?m)(?=^\[)", card_ini)
+                             if re.search(r"^cardType[ \t]*=[ \t]*(Plane|Bomber)[ \t]*\r?$", p, re.MULTILINE)
+                             and re.search(r"^playEffect[ \t]*=[ \t]*\S", p, re.MULTILINE)]
+    results.append(check(not planes_with_own_voice,
+                         f"没有飞机自己写了 playEffect（写了就会绕过兜底: {planes_with_own_voice}）"))
     results.append(check("InfantryVoiceSmallSlot" not in battle and "InfantryVoiceMediumSlot" not in battle,
                          "旧的「一档一个槽位常量」已收成前缀+后缀（否则加坦克要再抄一遍）"))
 
@@ -235,12 +271,16 @@ def main():
     # 逐个核一遍：家族 × 档位 的 6 个槽位 + 飞机那一条，都必须配了文件、且文件已被导入。
     families = {c: re.search(rf'{c} = "(.+?)";', battle) for c in ("InfantryVoicePrefix", "TankVoicePrefix")}
     results.append(check(all(v is not None for v in families.values()), "两个家族的槽位前缀都是常量"))
-    results.append(check(re.search(r'PlaneFlybyEffect = "sfx\((.+?)\)";', battle) is not None,
-                         "飞机那条也是常量（不在方法里裸写槽位名）"))
     wanted = [f"{v.group(1)}_{t}" for v in families.values() if v for t in ("small", "medium", "large")]
-    plane_slot = re.search(r'PlaneFlybyEffect = "sfx\((.+?)\)";', battle)
-    if plane_slot:
-        wanted.append(plane_slot.group(1))
+    planes = {c: re.search(rf'{c} = "sfx\((.+?)\)";', battle)
+              for c in ("PlaneDeployEffect", "PlaneFlybyEffect")}
+    results.append(check(all(v is not None for v in planes.values()),
+                         "飞机那两条也是常量（不在方法里裸写槽位名）"))
+    wanted += [v.group(1) for v in planes.values() if v]
+    # 两条必须是**不同的槽位**：写重了就等于「部署与移动用同一条」，
+    # 而主人给的素材本来就是按时机分成两组的。
+    results.append(check(planes["PlaneDeployEffect"].group(1) != planes["PlaneFlybyEffect"].group(1),
+                         "飞机部署与移动指向**不同**的槽位（写重了就等于没拆）"))
     for name in wanted:
         results.append(check(name in slots, f"槽位「{name}」在 [sfx] 段里存在"))
         for f in slots.get(name, []):
@@ -257,10 +297,12 @@ def main():
     move_fn = method(battle, "private void PlayMoveEffect(cardBase_ card)", "\n    }")
     results.append(check("string effect = card.playEffect;" in move_fn,
                          "卡上有 playEffect 就用它（喀秋莎靠这一行同时覆盖进场与移动）"))
-    results.append(check("card.cardType is not (CardTypes.Plane or CardTypes.Bomber)) return;" in move_fn
-                         and "effect = PlaneFlybyEffect;" in move_fn,
-                         "没写的话，飞机/轰炸机放「飞过」"))
-    results.append(check(move_fn.index("card.playEffect") < move_fn.index("PlaneFlybyEffect"),
+    results.append(check("effect = PlaneFallbackEffect(card, forDeploy: false);" in move_fn,
+                         "没写的话走 PlaneFallbackEffect 的**移动**那一格（战斗机 = fighter_flyby）"))
+    results.append(check("if (effect == null) return;" in move_fn
+                         and "is not (CardTypes.Plane or CardTypes.Bomber)" not in move_fn,
+                         "「非飞机不播」现在由 PlaneFallbackEffect 返回 null 表达，不再各判一遍兵种"))
+    results.append(check(move_fn.index("card.playEffect") < move_fn.index("PlaneFallbackEffect"),
                          "两份音的优先级：卡上的 playEffect 先于飞机默认"))
     results.append(check("PlayPlaneMoveEffect" not in battle, "旧名 PlayPlaneMoveEffect 已不存在"))
     # 移动分支：确认它接在 Move() 的 else（非部署）里，且入场分支没有它

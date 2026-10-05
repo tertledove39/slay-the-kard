@@ -751,3 +751,28 @@ if (isFriendly)
 六种输入并断言结果，另加一条「旧的拿整串去查的写法已消失」。
 
 > 教训：**这类「A 是 B 的子串/超串」的判定，文本断言等于没测。**
+
+### 57.（未定位）线程化预加载期间，日志里出现 cardbase.tscn / store.tscn 的解析失败
+
+**现象**：在合成测试里实例化 `bin/worldMap.tscn` 并让它的 `_Ready()` 跑完，
+日志末尾出现：
+
+    ERROR: Parse Error: Failed. [Resource file res://bin/cardbase.tscn:611]
+    ERROR: Failed loading resource: res://bin/cardbase.tscn.
+    ERROR: Parse Error: Failed. [Resource file res://store.tscn:36]
+    ERROR: Failed loading resource: res://store.tscn.
+
+两处报错行都是 `script = ExtResource(...)`（`cardbase.tscn` 指向 `res://bin/cardBase_.cs`）。
+
+**已排除**：不是文件本身的问题——把四个场景逐个 `ResourceLoader.load()`（不经过 WorldMap），
+`cardbase.tscn` / `store.tscn` / `worldMap.tscn` / `battleField.tscn` **全部 OK**。
+两个文件在 git 里也没有未提交改动。
+
+**可疑方向**：`WorldMap._Ready()` 里的 `SceneLoader.BeginPreload(...)` 走的是
+`ResourceLoader.LoadThreadedRequest`（**后台线程加载**），与主线程并发加载同一个 C# 脚本资源时
+可能失败。**未证实**——没有做隔离实验，也没有在真机（非 headless）复现过。
+
+**影响**：未知。真机运行时这几个场景是在切场景时由主线程加载的，未必走同一条路。
+
+**下一步**：真机进一次战斗、进一次商店，看日志里有没有同样的两行。有的话再查
+`SceneLoader` 的线程化加载；没有就说明只是合成测试的产物。

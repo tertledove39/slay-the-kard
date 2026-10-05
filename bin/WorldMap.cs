@@ -204,6 +204,10 @@ public partial class WorldMap : Control
         ConnectHover("store");
         ConnectHover("deck");
 
+        // 世界地图界面的**所有**按钮都响按键音（7 个区域按钮 + store + deck）。
+        // 递归挂载而不是逐个写名字：以后在场景里加按钮不用回来补这一行。
+        UiClickSound.AttachAll(this);
+
         RefreshAreaStates();
     }
 

@@ -1062,3 +1062,52 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 > 实机等价验证用临时 GDScript 跑过（跑完即删）：`Configure("")` 建出 **0** 个 `AudioStreamPlayer`、
 > `Configure("artillery_large_impact")` 建出 **4** 个且 bus 都是 `&"SFX"`；
 > 9 个新槽位逐个 `PickSfx` 都取到了 `AudioStream`。
+
+### 第十八轮（飞机部署/移动音 + 按键音）
+
+**需求一**：主人给了两组素材——`AU_depl_Fighter_small_01~02`（部署）与
+`AU_Flyby_Fighter_small_v2_01~02`（移动）——要求「所有战斗机的移动和部署音效改成这两个，
+同类型的随机播放」；随后补一句「**轰炸机也用这两个**」。
+
+素材本来就是按**时机**分的（depl / flyby），所以拆的是「部署」与「移动」这两个时刻，
+而不是兵种。第一版按兵种命名成 `fighter_*`，加上轰炸机之后这个名字就不准了，
+于是改为按**时机**命名，与素材文件名一一对应：
+
+    plane_deploy  ← AU_depl_Fighter_small_*
+    plane_flyby   ← AU_Flyby_Fighter_small_v2_*   （复用已有的键，语义本来就叫「飞过」）
+
+**「同类型随机播放」不用写代码**：`[sfx]` 段本来就是「逗号分隔、每次随机抽一条」。
+实机验证跑了 60 次抽取，两个槽位都各抽到 2 个不同文件。
+
+「哪些兵种算飞机、这一刻放哪条」抽成了 `PlaneFallbackEffect(card, forDeploy)`——
+部署走 `DeployMoveEffect`、移动走 `PlayMoveEffect`，两个调用点共用同一张表。
+13 张飞机卡**没有一张写了 `playEffect`**，所以改兜底就全覆盖了；测试也钉住了这一条
+（有卡自己写了 `playEffect` 就会绕过整张表，改兜底等于对它无效）。
+
+**需求二**：新增素材 `General_button2`，世界地图界面所有按钮 + 战斗界面「下一回合」按钮
+都用它当按键音。
+
+**分工是这次的关键**：「哪些按钮要响」是 **UI** 的事，「怎么响」是**音频**的事，所以分两层：
+
+- `bin/UiClickSound.cs`——薄门面。`AttachAll(root)` 递归找 `BaseButton` 把界面里
+  所有按钮一次挂完（世界地图的 7 个区域按钮是运行时按名字前缀找出来的，
+  写死名字的话以后加个按钮就静默没声）；`Attach(button)` 挂单个。
+  带 `HasMeta` 记号防重复挂载——挂两次就是两声。
+- `MusicManager.PlaySfx(slot)`——**放一次就完**。声部挂在 **autoload** 上而不是调用方场景里：
+  按键音最典型的用法就是「按下去 → 立刻切场景」（点区域按钮就进战斗），
+  挂场景里节点会跟着 `QueueFree`，声音刚起个头就被掐掉。
+
+实机（headless 起真 `worldMap.tscn`）验证：场景里 **9 个按钮**，挂完后
+**带记号的也是 9 个**；真按一下，`MusicManager` 上在播的声部从 1 变 2；
+直接调 `PlaySfx` 再到 3；传一个不存在的槽位则仍是 3（不崩、不误播）。
+
+`tests/verify_button_animations.py` 从 12 项扩到 25 项：新增按键音的挂载点、
+防重复记号、声部池、SFX 总线，以及**槽位 → 文件 → `.import`** 的交叉核对
+（少了任何一环都是静默没声，不查就只能靠耳朵发现）。
+
+> 顺带记录一个现象：在合成测试里 `worldMap._Ready()` 会启动**线程化预加载**
+> （`SceneLoader` 用 `ResourceLoader.LoadThreadedRequest`），随后日志里出现
+> `Parse Error: Failed [bin/cardbase.tscn:611]` 与 `store.tscn:36`。
+> 这两个场景**单独加载完全正常**（实测四个场景逐个 `load()` 全部 OK），
+> 报错行都是 `script = ExtResource(...)`。与本轮改动无关，也没有定位到根因，
+> 先记现象、不动代码。详见 `BUGS.md` #57（未定位）。

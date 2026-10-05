@@ -181,8 +181,16 @@ public partial class battlefield_ : Control
     private const string TankVoicePrefix = "tank";
 
     /// <summary>
-    /// 飞机与轰炸机的进场音。它们**不分档**，而且**入场与移动**放的是同一条。
+    /// **飞机（战斗机 `Plane` 与轰炸机 `Bomber`）**的两条兜底音。
+    ///
+    /// 素材是按**时机**给的（`depl` = 部署、`flyby` = 移动），所以**部署与移动是两条不同的槽位**，
+    /// 两组不通用。每组的多个文件配在 `[sfx]` 段的同一行里（逗号分隔 = 每次随机抽一条），
+    /// 所以「同类型随机播放」不用写任何抽签代码。
+    ///
+    /// **两种飞机行为完全一样**，所以按时机命名而不是按兵种——槽位名与素材文件名一一对应
+    /// （`AU_depl_Fighter_*` → `plane_deploy`、`AU_Flyby_Fighter_small_v2_*` → `plane_flyby`）。
     /// </summary>
+    private const string PlaneDeployEffect = "sfx(plane_deploy)";
     private const string PlaneFlybyEffect = "sfx(plane_flyby)";
 
     /// <summary>
@@ -574,6 +582,8 @@ private const int OpeningHandSize = 5;
         cardRes = ResourceManager.Instance?.GetScene("res://bin/cardbase.tscn") ?? ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
         //初始化按钮
         buttonNextTurn           = GetNode<TextureButton>("NextTurnButton");
+        // 「下一回合」按下时响一声按键音（战斗界面里只有它用这个音）。
+        UiClickSound.Attach(buttonNextTurn);
 
         // 初始化卡组：优先复用WorldMap已缓存的卡牌数据，避免重复解析card.ini
         if (BattleStateManager.IsCardDataCached)
@@ -959,7 +969,7 @@ private const int OpeningHandSize = 5;
     /// 卡进场（部署 / 加入战场）时的默认音：
     /// - **步兵** → `infantry_{档}`；
     /// - **坦克与火炮** → `tank_{档}`（素材自己叫 Light/Medium/Heavy，槽位统一叫 small/medium/large）；
-    /// - **飞机与轰炸机** → 不分档，一条 `plane_flyby`（它在场上挪位置另有一处，见 `PlayMoveEffect`）；
+    /// - **战斗机与轰炸机** → 不分档，但**部署与移动不是同一条**（见 `PlaneFallbackEffect`）；
     /// - 其余（总部、指令卡）→ `null`。
     ///
     /// 三档按 `attack + defence`：≤`DeploySoundSmallMax` 小、到 `DeploySoundMediumMax` 为止是中、
@@ -973,7 +983,8 @@ private const int OpeningHandSize = 5;
         // 总部的 cardType 也是 Infantry，不排掉的话开局摆总部也会响一声。
         if (card.isHq == HQ.hq) return null;
 
-        if (card.cardType is CardTypes.Plane or CardTypes.Bomber) return PlaneFlybyEffect;
+        string plane = PlaneFallbackEffect(card, forDeploy: true);
+        if (plane != null) return plane;
 
         string family = card.cardType switch
         {
@@ -984,6 +995,26 @@ private const int OpeningHandSize = 5;
         if (family == null) return null;
 
         return $"sfx({family}_{SizeTier(card)})";
+    }
+
+    /// <summary>
+    /// 飞机的兜底音——**「哪些兵种算飞机、这一刻该放哪条」只在这一个函数里判**。
+    ///
+    /// | | 部署（`forDeploy: true`） | 在场上挪位置（`false`） |
+    /// |---|---|---|
+    /// | 战斗机 `Plane` | `plane_deploy` | `plane_flyby` |
+    /// | 轰炸机 `Bomber` | `plane_deploy` | `plane_flyby` |
+    /// | 其它兵种 | `null` | `null` |
+    ///
+    /// 抽出来是因为**两个调用点要用同一张表**：部署走 `DeployMoveEffect`（由 `PlayCardEffect` 兜底），
+    /// 移动走 `PlayMoveEffect`。分开各写一遍的话，「飞机这一刻放哪条」就会有两个说法。
+    ///
+    /// 返回 `null` 表示「这个兵种不归我管」，调用方据此决定要不要继续往下走。
+    /// </summary>
+    private static string PlaneFallbackEffect(cardBase_ card, bool forDeploy)
+    {
+        if (card.cardType is not (CardTypes.Plane or CardTypes.Bomber)) return null;
+        return forDeploy ? PlaneDeployEffect : PlaneFlybyEffect;
     }
 
     /// <summary>
@@ -1018,7 +1049,8 @@ private const int OpeningHandSize = 5;
     ///
     /// 1. 卡上写了 `playEffect` 就用它——喀秋莎的「进入阵地」
     ///    （`playEffect = sfx(katyusha_into_pos)`）就是这么配的，**进场与移动共用一行**；
-    /// 2. 没写的话，飞机与轰炸机放那一声「飞过」；
+    /// 2. 没写的话，走 `PlaneFallbackEffect`：**战斗机放 `fighter_flyby`**（与它部署时的
+    ///    `fighter_deploy` 不是同一条），轰炸机放 `plane_flyby`；
     /// 3. 其余不播。
     ///
     /// 与入场那一声互斥：入场走 `Move()` 的部署分支 / `AddCardToPlace()`，移动走这里的 else 分支，
@@ -1034,8 +1066,10 @@ private const int OpeningHandSize = 5;
         string effect = card.playEffect;
         if (string.IsNullOrWhiteSpace(effect))
         {
-            if (card.cardType is not (CardTypes.Plane or CardTypes.Bomber)) return;
-            effect = PlaneFlybyEffect;
+            // 非飞机返回 null —— 这就是原来那句 `is not (Plane or Bomber) return;`，
+            // 只是「谁是飞机、这个兵种归谁管」现在由 PlaneFallbackEffect 一处说了算。
+            effect = PlaneFallbackEffect(card, forDeploy: false);
+            if (effect == null) return;
         }
 
         StartEffect(effect, new List<Vector2> { GetCardCenter(card) }, null, card);

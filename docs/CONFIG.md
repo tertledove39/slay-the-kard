@@ -110,7 +110,7 @@
 | 指令卡 `Command` | 一声「咚」（`[sfx]` 的 `咚` = `assest/咚.wav`） | `DefaultCommandPlayEffect` |
 | 步兵 `Infantry` | 按身材选一档 `infantry_{档}` | `InfantryVoicePrefix` |
 | 坦克 `Tank` / 火炮 `Artillery` | 按身材选一档 `tank_{档}` | `TankVoicePrefix` |
-| 飞机 `Plane` / 轰炸机 `Bomber` | 不分档，一条 `plane_flyby` | `PlaneFlybyEffect` |
+| 飞机 `Plane` / 轰炸机 `Bomber` | 不分档；**部署与移动各一条**：`plane_deploy` / `plane_flyby` | `PlaneFallbackEffect` |
 | 总部（`isHq = 1`） | **什么都不播** | — |
 
 **卡上写了 `playEffect` 就一律以卡为准**，兜底不生效（那 8 张带语音的指令卡就是这样）。
@@ -133,8 +133,23 @@
 
 1. **卡上写了 `playEffect` 就用它**——喀秋莎的「进入阵地」就是这么配的
    （`playEffect = sfx(katyusha_into_pos)`），**进场与移动共用同一行配置**；
-2. 没写的话，飞机与轰炸机放那一声 `plane_flyby`；
+2. 没写的话走 `PlaneFallbackEffect(card, forDeploy: false)`：飞机放 `plane_flyby`
+   （与它部署时的 `plane_deploy` **不是同一条**）；
 3. 其余不播。
+
+**飞机的「部署 / 移动 → 槽位」只写在 `PlaneFallbackEffect` 一处**
+（部署走 `DeployMoveEffect`、移动走 `PlayMoveEffect`，两个调用点共用同一张表）：
+
+| | 部署（`forDeploy: true`） | 在场上挪位置（`false`） |
+|---|---|---|
+| 战斗机 `Plane` | `plane_deploy` | `plane_flyby` |
+| 轰炸机 `Bomber` | `plane_deploy` | `plane_flyby` |
+| 其它兵种 | 不播 | 不播 |
+
+**两种飞机行为完全一样**，所以槽位按**时机**命名而不是按兵种——
+槽位名与素材文件名一一对应（`AU_depl_Fighter_*` → `plane_deploy`、
+`AU_Flyby_Fighter_small_v2_*` → `plane_flyby`）。每条写多个文件 = **每次随机抽一条**，
+「同类型随机播放」靠 `[sfx]` 段本来的机制，代码里没有抽签逻辑。
 
 两条路互斥：入场走 `Move()` 的部署分支 / `AddCardToPlace()`，移动走同函数的 else 分支，
 不会连响两声。（指令卡的 `playEffect` 不会走到这里——指令卡不上场。）
@@ -318,7 +333,11 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 
 - `dead`：单位阵亡时的爆炸音效。素材范围是`assest/爆炸3.wav`～`爆炸21.wav`，**下划线开头的未采用版本不列入**（`_爆炸16`/`_爆炸17`/`_爆炸19`）
 - `flyby`：`flying` 特效的飞掠音效（`assest/飞机飞过_单位.wav`）。调用方是特效自己（`effects/flying_effect.tscn` 的 `SfxSlot`），不经过 `battlefield_`。`airstrike` 继承`FlyingEffect`，所以起飞时也响这一声
-- `plane_flyby`：飞机与轰炸机的**进场与移动**音（`assest/飞机飞过_效果.wav`），不分档
+- `plane_deploy` / `plane_flyby`：飞机（战斗机与轰炸机）的**部署**音与**移动**音，不分档。
+  两组素材是按时机给的（`AU_depl_Fighter_small_*` / `AU_Flyby_Fighter_small_v2_*`），**不通用**；
+  每条两个文件、随机抽一条。挂载点见 `battlefield_.PlaneFallbackEffect`
+- `button`：**按键音**（`assest/General_button2.wav`）。世界地图界面所有按钮 +
+  战斗界面的「下一回合」按钮，挂载点见 `bin/UiClickSound.cs`
 - `katyusha_fire` / `katyusha_into_pos`：喀秋莎的**攻击**音与**进入阵地**音，分别挂在 `attackEffect` 与 `playEffect` 上
 - `draw`：抽卡音，5 条变体（`Draw_One_A`~`E`），随机抽一条
 - `tank_cannon_medium` / `tank_cannon_large` / `tank_cannon_impact`：坦克的**开火音**（两档，小的并入 medium）与**命中音**（不分档）

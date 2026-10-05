@@ -77,6 +77,8 @@ battleBGM_berlin_final_battle=res://assest/music/配乐3.mp3,res://assest/music/
 - `MusicManager.Instance?.PlaySlot("start_menu")` — 播放指定槽位
 - `MusicManager.Instance?.PlayBattleSlot(enemyPreset)` — 播放战斗BGM，含专属槽位回退
 - `MusicManager.Instance?.HasSlot("battleBGM_X")` — 槽位是否配置了曲目
+- `MusicManager.Instance?.PickSfx("button")` — 只**取**一条音效（`AudioStream`），播放器由调用方管
+- `MusicManager.Instance?.PlaySfx("button")` — **响一声就走**：自己抽、自己播，调用方不用管节点
 - `MusicManager.Instance?.StopMusic()`
 - `MusicManager.Instance?.SetVolumeDb(-6f)`
 - 常量：`MusicManager.BattleBgmPrefix`（`"battleBGM_"`）、`MusicManager.BattleSlot`（`"battle"`）
@@ -99,10 +101,18 @@ battleBGM_berlin_final_battle=res://assest/music/配乐3.mp3,res://assest/music/
 | 用途 | 背景音乐 | 一次性音效 |
 | 调度 | 有「播完再切」，切换不掐断当前曲目 | 无调度，每次播放各抽一条 |
 | 抽取 | 多曲时避开正在播的那首 | 抽到同一条也没关系（爆炸连着响同一条很自然） |
-| 接口 | `PlaySlot(slot)` | `PickSfx(slot)` → 返回 `AudioStream`，由调用方自行播放 |
+| 接口 | `PlaySlot(slot)` | `PickSfx(slot)` → 返回 `AudioStream`，由调用方自行播放；<br>`PlaySfx(slot)` → **放一次就完**，不用调用方管节点 |
 
 `PickSfx` 带缓存，同一条音频只读一次盘；槽位缺失或加载失败时返回 `null`，
 调用方保持原有音效即可（不会变成没声音）。
+
+**`PickSfx` 与 `PlaySfx` 怎么选**：需要在**自己场景里**控制播放器（要调音量、
+要等它播完 `await`）时用 `PickSfx`；只是「响一声就走」用 `PlaySfx`。
+
+`PlaySfx` 的声部挂在 **`MusicManager` 自己身上**（autoload，常驻），不是调用方所在的场景——
+按键音最典型的用法就是「按下去 → 立刻切场景」，挂场景里的话节点会跟着 `QueueFree`，
+声音刚起个头就被掐掉。多个声部轮换，连点也不会让后一声掐掉前一声；音量走 `SFX` 总线，
+和场景里的音效是同一条（设置界面调的就是它）。
 
 当前槽位：
 
@@ -114,7 +124,8 @@ battleBGM_berlin_final_battle=res://assest/music/配乐3.mp3,res://assest/music/
 | `咚` | **指令卡默认音**（`assest/咚.wav`） | 同上，但**卡上不用写**——指令卡没写 `playEffect` 时由 `battlefield_.PlayCardEffect` 兜底 |
 | `infantry_small` / `infantry_medium` / `infantry_large` | **步兵进场音**（`assest/AU_Infantry_*.wav`） | 同上，卡上也不用写——步兵按 `attack + defence` 分三档自动选 |
 | `tank_small` / `tank_medium` / `tank_large` | **坦克与火炮进场音**（`assest/Tank_Light/Medium/Heavy_Move_Fx.wav`） | 同上，同一套三档规则，只是换一套素材 |
-| `plane_flyby` | **飞机/轰炸机**（`assest/飞机飞过_效果.wav`） | 同上，**入场与移动**都放这一条，不分档 |
+| `plane_deploy` / `plane_flyby` | **飞机（战斗机与轰炸机）的部署 / 移动音**（`assest/AU_depl_Fighter_small_01~02` / `AU_Flyby_Fighter_small_v2_01~02`） | 同上，卡上不用写，不分档。**两条按时机分**、互不通用，挂载点 `battlefield_.PlaneFallbackEffect` |
+| `button` | **按键音**（`assest/General_button2.wav`） | `bin/UiClickSound.cs`。世界地图界面**所有**按钮（`AttachAll` 递归挂）+ 战斗界面的「下一回合」按钮（`Attach`） |
 | `katyusha_into_pos` | **喀秋莎进场/移动**（`assest/AU_Rocket_Art_Katyusha_IntoPos_01.wav`） | 挂在喀秋莎的 `playEffect` 上——**进场与移动共用这一行**（见 `CONFIG.md` 的「单位『移动』时的音」） |
 | `katyusha_fire` | **喀秋莎开火**（`assest/AU_Rocket_Art_Katyusha_fire_02.wav`） | 挂在喀秋莎的 `attackEffect` 上。带了它的攻击特效**不再叠通用机枪声**（`sfx` 在 `NoFiringSoundNames` 里） |
 | `draw` | **抽卡音**（`assest/Draw_One_A~E.wav`，**5 条变体**） | 卡牌从牌堆被抽走时由 `battlefield_.PlayDrawSound()` 放。同一段写了 5 个文件、逗号分隔，靠 `[sfx]` 段本来就有的「**随机抽一条**」实现变化——不用写任何抽签代码 |
@@ -131,8 +142,12 @@ battleBGM_berlin_final_battle=res://assest/music/配乐3.mp3,res://assest/music/
 > 档位边界见 `battlefield_` 的 `DeploySound*Max`，槽位前缀见 `InfantryVoicePrefix` / `TankVoicePrefix`，
 > 完整规则见 `CONFIG.md` 的「没写 playEffect 时的兜底」。
 >
-> 注意区分：**`plane_flyby` 是「飞机进场/移动」**，而 `flyby` 是**飞掠攻击特效**（`flying`/`airstrike`）
-> 起飞时的那一声，两者是不同的时机、也可以不同的素材。
+> 注意区分三个名字很像的槽位：
+> - **`plane_flyby`**：飞机（战斗机与轰炸机）**在场上挪位置**时的音；
+> - **`plane_deploy`**：同两种飞机**部署**时的音（与上一条**不是**同一条）；
+> - **`flyby`**：**飞掠攻击特效**（`flying` / `airstrike`）起飞时的那一声。
+>
+> 前两个是「单位换位置」，第三个是「攻击演出」，时机完全不同、素材也各用各的。
 
 > `[sfx]` 的键**可以是中文**：`iniHandler` 只取 `=` 前的整段文本做键，不过滤非 ASCII。
 > 已实测 `严冬`、`预备役` 等中文槽位都能取到。
