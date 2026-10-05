@@ -9,9 +9,11 @@ mouse_filter = 2
 script = ExtResource("1")
 RiseHeight = 46.0
 RiseScale = 1.18
-SwayDegrees = 10.0
-SwayCycles = 2.0
-Duration = 0.9
+SwayDegrees = 5.0
+SwaySecondsPerCycle = 4.0
+SwayCycles = 1.0
+RiseDuration = 1.5
+LandDuration = 1.5
 TopZIndex = 200
 SfxSlot = "flyby"
 

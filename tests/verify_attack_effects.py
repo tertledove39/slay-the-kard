@@ -103,42 +103,59 @@ def main():
 
     # ==================== ② flying ====================
     print("\n--- ② flying 飞掠 ---")
-    for field in ["RiseHeight", "RiseScale", "SwayDegrees", "SwayCycles",
-                  "Duration", "TopZIndex", "SfxSlot"]:
+    for field in ["RiseHeight", "RiseScale", "SwayDegrees", "SwaySecondsPerCycle", "SwayCycles",
+                  "RiseDuration", "LandDuration", "TopZIndex", "SfxSlot"]:
         results.append(check(f"[Export] public float {field}" in flying
                              or f"[Export] public int {field}" in flying
                              or f"[Export] public string {field}" in flying,
                              f"{field} 是 Export（调手感不必改代码）"))
 
-    results.append(check("private async Task RiseAsync(" in flying
-                         and "private async Task AimAsync(" in flying
+    # 「摆动 4 秒一个周期」这种要求用「总时长的百分比」表达不出来，
+    # 所以每段改成各自填秒数。
+    results.append(check("RiseDuration + SwaySecondsPerCycle * SwayCycles + LandDuration" in flying,
+                         "总时长由三段各自的秒数相加，不再按百分比切"))
+    results.append(check("RiseFraction" not in flying and "AimFraction" not in flying
+                         and "SwayFraction" not in flying,
+                         "百分比分段已移除"))
+
+    results.append(check("private async Task RiseAndAimAsync(" in flying
                          and "private async Task SwayAroundAimAsync(" in flying
                          and "private async Task LandAsync(" in flying,
-                         "升起 / 转向目标 / 在瞄准角上摆动 / 落回 四段分开"))
-    results.append(check("baseScale * RiseScale" in flying, "漂浮时轻微放大"))
-    results.append(check("basePosition + new Vector2(0f, -RiseHeight)" in flying, "往上升"))
+                         "三段：升起含转向 / 瞄准角上摆动 / 落回"))
+    results.append(check("private async Task AimAsync(" not in flying
+                         and "private async Task RiseAsync(" not in flying,
+                         "旧的「先升完再单独转」两段已合并"))
+
+    # 要求：升到最高点时方向已经调整完毕 —— 升起与转向必须在同一个 tween 里并行完成
+    rise = method(flying, "private async Task RiseAndAimAsync(", "private async Task SwayAroundAimAsync(")
+    results.append(check("tween.SetParallel(true);" in rise, "升起/放大/转向并行"))
+    results.append(check('TweenProperty(card, "position", basePosition + new Vector2(0f, -RiseHeight), duration)' in rise,
+                         "往上升"))
+    results.append(check("baseScale * RiseScale" in rise, "漂浮时轻微放大"))
+    results.append(check('TweenProperty(card, "rotation", aimRotation, duration)' in rise,
+                         "转向与升起同一个 duration（升完即已对准）"))
+    results.append(check(rise.count("duration)") >= 3, "三件事共用同一个 duration"))
 
     # 转向：幅度由「攻击者→目标」的方向决定，而不是固定角度
-    aim = method(flying, "private static float AimRotationOffset(", "private async Task RiseAsync(")
+    aim = method(flying, "private static float AimRotationOffset(", "private async Task RiseAndAimAsync(")
     results.append(check("positions[1] - positions[0]" in aim, "方向取自 攻击者→目标"))
     results.append(check("direction.Angle() + Mathf.Pi / 2f" in aim,
                          "让卡的「上边」对准目标（与 Bullet 的朝向约定一致）"))
     results.append(check("direction.LengthSquared() < 0.0001f" in aim,
                          "攻击者与目标重合时不乱转"))
 
-    set_ = method(flying, "private async Task AimAsync(", "private async Task SwayAroundAimAsync(")
-    results.append(check('TweenProperty(card, "rotation", toRotation, duration)' in set_,
-                         "转的是 rotation（不是左右平移）"))
-    results.append(check("Tween.TransitionType.Sine" in set_ and "Tween.EaseType.InOut" in set_,
-                         "转向是慢速 + 缓动"))
-
     sway = method(flying, "private async Task SwayAroundAimAsync(", "private async Task LandAsync(")
-    results.append(check("SwayCycles * 2f" in sway, "摆动来回数由 SwayCycles 决定"))
+    results.append(check("SwayCycles * 2f" in sway or "cycles * 2" in sway,
+                         "摆动来回数由 SwayCycles 决定"))
     results.append(check("Mathf.DegToRad(SwayDegrees)" in sway, "摆幅是角度（DegToRad），不是像素"))
     results.append(check("aimRotation + (index % 2 == 0 ? offset : -offset)" in sway,
                          "摆动是「在瞄准角的基础上」左右偏，不是绕 0 度摆"))
     results.append(check('tween.TweenProperty(card, "rotation", aimRotation, step)' in sway,
                          "最后停在瞄准角上（落回才不会斜着停住）"))
+
+    flying_scene_vals = (ROOT / "effects" / "flying_effect.tscn").read_text(encoding="utf-8")
+    results.append(check("SwayDegrees = 5.0" in flying_scene_vals, "摆幅 ±5°"))
+    results.append(check("SwaySecondsPerCycle = 4.0" in flying_scene_vals, "摆动一个来回 4 秒"))
 
     results.append(check("source.isUnderCardEffect = true;" in flying, "漂浮期间标记「特效在管这张卡」"))
     results.append(check("source.ZIndex = TopZIndex;" in flying, "抬高层级压住其他卡"))

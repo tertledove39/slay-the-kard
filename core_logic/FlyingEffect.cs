@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 
 /// <summary>
-/// 「飞掠」特效：让**触发它的那张卡**飘起来 → 在空中轻微左右摆动 → 落回桌上。
+/// 「飞掠」特效：让**触发它的那张卡**飘起来 → 在空中朝目标方向轻微摆动 → 落回桌上。
 ///
 /// 「漂浮」是靠三件事一起表现的：往上升、轻微放大、以及在漂浮期间把 ZIndex 抬到最高
 /// 压住其他卡——高度是假的，遮挡关系才是让人一眼看出「它起来了」的关键。
@@ -13,7 +13,13 @@ using System.Threading.Tasks;
 /// 同时它自己**不画任何东西**（不生成贴图、不占父节点层级），
 /// 场景里只挂一个 AudioStreamPlayer 用来放飞掠音效。
 ///
-/// 参数全部 Export 在 `effects/flying_effect.tscn` 上，调手感不必改代码。
+/// 三段时序：
+/// 1. **升起与转向同时进行**——升到最高点时方向已经对准目标，不做「先升完再慢慢转」；
+/// 2. 在空中朝着目标方向左右摆动（摆幅 `SwayDegrees`，速度按 `SwaySecondsPerCycle` 算）；
+/// 3. 落回桌上，位置/缩放/**角度**一起还原。
+///
+/// 每段的时长都直接填秒数（不再按总时长的百分比切），因为「摆动 4 秒一个周期」
+/// 这种要求用百分比表达不出来。参数全部 Export 在 `effects/flying_effect.tscn` 上。
 /// </summary>
 public partial class FlyingEffect : Effect
 {
@@ -23,26 +29,26 @@ public partial class FlyingEffect : Effect
     /// <summary>漂浮期间放大到原来的多少倍（1.18 = 放大 18%）。</summary>
     [Export] public float RiseScale = 1.18f;
 
-    /// <summary>在「已经指向目标」的基础上，左右来回摆动的幅度（度）。</summary>
-    [Export] public float SwayDegrees = 10f;
+    /// <summary>在「已经指向目标」的基础上，左右摆动的幅度（度）。</summary>
+    [Export] public float SwayDegrees = 5f;
+
+    /// <summary>摆动**一个来回**要几秒。</summary>
+    [Export] public float SwaySecondsPerCycle = 4f;
 
     /// <summary>摆动几个来回。</summary>
-    [Export] public float SwayCycles = 2f;
+    [Export] public float SwayCycles = 1f;
 
-    /// <summary>整段动画的时长（秒）。</summary>
-    [Export] public float Duration = 0.9f;
+    /// <summary>升起（含同时进行的转向）用几秒。</summary>
+    [Export] public float RiseDuration = 1.5f;
+
+    /// <summary>落回桌上用几秒。</summary>
+    [Export] public float LandDuration = 1.5f;
 
     /// <summary>漂浮期间用的 ZIndex，要高于其他卡的 10 / 手牌的 20。</summary>
     [Export] public int TopZIndex = 200;
 
     /// <summary>飞掠音效所在的槽位名，对应 configs/music.ini 的 [sfx] 段。</summary>
     [Export] public string SfxSlot = "flyby";
-
-    // 四段的时间占比：升起 30% → 转向目标 25% → 在目标方向上摆动 25% → 落回 20%。
-    // 这样改 Duration 一处就能整段变快变慢，不必逐个调。
-    private const float RiseFraction = 0.30f;
-    private const float AimFraction = 0.25f;
-    private const float SwayFraction = 0.25f;
 
     private AudioStreamPlayer sfxPlayer;
 
@@ -51,13 +57,20 @@ public partial class FlyingEffect : Effect
         sfxPlayer = GetNodeOrNull<AudioStreamPlayer>("Sfx");
     }
 
+    /// <summary>三段加起来的总时长。`Play(time)` 给了值时按它整体缩放。</summary>
+    private float TotalSeconds => RiseDuration + SwaySecondsPerCycle * SwayCycles + LandDuration;
+
     public override async Task Play(IReadOnlyList<Vector2> positions = null, float? time = null,
                                     cardBase_ source = null, int count = 0)
     {
         // 动的是卡本身，没有卡就什么都做不了。
         if (source == null || !IsInstanceValid(source)) return;
 
-        float duration = time.HasValue && time.Value > 0f ? time.Value : Duration;
+        // 传了 time 就当作「整段总时长」，三段按比例一起缩放；不传就用场景里各段自己的秒数。
+        float scale = 1f;
+        if (time.HasValue && time.Value > 0f && TotalSeconds > 0f)
+            scale = time.Value / TotalSeconds;
+
         Vector2 basePosition = source.Position;
         Vector2 baseScale = source.Scale;
         float baseRotation = source.Rotation;
@@ -74,11 +87,9 @@ public partial class FlyingEffect : Effect
 
         try
         {
-            await RiseAsync(source, basePosition, baseScale, duration * RiseFraction);
-            await AimAsync(source, baseRotation, aimRotation, duration * AimFraction);
-            await SwayAroundAimAsync(source, aimRotation, duration * SwayFraction);
-            await LandAsync(source, basePosition, baseScale, baseRotation,
-                            duration * (1f - RiseFraction - AimFraction - SwayFraction));
+            await RiseAndAimAsync(source, basePosition, baseScale, aimRotation, RiseDuration * scale);
+            await SwayAroundAimAsync(source, aimRotation, SwaySecondsPerCycle * SwayCycles * scale);
+            await LandAsync(source, basePosition, baseScale, baseRotation, LandDuration * scale);
         }
         finally
         {
@@ -109,7 +120,13 @@ public partial class FlyingEffect : Effect
         return direction.Angle() + Mathf.Pi / 2f;
     }
 
-    private async Task RiseAsync(cardBase_ card, Vector2 basePosition, Vector2 baseScale, float duration)
+    /// <summary>
+    /// 升起 + 放大 + **转向目标**三件事同时进行，一起在 `duration` 内完成。
+    /// 合在一起是刻意的：升到最高点时方向就该已经对准了，
+    /// 不能出现「悬在空中还在慢慢转」的中间状态。
+    /// </summary>
+    private async Task RiseAndAimAsync(cardBase_ card, Vector2 basePosition, Vector2 baseScale,
+                                       float aimRotation, float duration)
     {
         var tween = CreateTween();
         tween.SetParallel(true);
@@ -117,25 +134,20 @@ public partial class FlyingEffect : Effect
              .SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
         tween.TweenProperty(card, "scale", baseScale * RiseScale, duration)
              .SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
-        await ToSignal(tween, Tween.SignalName.Finished);
-    }
-
-    /// <summary>转向目标。慢速 + Sine/InOut 缓动，不追求一次性到位。</summary>
-    private async Task AimAsync(cardBase_ card, float fromRotation, float toRotation, float duration)
-    {
-        var tween = CreateTween();
-        tween.TweenProperty(card, "rotation", toRotation, duration)
+        tween.TweenProperty(card, "rotation", aimRotation, duration)
              .SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
         await ToSignal(tween, Tween.SignalName.Finished);
     }
 
     /// <summary>
-    /// 在**已经指向目标**的角度上左右来回摆动若干度。
-    /// 落回由调用方的还原负责，这里只要保证最后一个来回停在瞄准角上。
+    /// 在**已经指向目标**的角度上左右摆动若干度。
+    /// 一个来回的时长 = `duration / SwayCycles`（`duration` 已由调用方乘过周期数）。
+    /// 最后一个来回停在瞄准角上，落回时角度才不会突然跳一下。
     /// </summary>
     private async Task SwayAroundAimAsync(cardBase_ card, float aimRotation, float duration)
     {
-        int halfSwings = Mathf.Max(1, Mathf.RoundToInt(SwayCycles * 2f));
+        int cycles = Mathf.Max(1, Mathf.RoundToInt(SwayCycles));
+        int halfSwings = cycles * 2;
         float step = duration / halfSwings;
         float offset = Mathf.DegToRad(SwayDegrees);
 
