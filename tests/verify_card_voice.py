@@ -145,10 +145,12 @@ def main():
         if m:
             wired[card] = m.group(1).strip()
 
-    # 喀秋莎也在列：它的 playEffect 是「进入阵地」，进场与移动共用（见 ⑧ 与 ⑦）
-    expected = {"冬季攻势": "严冬", "战略重心": "战略重心", "五年计划": "红色旗帜",
-                "塔曼斯卡亚": "嘿", "方面军": "阿嘿", "朱可夫": "朱可夫",
-                "拖拉机厂": "拉伸", "预备役": "预备役", "喀秋莎": "katyusha_into_pos"}
+    # 喀秋莎也在列：它的 playEffect 是「进入阵地」，进场与移动共用（见 ⑧ 与 ⑦）。
+    # 严冬 被两张卡共用（冬季攻势 与 冬季战争）—— 一个槽位可以被多张卡引用，这是允许的。
+    expected = {"冬季攻势": "严冬", "冬季战争": "严冬", "战略重心": "战略重心",
+                "五年计划": "红色旗帜", "塔曼斯卡亚": "嘿", "方面军": "阿嘿",
+                "朱可夫": "朱可夫", "拖拉机厂": "拉伸", "预备役": "预备役",
+                "喀秋莎": "katyusha_into_pos"}
     for card, slot in sorted(expected.items()):
         results.append(check(wired.get(card) == slot, f"{card} → sfx({slot})"))
 
@@ -281,10 +283,42 @@ def main():
             results.append(check(src.exists(), f"{name} → {src.name} 存在"))
             results.append(check(Path(str(src) + ".import").exists(),
                                  f"{name} 的 {src.name} 已被 Godot 导入"))
-    # 攻击特效里带了自定义音效，就不该再叠通用机枪声
-    results.append(check('"sfx"' in method(effect, "HashSet<string> NoFiringSoundNames",
-                                           "public static bool ReplacesFiringSound"),
-                         "「sfx」进了静音名单：攻击特效自带音效时不再叠通用开火声"))
+    # 攻击特效里带了自定义音效，就不该再叠通用机枪声。
+    # **这里必须验行为，不能只验名单里有没有 "sfx" 这个字符串** ——
+    # 曾经就是这么漏的：名单里有 `sfx`，但判定拿的是**带参数的整串** `sfx(katyusha_fire)`，
+    # 永远匹配不上，喀秋莎的机枪声一直没被静音，而文本断言照样是绿的。
+    print("\n--- ⑧b 通用开火声的判定（验行为，不验文本） ---")
+    suppress = method(effect, "public static bool ReplacesFiringSound(string effectNames)",
+                      "public static Effect Create(string name)")
+    results.append(check("ParseName(raw, out string name, out _);" in suppress,
+                         "判定**先拆参数**再查名单"))
+    results.append(check("NoFiringSoundNames.Contains(name)" in suppress,
+                         "查的是拆出来的名字，不是整串"))
+    results.append(check("NoFiringSoundNames.Contains(raw.Trim())" not in suppress,
+                         "旧的「拿整串去查」写法已消失"))
+
+    # 从源码里把名单和边界读出来，在 Python 里重放一遍判定——测的是规则，不是文本
+    listed = set(re.findall(r'"(\w+)"', method(effect, "HashSet<string> NoFiringSoundNames",
+                                               "public static bool ReplacesFiringSound")))
+
+    def replaces(effect_names):
+        """按 C# 的规则重放：逗号分段 -> 拆掉括号里的参数 -> 查名单。"""
+        for raw in effect_names.split(","):
+            name = raw.strip().split("(")[0].strip()
+            if name in listed:
+                return True
+        return False
+
+    cases = [
+        ("bullet", False, "普通子弹卡照旧有通用开火声"),
+        ("bullet,sfx(katyusha_fire)", True, "**喀秋莎**：带了自定义音效 -> 静音（曾经漏的就是这条）"),
+        ("sfx(katyusha_fire)", True, "只写音效也是静音"),
+        ("flying", True, "飞掠：扔炸弹，不该有机枪声"),
+        ("airstrike", True, "空袭：同上"),
+        ("strafe", False, "扫射：打的就是子弹，那声机枪正是它要的"),
+    ]
+    for value, want, why in cases:
+        results.append(check(replaces(value) is want, f"「{value}」-> {'静音' if want else '保留机枪声'}：{why}"))
 
     # 挂载点：没写 playEffect 的走兜底；写了的一律以卡为准
     results.append(check("effect = card.cardType == CardTypes.Command ? DefaultCommandPlayEffect : DeployMoveEffect(card);"

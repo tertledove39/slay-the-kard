@@ -970,6 +970,29 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 测试里那条结构检查值得记：**每一处 `deck.Remove*` 之后 160 字符内都必须有
 `PlayDrawSound()`**。以后谁新加第五种抽法却忘了挂音，这条会红——不然那种抽法就是静默没声。
 
+### 第十六轮修正（喀秋莎的机枪声为什么没被静音）
+
+主人问「为什么喀秋莎还是播放了 bullet 音效」。是**上一轮埋的 bug**，见 `BUGS.md` #56：
+
+第十四轮给 `NoFiringSoundNames` 加了 `"sfx"`，但 `ReplacesFiringSound` 的判定是
+`NoFiringSoundNames.Contains(raw.Trim())` —— 名单里是**特效名** `sfx`，
+而卡上的分段是 **`sfx(katyusha_fire)`**（带参数），整串永远匹配不上。加进去那天就没生效过。
+
+修复是判定里先用 `ParseName` 拆掉参数再查名单。
+
+**更值得记的是为什么测试没拦住**：那条断言是查**源码文本**的
+（`'"sfx"' in 名单那一段`），只能证明「名单里有这个字符串」，**证明不了判定会命中**。
+现在换成**行为测试**：把名单从源码里读出来，在 Python 里按同样规则重放六种输入——
+
+    bullet                      -> 保留机枪声
+    bullet,sfx(katyusha_fire)   -> 静音   ← 漏的就是这条
+    sfx(katyusha_fire)          -> 静音
+    flying / airstrike          -> 静音
+    strafe                      -> 保留机枪声
+
+并加一条「旧的拿整串去查的写法已消失」。**这类「A 是不是 B 的子串」的判定，
+文本断言等于没测。**
+
 ### 场景里 export 的值要带中文注释
 
 `.tscn` 的导出值在 Inspector 里只显示英文字段名，看不出含义，所以约定在**上一行**写一行

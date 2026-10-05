@@ -727,3 +727,27 @@ if (isFriendly)
 判据只写一处是这个修法的重点——同一个规则在四个地方各写一遍，下次改状态机必然漏一个。
 
 **回归**：`tests/verify_dead_unit_targeting.py`（15 条）。
+
+### 56. 喀秋莎的通用机枪声没被静音：判定拿的是「带参数的整串」
+
+**症状**：主人问「为什么喀秋莎还是播放了 bullet 音效」。它的 `attackEffect`
+是 `bullet,sfx(katyusha_fire)`，本该静音通用开火声（`battleSound` = `机枪_低.wav`），
+结果照旧响。
+
+**根因**：第 54 轮给 `NoFiringSoundNames` 加了 `"sfx"`，但 `ReplacesFiringSound` 的判定是
+
+    foreach (string raw in effectNames.Split(','))
+        if (NoFiringSoundNames.Contains(raw.Trim())) return true;   // ← 拿到的是 "sfx(katyusha_fire)"
+
+名单里存的是**特效名**（`sfx`），而卡上写的是 `sfx(katyusha_fire)`——`raw.Trim()`
+是带括号的整串，**永远匹配不上**。`"sfx"` 这一条从加进去那天起就没生效过。
+
+**修复**：判定里先用 `EffectRegistry.ParseName` 拆掉参数再查名单。
+
+**为什么上一轮的测试没发现**：那条断言是**查源码文本**——
+`'"sfx"' in 名单那一段`，只能证明「名单里有这个字符串」，**证明不了判定会命中**。
+现在改成**行为测试**：把名单读出来，在 Python 里按同样的规则重放
+`bullet` / `bullet,sfx(katyusha_fire)` / `sfx(...)` / `flying` / `airstrike` / `strafe`
+六种输入并断言结果，另加一条「旧的拿整串去查的写法已消失」。
+
+> 教训：**这类「A 是 B 的子串/超串」的判定，文本断言等于没测。**

@@ -111,7 +111,11 @@ public static class EffectRegistry
 
         foreach (string raw in effectNames.Split(','))
         {
-            if (NoFiringSoundNames.Contains(raw.Trim())) return true;
+            // **必须先拆掉参数再查名单**：名单里存的是特效名（`sfx`），
+            // 而卡上写的是 `sfx(katyusha_fire)`——直接拿整串去查永远查不到。
+            // （曾经就是这么错的：喀秋莎的机枪声一直没被静音。）
+            ParseName(raw, out string name, out _);
+            if (NoFiringSoundNames.Contains(name)) return true;
         }
         return false;
     }
