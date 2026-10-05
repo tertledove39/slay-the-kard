@@ -26,5 +26,6 @@ script = ExtResource("1_bomb")
 ; 贴图相对弹体中心的偏移
 position = Vector2(1, 3.1666665)
 ; 贴图大小。航弹原图 10x14，嫌大嫌小改这里；若要转 180° 请在上面加一行 rotation = 3.14159
-scale = Vector2(0.6, 0.6)
+; 净尺寸 = 根节点 scale(3) × 本值，当前 3 × 1.2 = 3.6（原先 0.6，太小看不见）
+scale = Vector2(1.2, 1.2)
 texture = ExtResource("2_bomb")

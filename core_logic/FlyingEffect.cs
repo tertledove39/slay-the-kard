@@ -123,6 +123,19 @@ public partial class FlyingEffect : Effect
                 source.Rotation = baseRotation;
                 source.ZIndex = baseZIndex;
                 source.isUnderCardEffect = false;
+
+                // 层级交还给战场重算——**不能只靠上面那句还原**。
+                //
+                // baseZIndex 是攻击开始那一刻的值，而它很可能是个临时值：玩家是
+                // 「拖着这张卡去撞对面」才发起攻击的（battlefield_.cs 的
+                // `Attack(cardNowChoose, ...)`），拖拽期间卡被抬到 ZIndex = 100。
+                // 光还原它就等于把 100 永久留在身上——手牌才 20，于是表现为
+                // **打完仗落回桌面，这张卡仍然压在手牌上面**，而且不会自己好：
+                // 只有下一次有人碰巧把显示顺序标脏，它才会被改回场上卡的 10。
+                //
+                // 这里只负责说「该重算了」，不自己猜一个层级——层级数字的唯一权威是
+                // 战场的 RefreshAllCardDisplayOrder()（见 docs/NOTICE.md 的层级表）。
+                if (GetParent() is battlefield_ field) field._displayOrderDirty = true;
             }
         }
     }

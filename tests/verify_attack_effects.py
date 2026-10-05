@@ -332,6 +332,19 @@ def main():
     results.append(check('path="res://bin/Bullet.cs"' in bomb_scene, "航弹复用 Bullet 脚本（运动方式照 bullet）"))
     results.append(check("航弹.png" in bomb_scene, "航弹弹体用 航弹.png"))
 
+    # 航弹要看得见：净尺寸 = 根节点 scale × Sprite2D scale。
+    # 原先是 3 × 0.6 = 1.8，实机反馈太小；现在 3 × 1.2 = 3.6，翻了一倍。
+    bomb_root = re.search(r"scale = Vector2\(([\d.]+), ([\d.]+)\)\nscript", bomb_scene)
+    bomb_sprite = re.search(r"scale = Vector2\(([\d.]+), ([\d.]+)\)\ntexture", bomb_scene)
+    results.append(check(bomb_root is not None and bomb_sprite is not None,
+                         "航弹的根缩放与贴图缩放都写在场景里（调大小不必改代码）"))
+    if bomb_root and bomb_sprite:
+        net = float(bomb_root.group(1)) * float(bomb_sprite.group(1))
+        # 浮点：3 × 1.2 会算成 3.5999999999999996，比较要给容差
+        results.append(check(round(net, 3) >= 3.6,
+                             f"航弹净尺寸 {net:g}（根 {bomb_root.group(1)} × 贴图 {bomb_sprite.group(1)}），"
+                             "不小于放大后的 3.6"))
+
     bullet_scene_path = next(p for n, p in scene_paths(effect).items() if n == "bullet")
     results.append(check("ProjectileCount = 10" in
                          (ROOT / bullet_scene_path.replace("res://", "")).read_text(encoding="utf-8"),

@@ -669,3 +669,33 @@ if (isFriendly)
 **回归**：`tests/verify_attack_effects.py`、`tests/verify_attack_death_timing.py`、
 `tests/verify_unit_dead_trigger.py`（测试 2 相应重写——原断言钉的是
 「触发在 `RemoveCard` 之后」，`RemoveCard` 挪进表现方法后它会变成永远成立的空断言）。
+
+### 54. 飞掠/空袭的卡落回桌面之后，仍然压在手牌上面
+
+**症状**：上一轮把抬起卡的层级降到 12 之后，**动画期间**已经不压手牌了，
+但**播完落回桌面，那张卡还是压在手牌上面**，而且不会自己恢复。
+
+**根因**：攻击是从**拖拽释放**发起的（`battlefield_.cs` 的 `Attack(cardNowChoose, ...)`），
+而拖拽期间这张卡被抬到 `ZIndex = 100`（同文件 `cardNowChoose.ZIndex = 100;`）。
+
+`FlyingEffect` 在 `Play` 开头存下 `baseZIndex = source.ZIndex`——那时候拿到的就是 **100**。
+播完 `finally` 里又 `source.ZIndex = baseZIndex` 还原回去，于是 100 被永久留在身上；
+手牌才 20，表现就是「落回桌面还压着手牌」。
+
+它不会自己好，因为**层级只在 `RefreshAllCardDisplayOrder()` 里被改回去，而那个函数只在
+`_displayOrderDirty` 为真时跑**——特效结束时没有任何人把标记置脏。只有下一次玩家碰巧
+悬停别的卡（`RefreshMyHand` 会标脏）才会顺手修好，所以现象看起来像是"有时候好有时候不好"。
+
+**修复**：`FlyingEffect` 的 `finally` 里还原完之后补一句
+`if (GetParent() is battlefield_ field) field._displayOrderDirty = true;`——
+**只负责说「该重算了」，不自己猜一个层级**。层级数字的唯一权威是战场的
+`RefreshAllCardDisplayOrder()`（见 `docs/NOTICE.md` 的层级表）；在特效里写死一个 10
+等于把同一份约定配到第二处。
+
+**回归**：`tests/verify_card_layering.py`。
+
+**顺带记一笔（本次未改）**：`ResourceManager` 的卡牌对象池在发放/回收时**不重置 `ZIndex`**，
+所以池里的卡会带着上一任的层级出来（`SetCardInformation` 已经归零了
+`shouldBeRemoved` / `isDiscarding` / `isUnderCardEffect`，唯独漏了 `ZIndex`）。
+目前靠「上场/进手牌都会把显示顺序标脏」自愈；要根治得在 `SetCardInformation` 里一起归零，
+但那会给新卡一个 0 的瞬态层级（可能有一帧沉到背景后面），所以这次没动。

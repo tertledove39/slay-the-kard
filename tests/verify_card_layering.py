@@ -66,6 +66,14 @@ def main():
     results.append(check("source.ZIndex = TopZIndex;" in flying, "播放期间真的应用了这个层级"))
     results.append(check("source.ZIndex = baseZIndex;" in flying, "播完还原回原来的层级"))
 
+    # **还原还不够**：baseZIndex 是攻击开始那一刻的值，而攻击是从拖拽释放发起的
+    # （`Attack(cardNowChoose, ...)`），那时卡被抬到 100。光还原等于把 100 永久留下——
+    # 表现就是「落回桌面后仍然压在手牌上面」，而且不会自己好。
+    results.append(check("if (GetParent() is battlefield_ field) field._displayOrderDirty = true;" in flying,
+                         "还原后把显示顺序标脏（层级交还给战场重算，不自己猜一个值）"))
+    results.append(check("private int TopZIndex" not in flying.replace("[Export] public int TopZIndex", ""),
+                         "没有把场上卡的层级写死在特效里（那样等于同一约定配两处）"))
+
     # ==================== ② 阵亡/弃置动画必须低于手牌 ====================
     print("\n--- ② 阵亡/弃置动画的层级 ---")
     results.append(check("_discardZCounter = 50" not in battle_code,

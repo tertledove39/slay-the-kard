@@ -90,13 +90,20 @@
 **唯一的不变式：除了拖拽与选项 UI，任何「临时浮起来」的卡都必须低于手牌 20。**
 手牌是玩家随时要点的东西，被盖住就没法操作了。
 
-两条踩过的坑：
+三条踩过的坑：
 
 - `_discardZCounter` 曾经是 `= 50` 且无限自增——弃牌动画整段压在**手牌上面**。
   现在改成 `[DiscardZBase, DiscardZMax]` 区间内取号并**封顶**（宁可几张同层），
   每批弃置前由 `ResetDiscardZCounter()` 重置。
 - 飞掠抬起的卡曾经在场景里写死 `TopZIndex = 200`。**场景值优先于 C# 默认值**，
   所以改 C# 默认值不会立刻生效——要连场景里那一行一起改（或删掉让它吃默认值）。
+- **改过层级的特效，收尾时必须把 `_displayOrderDirty` 标脏**，光还原自己存的那个值是
+  不够的。攻击是从**拖拽释放**发起的（`Attack(cardNowChoose, ...)`），那会儿卡被抬到
+  **100**；`FlyingEffect` 存下的 `baseZIndex` 就是 100，播完还原回去等于把它永久留下——
+  表现就是「落回桌面仍压着手牌」，而且**不会自己好**（层级只在
+  `RefreshAllCardDisplayOrder()` 里被改回去，而那函数只在标脏时才跑）。
+  正确做法是 `if (GetParent() is battlefield_ field) field._displayOrderDirty = true;`，
+  **让权威去重算，而不是自己猜一个值**。同类：`CardDiscardAndRemove`、`RetreatUnit`。
 
 由 `tests/verify_card_layering.py` 守着：抬起卡与弃置动画的层级都必须在 10 与 20 之间。
 

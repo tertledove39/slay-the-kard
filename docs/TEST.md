@@ -707,6 +707,30 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
   `verify_unit_dead_trigger.py` 的测试 2 相应重写成钉这条（原来是钉「触发在 RemoveCard
   之后」——`RemoveCard` 挪进表现方法后，那条断言会变成一个永远成立的空断言）。
 
+### 第六轮调整（航弹放大 + 落地后仍压手牌）
+
+**① 航弹太小。** `bin/bomb.tscn` 的 Sprite2D 缩放 `0.6 → 1.2`，净尺寸从 `3 × 0.6 = 1.8`
+变成 `3 × 1.2 = 3.6`，翻一倍。测试不钉"就是这个数"，而是钉**净尺寸 = 根 scale × 贴图 scale
+且不小于 3.6**——两个缩放都写在场景里，主人自己调大小不必改代码。
+（`project.godot` 的 `default_texture_filter=0` 是 Nearest，放大会看到像素块而不是模糊。
+`航弹.png` 只有 10×14，想更清晰得换更大的素材。）
+
+**② 动画播完、飞机落下之后，卡仍然压在手牌上面。** 上一轮只修了"动画期间"，
+这一轮找到了收尾那一半：
+
+- 攻击是从**拖拽释放**发起的（`Attack(cardNowChoose, ...)`），那会儿卡被抬到 `ZIndex = 100`。
+- `FlyingEffect` 开头存 `baseZIndex = source.ZIndex` → 存到的是 **100**；`finally` 里
+  `source.ZIndex = baseZIndex` 又还原成 100。手牌才 20，于是永久压住。
+- **它不会自己好**：层级只在 `RefreshAllCardDisplayOrder()` 里被改回去，而那个函数只在
+  `_displayOrderDirty` 为真时跑，特效结束时没人标脏。只有玩家碰巧悬停别的卡才会顺手修好
+  ——所以现象看起来像"有时候好有时候不好"。
+
+修法是 `finally` 里还原完补一句 `field._displayOrderDirty = true;`：
+**特效只负责说"该重算了"，不自己猜一个层级**。层级数字的唯一权威是战场的
+`RefreshAllCardDisplayOrder()`；在特效里写死一个 10 等于把同一份约定配到第二处。
+这条已经写进 `docs/NOTICE.md` 的层级约定里，`verify_card_layering.py` 加了两条守着
+（必须标脏、必须不自己写死层级）。
+
 ### 场景里 export 的值要带中文注释
 
 `.tscn` 的导出值在 Inspector 里只显示英文字段名，看不出含义，所以约定在**上一行**写一行
