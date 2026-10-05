@@ -159,15 +159,23 @@ public partial class battlefield_ : Control
     private const string DefaultCommandPlayEffect = "sfx(咚)";
 
     /// <summary>
-    /// 步兵进场音的档位边界，按 `attack + defence` 分（需求方给的规则）：
-    /// ≤ `SmallMax` 小 / 到 `MediumMax` 为止是中 / 再往上是大。
-    /// 槽位名只在这里出现一处，音频文件配在 `configs/music.ini` 的 `[sfx]` 段。
+    /// 地面单位进场音的档位边界，按 `attack + defence` 分（需求方给的规则）：
+    /// ≤ `SmallMax` 小 / 到 `MediumMax` 为止是中 / 再往上是大。步兵与坦克/火炮共用这套边界。
     /// </summary>
-    private const int InfantryVoiceSmallMax = 4;
-    private const int InfantryVoiceMediumMax = 8;
-    private const string InfantryVoiceSmallSlot = "infantry_small";
-    private const string InfantryVoiceMediumSlot = "infantry_medium";
-    private const string InfantryVoiceLargeSlot = "infantry_large";
+    private const int DeploySoundSmallMax = 4;
+    private const int DeploySoundMediumMax = 8;
+
+    /// <summary>
+    /// 进场音的**槽位前缀**，与档位后缀拼成 `[sfx]` 里的槽位名（如 `infantry_small`、`tank_large`）。
+    /// 步兵与坦克/火炮各一套三档素材，所以前缀不同；音频文件配在 `configs/music.ini` 的 `[sfx]` 段。
+    /// </summary>
+    private const string InfantryVoicePrefix = "infantry";
+    private const string TankVoicePrefix = "tank";
+
+    /// <summary>
+    /// 飞机与轰炸机的进场音。它们**不分档**，而且**入场与移动**放的是同一条。
+    /// </summary>
+    private const string PlaneFlybyEffect = "sfx(plane_flyby)";
 
     /// <summary>
     /// 自定义内存变量：在当前战场场景中持久保存
@@ -902,29 +910,60 @@ private const int OpeningHandSize = 5;
         string effect = card.playEffect;
         if (string.IsNullOrWhiteSpace(effect))
         {
-            effect = card.cardType == CardTypes.Command ? DefaultCommandPlayEffect : InfantryDeployEffect(card);
+            effect = card.cardType == CardTypes.Command ? DefaultCommandPlayEffect : DeployMoveEffect(card);
         }
 
         StartEffect(effect, new List<Vector2> { GetCardCenter(card) }, null, card);
     }
 
     /// <summary>
-    /// 步兵进场音：按 `attack + defence` 分三档——≤`InfantryVoiceSmallMax` 小、
-    /// 到 `InfantryVoiceMediumMax` 为止是中、再往上是大。不是步兵、或是总部，返回 `null`。
+    /// 卡进场（部署 / 加入战场）时的默认音：
+    /// - **步兵** → `infantry_{档}`；
+    /// - **坦克与火炮** → `tank_{档}`（素材自己叫 Light/Medium/Heavy，槽位统一叫 small/medium/large）；
+    /// - **飞机与轰炸机** → 不分档，一条 `plane_flyby`（它的「移动」另有一处，见 `PlayPlaneMoveEffect`）；
+    /// - 其余（总部、指令卡）→ `null`。
     ///
-    /// 取的是**进场那一刻的当前值**，也就是卡面值：`PlayCardEffect` 排在
+    /// 三档按 `attack + defence`：≤`DeploySoundSmallMax` 小、到 `DeploySoundMediumMax` 为止是中、
+    /// 再往上是大。取的是**进场那一刻的当前值**（= 卡面值）：`PlayCardEffect` 排在
     /// `Deployed` / `BeingAddedToField` 之前，「部署时 +1/+1」那类还没结算。
     ///
-    /// 档位边界与槽位名只写在这里一处，音频文件本身配在 `configs/music.ini` 的 `[sfx]` 段。
+    /// 档位边界与槽位前缀只写在这里一处，音频文件本身配在 `configs/music.ini` 的 `[sfx]` 段。
     /// </summary>
-    private static string InfantryDeployEffect(cardBase_ card)
+    private static string DeployMoveEffect(cardBase_ card)
     {
-        if (card.cardType != CardTypes.Infantry || card.isHq == HQ.hq) return null;
+        // 总部的 cardType 也是 Infantry，不排掉的话开局摆总部也会响一声。
+        if (card.isHq == HQ.hq) return null;
+
+        if (card.cardType is CardTypes.Plane or CardTypes.Bomber) return PlaneFlybyEffect;
+
+        string family = card.cardType switch
+        {
+            CardTypes.Infantry => InfantryVoicePrefix,
+            CardTypes.Tank or CardTypes.Artillery => TankVoicePrefix,
+            _ => null
+        };
+        if (family == null) return null;
 
         int size = card.ReadAttack() + card.ReadDefence();
-        if (size <= InfantryVoiceSmallMax) return $"sfx({InfantryVoiceSmallSlot})";
-        if (size <= InfantryVoiceMediumMax) return $"sfx({InfantryVoiceMediumSlot})";
-        return $"sfx({InfantryVoiceLargeSlot})";
+        string tier = size <= DeploySoundSmallMax ? "small"
+                    : size <= DeploySoundMediumMax ? "medium"
+                    : "large";
+        return $"sfx({family}_{tier})";
+    }
+
+    /// <summary>
+    /// 飞机**移动**时的那一声「飞过」。入场那一声走 `PlayCardEffect`，两边互斥（一次进场只走一条路、
+    /// 一次移动只走这一条），不会连响两声。
+    ///
+    /// 与入场不同，这里**不看卡上的 `playEffect`**：`playEffect` 的语义是「打出时」，
+    /// 在场上挪位置不算打出。
+    /// </summary>
+    private void PlayPlaneMoveEffect(cardBase_ card)
+    {
+        if (card == null || !IsInstanceValid(card)) return;
+        if (card.cardType is not (CardTypes.Plane or CardTypes.Bomber)) return;
+
+        StartEffect(PlaneFlybyEffect, new List<Vector2> { GetCardCenter(card) }, null, card);
     }
 
     private bool PlayAttackEffect(cardBase_ from, cardBase_ to)
@@ -2404,6 +2443,8 @@ InputState currentInputState = InputState.nil;
             {
                 card.HaveMoved();
             }
+            // 飞机在场上挪位置也响一声「飞过」（入场那一声走 PlayCardEffect，两条互斥）
+            PlayPlaneMoveEffect(card);
             // 否则触发移动单位的 Moving 效果
             await TriggerUnitEffects("Moving", card, new List<cardBase_> { card }, checkOnlySourceCard: true);
         }

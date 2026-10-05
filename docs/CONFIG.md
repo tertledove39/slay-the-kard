@@ -96,23 +96,32 @@
 | 卡的兵种 | 没写 `playEffect` 时 | 常量 |
 |----------|---------------------|------|
 | 指令卡 `Command` | 一声「咚」（`[sfx]` 的 `咚` = `assest/咚.wav`） | `DefaultCommandPlayEffect` |
-| 步兵 `Infantry`（**总部除外**） | 按身材选一档进场脚步声 | `InfantryVoice*Slot` |
-| 其它（坦克 / 飞机 / 火炮 / 总部） | 什么都不播 | — |
+| 步兵 `Infantry` | 按身材选一档 `infantry_{档}` | `InfantryVoicePrefix` |
+| 坦克 `Tank` / 火炮 `Artillery` | 按身材选一档 `tank_{档}` | `TankVoicePrefix` |
+| 飞机 `Plane` / 轰炸机 `Bomber` | 不分档，一条 `plane_flyby` | `PlaneFlybyEffect` |
+| 总部（`isHq = 1`） | **什么都不播** | — |
 
 **卡上写了 `playEffect` 就一律以卡为准**，兜底不生效（那 8 张带语音的指令卡就是这样）。
 
-**步兵进场音**（`AU_Infantry_*` 三个素材）：
+**三档进场音**（`attack + defence`）：
 
-| 档 | `attack + defence` | 槽位 | 素材 |
-|----|--------------------|------|------|
-| 小 | ≤ 4（`InfantryVoiceSmallMax`） | `infantry_small` | `assest/AU_infantry_small_move_03.wav` |
-| 中 | 5 ~ 8（`InfantryVoiceMediumMax`） | `infantry_medium` | `assest/AU_Infantry_medium_Move_04.wav` |
-| 大 | ≥ 9 | `infantry_large` | `assest/AU_Infantry_Large_Move_02.wav` |
+| 档 | `attack + defence` | 步兵槽位 | 坦克/火炮槽位 | 素材 |
+|----|--------------------|----------|---------------|------|
+| 小 | ≤ 4（`DeploySoundSmallMax`） | `infantry_small` | `tank_small` | `AU_infantry_small_move_03` / `Tank_Light_Move_Fx` |
+| 中 | 5 ~ 8（`DeploySoundMediumMax`） | `infantry_medium` | `tank_medium` | `AU_Infantry_medium_Move_04` / `Tank_Medium_Move_Fx` |
+| 大 | ≥ 9 | `infantry_large` | `tank_large` | `AU_Infantry_Large_Move_02` / `Tank_Heavy_Move_Fx` |
+
+槽位名是 `{前缀}_{档位}` **拼出来的**，所以加一个兵种只要加一个前缀常量 + `[sfx]` 三条，
+判定逻辑一行都不用改。（坦克素材自己叫 Light/Medium/Heavy，槽位统一叫 small/medium/large。）
+
+**飞机的「移动」**：入场走上面的兜底，**在场上挪位置**另在 `Move()` 的移动分支里调
+`PlayPlaneMoveEffect(card)`，放的是同一条 `plane_flyby`。两条互斥，不会连响两声。
+移动那一声**不看卡上的 `playEffect`**——那个语义是「打出时」，挪位置不算打出。
 
 - 取的是**进场那一刻的当前值**（= 卡面值）：`PlayCardEffect` 排在 `Deployed` / `BeingAddedToField` **之前**，「部署时 +1/+1」那类还没结算。
 - **两条进场路径都覆盖，且不会重复播**：从手牌拖上场走 `Move()`（`isDeployedFromHand`，同时触发 `Deployed`）；效果刷进场走 `AddCardToPlace()`（同时触发 `BeingAddedToField`）。在场上挪位置的单位两条都不满足。
-- **双方都播**（敌我步兵进场都响）。
-- 总部虽然 `cardType` 也是 `Infantry`，但按 `isHq` 排除掉了。
+- **双方都播**（敌我进场都响）。
+- 总部虽然 `cardType` 也是 `Infantry`，但按 `isHq` 排除掉了（否则开局摆总部也会响一声）。
 
 **为什么做成兜底而不是逐卡写**：86 张指令卡、46 张步兵卡，逐卡写就是同一个值抄上百遍（规范 E），而且以后每加一张卡都要记得补——漏了就静默没声。音效文件本身仍只配在 `[sfx]` 段一处。
 

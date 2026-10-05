@@ -112,9 +112,16 @@ battleBGM_berlin_final_battle=res://assest/music/配乐3.mp3,res://assest/music/
 | `flyby` | 飞掠音效（`assest/飞机飞过_单位.wav`） | `FlyingEffect`（`effects/flying_effect.tscn` 的 `SfxSlot`）；`AirStrikeEffect` 继承它，共用这一声 |
 | `严冬` / `战略重心` / `红色旗帜` / `嘿` / `阿嘿` / `朱可夫` / `拉伸` / `预备役` | 卡牌语音（`assest/同名.wav`） | `SoundEffect`，槽位由卡上的 `playEffect = sfx(槽位名)` 给出。清单与对照表见 `CONFIG.md` 的「卡牌语音」 |
 | `咚` | **指令卡默认音**（`assest/咚.wav`） | 同上，但**卡上不用写**——指令卡没写 `playEffect` 时由 `battlefield_.PlayCardEffect` 兜底 |
-| `infantry_small` / `infantry_medium` / `infantry_large` | **步兵进场音**（`assest/AU_Infantry_*.wav`） | 同上，卡上也不用写——步兵按 `attack + defence` 分三档自动选。档位边界见 `battlefield_` 的 `InfantryVoice*` 常量，完整规则见 `CONFIG.md` 的「没写 playEffect 时的兜底」 |
+| `infantry_small` / `infantry_medium` / `infantry_large` | **步兵进场音**（`assest/AU_Infantry_*.wav`） | 同上，卡上也不用写——步兵按 `attack + defence` 分三档自动选 |
+| `tank_small` / `tank_medium` / `tank_large` | **坦克与火炮进场音**（`assest/Tank_Light/Medium/Heavy_Move_Fx.wav`） | 同上，同一套三档规则，只是换一套素材 |
+| `plane_flyby` | **飞机/轰炸机**（`assest/飞机飞过_效果.wav`） | 同上，**入场与移动**都放这一条，不分档 |
 
-> 后两类素材**卡牌上都不需要写任何东西**，加新卡时自动就有声音。
+> 这几类素材**卡牌上都不需要写任何东西**，加新卡时自动就有声音。
+> 档位边界见 `battlefield_` 的 `DeploySound*Max`，槽位前缀见 `InfantryVoicePrefix` / `TankVoicePrefix`，
+> 完整规则见 `CONFIG.md` 的「没写 playEffect 时的兜底」。
+>
+> 注意区分：**`plane_flyby` 是「飞机进场/移动」**，而 `flyby` 是**飞掠攻击特效**（`flying`/`airstrike`）
+> 起飞时的那一声，两者是不同的时机、也可以不同的素材。
 
 > `[sfx]` 的键**可以是中文**：`iniHandler` 只取 `=` 前的整段文本做键，不过滤非 ASCII。
 > 已实测 `严冬`、`预备役` 等中文槽位都能取到。

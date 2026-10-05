@@ -888,6 +888,35 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 切片又踩了一次坑：`Move` 后面不是 `MoveUnit`，按「下一个方法名」切直接 `ValueError`。
 固定长度窗口才是稳的（这条在第十轮已经记过一次）。
 
+### 第十三轮调整（坦克/火炮进场音，飞机移动也响）
+
+需求：新增 `Tank_*_Move_Fx` 素材，规则与步兵一致；**坦克与火炮**播它；
+**飞机入场与移动**都播 `飞机飞过_效果`。
+
+**没有新写一套判定，而是把上一轮的 `InfantryDeployEffect` 泛化成 `DeployMoveEffect`**：
+档位规则本来就一样，差别只在**素材家族**。于是槽位名改成 `{前缀}_{档位}` 拼出来：
+
+    CardTypes.Infantry                   → infantry_{small|medium|large}
+    CardTypes.Tank or CardTypes.Artillery → tank_{small|medium|large}
+    CardTypes.Plane or CardTypes.Bomber   → plane_flyby（不分档）
+
+这样加一个兵种只要加一个前缀常量 + `[sfx]` 三条，判定逻辑一行都不用改。
+上一轮的 6 个「一档一个槽位常量」也随之收成了 3 个（两个前缀 + 飞机那条）——
+测试里有一条专门断言旧常量已消失，防止有人又抄回去。
+
+**「移动」是新的时机**：入场那一声在两轮的汇聚点 `PlayCardEffect` 里，
+而移动走的是 `Move()` 的 `else`（非部署）分支，那里新加 `PlayPlaneMoveEffect(card)`。
+两条互斥，不会连响两声——测试断言部署分支里**没有**这个调用。
+
+移动那一声**不看卡上的 `playEffect`**：那个语义是「打出时」，在场上挪位置不算打出。
+
+测试补 30 条（⑥ 扩写 + 新增 ⑦）。顺带核对真实数据：
+29 张坦克/火炮分 **7 小 / 11 中 / 11 大**，13 张飞机/轰炸机走不分档那一条。
+
+**又一次靠「交叉核对」拦住静默失败**：`Tank_*.wav` 三个文件**都没有 `.import`**，
+`ResourceLoader` 会直接返回 null、配置全对也没声——和上一轮 `战略重心.wav` 同一个坑。
+跑一次 `--headless --editor --quit` 补上即可（测试里每个槽位都断言 `.import` 存在）。
+
 ### 场景里 export 的值要带中文注释
 
 `.tscn` 的导出值在 Inspector 里只显示英文字段名，看不出含义，所以约定在**上一行**写一行

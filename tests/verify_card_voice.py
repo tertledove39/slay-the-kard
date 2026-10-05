@@ -193,48 +193,76 @@ def main():
     # ==================== ⑥ 步兵进场音（三档） ====================
     # 规则：attack + defence = 总身材；≤4 小 / 5~8 中 / ≥9 大。
     # 进场有两条路，但它们都汇聚到 PlayCardEffect（见该方法的注释），所以只需挂一处。
-    print("\n--- ⑥ 步兵进场音（三档） ---")
-    results.append(check("private static string InfantryDeployEffect(cardBase_ card)" in battle,
+    print("\n--- ⑥ 进场音：步兵 / 坦克火炮 三档，飞机不分档 ---")
+    results.append(check("private static string DeployMoveEffect(cardBase_ card)" in battle,
                          "有独立的档位判定函数"))
-    tier_fn = method(battle, "private static string InfantryDeployEffect(cardBase_ card)",
-                     "\n    }")
-    results.append(check("card.cardType != CardTypes.Infantry || card.isHq == HQ.hq" in tier_fn,
-                         "只对步兵生效，且排除总部（总部的 cardType 也是 Infantry）"))
+    tier_fn = method(battle, "private static string DeployMoveEffect(cardBase_ card)", "\n    }")
+    results.append(check("if (card.isHq == HQ.hq) return null;" in tier_fn,
+                         "排除总部（总部的 cardType 也是 Infantry）"))
     results.append(check("card.ReadAttack() + card.ReadDefence()" in tier_fn,
                          "按 attack + defence 判档"))
-    results.append(check("InfantryVoiceSmallSlot" in tier_fn and "InfantryVoiceMediumSlot" in tier_fn
-                         and "InfantryVoiceLargeSlot" in tier_fn,
-                         "三档各自的槽位名都走常量（不在方法里裸写）"))
+    results.append(check("CardTypes.Infantry => InfantryVoicePrefix" in tier_fn,
+                         "步兵用 infantry 那一套素材"))
+    results.append(check("CardTypes.Tank or CardTypes.Artillery => TankVoicePrefix" in tier_fn,
+                         "**坦克与火炮**共用 tank 那一套素材"))
+    results.append(check("card.cardType is CardTypes.Plane or CardTypes.Bomber) return PlaneFlybyEffect;" in tier_fn,
+                         "飞机与轰炸机**不分档**，直接返回那一条飞过声"))
+    results.append(check("InfantryVoiceSmallSlot" not in battle and "InfantryVoiceMediumSlot" not in battle,
+                         "旧的「一档一个槽位常量」已收成前缀+后缀（否则加坦克要再抄一遍）"))
 
     # 边界按**需求方给的规则**验一遍：把常量读出来重新算一遍分档
     limits = {k: int(re.search(rf"{k} = (\d+);", battle).group(1))
-              for k in ("InfantryVoiceSmallMax", "InfantryVoiceMediumMax")}
+              for k in ("DeploySoundSmallMax", "DeploySoundMediumMax")}
     def tier(total):
-        if total <= limits["InfantryVoiceSmallMax"]:
+        if total <= limits["DeploySoundSmallMax"]:
             return "small"
-        return "medium" if total <= limits["InfantryVoiceMediumMax"] else "large"
+        return "medium" if total <= limits["DeploySoundMediumMax"] else "large"
 
     results.append(check([tier(n) for n in (1, 4, 5, 8, 9, 18)]
                          == ["small", "small", "medium", "medium", "large", "large"],
-                         f"分档边界符合规则（≤{limits['InfantryVoiceSmallMax']} 小 / "
-                         f"5~{limits['InfantryVoiceMediumMax']} 中 / ≥{limits['InfantryVoiceMediumMax']+1} 大）"))
+                         f"分档边界符合规则（≤{limits['DeploySoundSmallMax']} 小 / "
+                         f"5~{limits['DeploySoundMediumMax']} 中 / ≥{limits['DeploySoundMediumMax']+1} 大）"))
 
-    # 三条音频得配上，槽位名还得和代码常量对得上
-    for const in ("InfantryVoiceSmallSlot", "InfantryVoiceMediumSlot", "InfantryVoiceLargeSlot"):
-        name = re.search(rf'{const} = "(.+?)";', battle)
-        results.append(check(name is not None and name.group(1) in slots,
-                             f"{const} 指向的槽位「{name.group(1) if name else '?'}」在 [sfx] 段里存在"))
-    for name in ("infantry_small", "infantry_medium", "infantry_large"):
+    # 槽位名是「前缀_档位」拼出来的，所以只要前缀与档位词对，所有槽位都对得上。
+    # 逐个核一遍：家族 × 档位 的 6 个槽位 + 飞机那一条，都必须配了文件、且文件已被导入。
+    families = {c: re.search(rf'{c} = "(.+?)";', battle) for c in ("InfantryVoicePrefix", "TankVoicePrefix")}
+    results.append(check(all(v is not None for v in families.values()), "两个家族的槽位前缀都是常量"))
+    results.append(check(re.search(r'PlaneFlybyEffect = "sfx\((.+?)\)";', battle) is not None,
+                         "飞机那条也是常量（不在方法里裸写槽位名）"))
+    wanted = [f"{v.group(1)}_{t}" for v in families.values() if v for t in ("small", "medium", "large")]
+    plane_slot = re.search(r'PlaneFlybyEffect = "sfx\((.+?)\)";', battle)
+    if plane_slot:
+        wanted.append(plane_slot.group(1))
+    for name in wanted:
+        results.append(check(name in slots, f"槽位「{name}」在 [sfx] 段里存在"))
         for f in slots.get(name, []):
             src = ROOT / f.replace("res://", "")
             results.append(check(src.exists(), f"{name} → {src.name} 存在"))
             results.append(check(Path(str(src) + ".import").exists(),
                                  f"{name} 的 {src.name} 已被 Godot 导入"))
 
-    # 挂载点：没写 playEffect 的步兵走兜底；写了的一律以卡为准
-    results.append(check("effect = card.cardType == CardTypes.Command ? DefaultCommandPlayEffect : InfantryDeployEffect(card);"
+    # ==================== ⑦ 飞机移动也响 ====================
+    # 入场那一声走 PlayCardEffect（与部署分支互斥），**移动**那一声在 Move() 的 else 分支里。
+    print("\n--- ⑦ 飞机移动也响一声飞过 ---")
+    plane_fn = method(battle, "private void PlayPlaneMoveEffect(cardBase_ card)", "\n    }")
+    results.append(check("card.cardType is not (CardTypes.Plane or CardTypes.Bomber)" in plane_fn,
+                         "只对飞机/轰炸机生效"))
+    results.append(check("StartEffect(PlaneFlybyEffect," in plane_fn, "放的是同一条飞过声"))
+    results.append(check("card.playEffect" not in plane_fn,
+                         "移动不看卡上的 playEffect（那个语义是「打出时」）"))
+    # 移动分支：确认它接在 Move() 的 else（非部署）里，且入场分支没有它
+    move_body = battle[battle.index("async Task Move(cardBase_ card, place_ position)"):][:6000]
+    deploy_branch = move_body[move_body.index("if (isDeployedFromHand)"):]
+    else_branch = return_stmt = deploy_branch[deploy_branch.index("else"):]
+    results.append(check("PlayPlaneMoveEffect(card);" in else_branch,
+                         "移动分支（else）里调了 PlayPlaneMoveEffect"))
+    results.append(check("PlayPlaneMoveEffect(card);" not in deploy_branch[:deploy_branch.index("else")],
+                         "部署分支里**没有**它 —— 两条互斥，不会连响两声"))
+
+    # 挂载点：没写 playEffect 的走兜底；写了的一律以卡为准
+    results.append(check("effect = card.cardType == CardTypes.Command ? DefaultCommandPlayEffect : DeployMoveEffect(card);"
                          in play_card,
-                         "PlayCardEffect 里：指令卡用「咚」、步兵用进场音"))
+                         "PlayCardEffect 里：指令卡用「咚」、其余兵种用各自的进场音"))
     cond = play_card.index("if (string.IsNullOrWhiteSpace(effect))")
     assign = play_card.index("effect = card.cardType == CardTypes.Command")
     results.append(check(cond < assign, "**卡上有 playEffect 就不兜底**——兜底在空白判断里面"))
