@@ -21,12 +21,6 @@ public partial class MusicManager : Node
     /// <summary>槽位值为多首曲目时的分隔符。</summary>
     private static readonly char[] PathSeparator = { ',' };
 
-    /// <summary>一次性音效（`PlaySfx`）的声部数。连点时轮换使用，后一声不会掐掉前一声。</summary>
-    private const int SfxVoiceCount = 4;
-
-    /// <summary>一次性音效播放器所在的音频总线（与场景里既有的音效一致，音量由设置界面控这条总线）。</summary>
-    private const string SfxBus = "SFX";
-
     // 槽位名按忽略大小写比较：battleBGM_DonBend 与 battleBGM_donbend 等价。
     // 若区分大小写，写错时会静默回退到通用战斗BGM，属于很难排查的失败模式。
     private readonly Dictionary<string, string[]> slotPaths = new(StringComparer.OrdinalIgnoreCase);
@@ -43,9 +37,8 @@ public partial class MusicManager : Node
     private readonly Random rnd = new();
     private AudioStreamPlayer player;
 
-    /// <summary>`PlaySfx` 的声部池，首次使用时才建（没人按按钮就不花这份钱）。</summary>
-    private AudioStreamPlayer[] sfxVoices;
-    private int nextSfxVoice;
+    /// <summary>`PlaySfx` 的声部池（挂在 autoload 上，切场景不会被掐断）。</summary>
+    private SfxPlayer sfxPlayer;
     private string currentSlot = "";
     private string currentPath = "";
     /// <summary>当前曲目播完后要切过去的槽位；为空表示留在当前槽位继续放。</summary>
@@ -60,6 +53,7 @@ public partial class MusicManager : Node
         // 因此统一关掉内建循环（见 DisableBuiltinLoop），改由 OnTrackFinished 在曲末决定续播还是换曲。
         player.Finished += OnTrackFinished;
         AddChild(player);
+        sfxPlayer = new SfxPlayer(this, PickSfx);
         LoadConfig();
     }
 
@@ -216,38 +210,13 @@ public partial class MusicManager : Node
     /// <summary>
     /// **放一次就完**的音效（UI 按键音等）：抽一条、塞进一个空闲声部、立刻开播，不管它什么时候结束。
     ///
-    /// 声部挂在 `MusicManager` 自己身上（autoload，**常驻**），而不是调用方所在的场景：
-    /// 按键音最典型的用法就是「按下去 → 立刻切场景」，挂场景里的话节点会跟着 `QueueFree`，
-    /// 声音刚起个头就被掐掉。
+    /// 声部池在 <see cref="SfxPlayer"/> 里，挂在 `MusicManager` 自己身上（autoload，**常驻**），
+    /// 而不是调用方所在的场景——按键音最典型的用法就是「按下去 → 立刻切场景」，
+    /// 挂场景里的话节点会跟着 `QueueFree`，声音刚起个头就被掐掉。
     ///
-    /// 多个声部轮换，所以连点也不会让后一声掐掉前一声。音量走 `SFX` 总线，
-    /// 设置界面调的就是那条总线。
+    /// 需要在**自己场景里**控制播放器（调音量、`await` 它播完）时改用 `PickSfx`。
     /// </summary>
-    public void PlaySfx(string slot)
-    {
-        if (!IsInsideTree()) return;
-
-        AudioStream stream = PickSfx(slot);
-        if (stream == null) return;   // PickSfx 已经报过警了
-
-        sfxVoices ??= CreateSfxVoices();
-        AudioStreamPlayer voice = sfxVoices[nextSfxVoice];
-        nextSfxVoice = (nextSfxVoice + 1) % sfxVoices.Length;
-        voice.Stream = stream;
-        voice.Play();
-    }
-
-    private AudioStreamPlayer[] CreateSfxVoices()
-    {
-        var voices = new AudioStreamPlayer[SfxVoiceCount];
-        for (int index = 0; index < voices.Length; index++)
-        {
-            var voice = new AudioStreamPlayer { Bus = SfxBus };
-            AddChild(voice);
-            voices[index] = voice;
-        }
-        return voices;
-    }
+    public void PlaySfx(string slot) => sfxPlayer?.Play(slot);
 
     public void StopMusic()
     {

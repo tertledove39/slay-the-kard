@@ -1097,6 +1097,12 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
   按键音最典型的用法就是「按下去 → 立刻切场景」（点区域按钮就进战斗），
   挂场景里节点会跟着 `QueueFree`，声音刚起个头就被掐掉。
 
+> 写完发现 `MusicManager.cs` 涨到 **306 行、破了 300 行红线**（规范 B），于是把声部池
+> 拆成 `core_logic/SfxPlayer.cs`（宿主 + 一个「槽位 → 音效」的委托，就是 `PickSfx`）。
+> `MusicManager` 退回 **275 行**，只剩一句 `PlaySfx(slot) => sfxPlayer?.Play(slot);`。
+> 拆分后重跑实机验证：`MusicManager` 下 5 个播放器（1 个 BGM + 4 个声部），
+> 按钮音照常响。测试里顺手钉了一条 `MusicManager.cs < 300 行`——不然下次一加功能又涨回去。
+
 实机（headless 起真 `worldMap.tscn`）验证：场景里 **9 个按钮**，挂完后
 **带记号的也是 9 个**；真按一下，`MusicManager` 上在播的声部从 1 变 2；
 直接调 `PlaySfx` 再到 3；传一个不存在的槽位则仍是 3（不崩、不误播）。

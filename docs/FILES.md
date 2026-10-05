@@ -27,6 +27,7 @@
 | core_logic/FlyingEffect.cs | **飞掠特效**：让触发它的那张卡升起（位置 + 轻微放大）-> 原地悬停 -> 落回，期间抬高层级压住其他卡（`TopZIndex`，**必须低于手牌的 20**）。**全程不转角度**（`SwayDegrees` 默认 0 = 静止悬停）。参数全部 Export 在 `effects/flying_effect.tscn`。两个钩子：`DuringRiseAsync`（与起飞并行的事）与 `StayAsync`（悬停阶段） |
 | core_logic/AirStrikeEffect.cs | **「飞起来打一下」特效** `AirStrikeEffect : FlyingEffect`，只覆写 `DuringRiseAsync` = **起飞的同时把子特效打出去**。一个脚本、两个场景，靠 `StrikeEffectName` 区分：`bombing` = 投弹（`airstrike`）、`bullet` = 打枪（`strafe`）。升起/悬停/降落/还原/音效全部沿用父类 |
 | core_logic/SoundEffect.cs | **只放一段音效**的特效（卡牌语音）。槽位从**特效名的参数**来：`playEffect = sfx(严冬)` → `Configure("严冬")` → `MusicManager.PickSfx`。`Play` 会**等音效放完**才返回，否则调用方回收节点时会把声音一起掐掉 |
+| core_logic/SfxPlayer.cs | **「放一次就完」的音效声部池**（4 个声部轮换，走 `SFX` 总线）。声部挂在传入的宿主节点下——`MusicManager` 是 autoload，所以「按下按钮→立刻切场景」时声音不会被掐断。从 `MusicManager` 拆出来是为了守住 300 行红线（规范 B）：两者唯一的交集只是「音效从哪来」，由构造函数传入的 `Func<string, AudioStream>` 提供 |
 | effects/sound_effect.tscn | 上述音效特效的场景。**全项目共用这一个**——语音不必一音效一场景 |
 | bin/bomb.tscn | 航弹弹体（复用 `bin/Bullet.cs`，贴图 `assest/航弹.png`），供 `bombing` 特效用 |
 | bin/tank_shell.tscn | 坦克炮弹弹体（复用 `bin/Bullet.cs`，贴图 `assest/tank_projetile.png`，原图只有 3×9 所以 `Sprite2D.scale` 给得比航弹大得多），供 `TankAttack` 特效用 |

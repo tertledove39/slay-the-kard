@@ -25,6 +25,7 @@ def main():
     display = (ROOT / "DisplayCard.cs").read_text(encoding="utf-8")
     ui_click = (ROOT / "bin" / "UiClickSound.cs").read_text(encoding="utf-8")
     music = (ROOT / "core_logic" / "MusicManager.cs").read_text(encoding="utf-8")
+    sfx_player = (ROOT / "core_logic" / "SfxPlayer.cs").read_text(encoding="utf-8")
     music_ini = (ROOT / "configs" / "music.ini").read_text(encoding="utf-8")
     battle = (ROOT / "bin" / "battlefield_.cs").read_text(encoding="utf-8")
 
@@ -75,14 +76,19 @@ def main():
 
         # 播放侧：声部必须挂在 **autoload** 上。按键音最典型的用法就是
         # 「按下去 → 立刻切场景」（点区域按钮就进战斗），挂场景里会被 QueueFree 掐断。
-        check('public void PlaySfx(string slot)' in music,
-              'MusicManager 提供「放一次就完」的入口'),
-        check('sfxVoices ??= CreateSfxVoices();' in music and 'AddChild(voice);' in music,
-              '声部懒建并挂在 MusicManager 自己身上（autoload 常驻，切场景不会掐断）'),
-        check('nextSfxVoice = (nextSfxVoice + 1) % sfxVoices.Length;' in music,
+        check('public void PlaySfx(string slot) => sfxPlayer?.Play(slot);' in music,
+              'MusicManager 提供「放一次就完」的入口（自己只管转发）'),
+        check('sfxPlayer = new SfxPlayer(this, PickSfx);' in music,
+              '声部池挂在 MusicManager 自己身上（autoload 常驻，切场景不会掐断）'),
+        check('voices ??= CreateVoices();' in sfx_player and 'host.AddChild(voice);' in sfx_player,
+              '声部懒建在宿主节点下（没人按按钮就不花这份钱）'),
+        check('nextVoice = (nextVoice + 1) % voices.Length;' in sfx_player,
               '多个声部轮换，连点不会互相掐'),
-        check('new AudioStreamPlayer { Bus = SfxBus }' in music and 'SfxBus = "SFX"' in music,
+        check('new AudioStreamPlayer { Bus = Bus }' in sfx_player and 'Bus = "SFX"' in sfx_player,
               '走 SFX 总线（设置界面调的那条）'),
+        # 拆分的动机是 300 行红线（规范 B），所以把这条也钉住 —— 否则下次一加功能又涨回去。
+        check(len(music.split("\n")) < 300,
+              f'MusicManager.cs 仍在 300 行红线内（当前 {len(music.splitlines())} 行）'),
     ]
 
     # 交叉核对：UiClickSound 里写的槽位名必须在 [sfx] 段里存在，且文件真在、真被 Godot 导入。

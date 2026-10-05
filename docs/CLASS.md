@@ -196,12 +196,29 @@
 | `PlaySlot(slot)` | 请求槽位。**不立即换曲**：有曲目在播时只记入`pendingSlot`排队，等曲末再切 |
 | `PlayBattleSlot(enemyPreset)` | 战斗BGM入口：优先`battleBGM_<预设名>`槽位，未配置回退`BattleSlot` |
 | `HasSlot(slot)` | 槽位是否配置了至少一首曲目 |
+| `PickSfx(slot)` | **取**一条音效（`AudioStream`，带缓存），播放器由调用方管——要调音量或 `await` 播完时用它 |
+| `PlaySfx(slot)` | **放一次就完**，不用调用方管节点。转发给 `SfxPlayer`（见下） |
 | `StopMusic()` / `SetVolumeDb(db)` | 停止播放（并清空排队）/ 设置音量 |
 | `BattleBgmPrefix` / `BattleSlot` | 常量`"battleBGM_"`与`"battle"`，避免调用方写死字符串 |
 
 内部成员：`StartSlot()`是唯一真正起播的地方；`OnTrackFinished()`由`AudioStreamPlayer.Finished`驱动，曲末切到排队槽位、无排队则从当前槽位续播下一首；`DisableBuiltinLoop()`关掉三种格式的内建循环，否则曲目永不结束、`Finished`不触发。
 
 槽位表为`Dictionary<string, string[]>`并按忽略大小写比较；同槽位重复请求撤销排队，换槽位抽到同一首也不重播。详见`docs/MUSIC.md`。
+
+### `SfxPlayer` (core_logic/SfxPlayer.cs)
+
+「放一次就完」的音效声部池，按键音这类**不需要等它播完、也不需要控制音量**的音走它。
+
+声部**挂在传入的宿主节点上**（`MusicManager` 是 autoload，常驻）而不是调用方所在的场景：
+这类音效最典型的用法就是「按下去 → 立刻切场景」，挂场景里的话节点会跟着 `QueueFree`，
+声音刚起个头就被掐掉。4 个声部轮换使用，连点不会互相掐；走 `SFX` 总线
+（与场景里既有的音效同一条，音量由设置界面控）。
+
+**不是 `Node` 子类**：它自己不占生命周期——只是「在别人的节点下建几个播放器、轮流用」
+的一层簿记，没有 `_Ready` / `_ExitTree` 要做的事。宿主销毁时子播放器跟着走，不需要额外清理。
+
+从 `MusicManager` 拆出来是为了守住 300 行红线（规范 B）——两者唯一的交集只是
+「音效从哪来」，由宿主通过构造函数传入的 `Func<string, AudioStream>`（即 `MusicManager.PickSfx`）提供。
 
 ### `GameDialogueBalloon` : CanvasLayer (core_ui/GameDialogueBalloon.cs)
 
