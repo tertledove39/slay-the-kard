@@ -607,7 +607,7 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 参数（升起高度、放大倍率、摆幅、时速、音效槽位）全部 Export 在 `effects/flying_effect.tscn` 上，
 调手感不必改代码——测试断言这些字段都是 `[Export]`。
 
-### 第二轮调整（flying 的旋转 / bombing 的命中音效）
+### 第二轮调整（flying 的旋转 / bombing 的命中音效，后者已撤销）
 
 - **flying 的「摆动」原本做错了**：第一版是在 X 轴上左右**平移**，而要求是**旋转**——
   「先指向被攻击的目标，再在那个角度上左右摆约 10°」。现在四段是
@@ -616,12 +616,14 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
   摆动是在 `aimRotation` 基础上 ±`SwayDegrees` 而不是绕 0 度摆；最后停在瞄准角上。
 - **落回要连角度一起还原**，否则打完之后卡会斜着停在场上。`finally` 的还原清单
   已包含 `Rotation`（与位置/缩放/层级/标记并列）。
-- **bombing 的爆炸音效按「每发命中各响一声」做**：`BulletEffect` 新增
-  `ImpactSfxSlot` / `ImpactSfxVolume` / `ImpactVoiceCount` 三个 Export。
-  时机挂在 `await bullet.Play(...)` 之后——`Bullet.Play` 正是在飞抵目标那一刻返回的，
-  不必再往 `Bullet` 里塞回调。**多声部**（默认 6 个播放器轮换）是必需的：
-  多发弹体错开命中，只用一个播放器会让后一声掐掉前一声，听起来像少炸了几发。
-  `bullet` 不填槽位，行为与从前完全一致（测试反向断言这一点）。
+- ~~**bombing 的爆炸音效按「每发命中各响一声」做**~~（**已全部撤销**）：
+  曾给 `BulletEffect` 加过 `ImpactSfxSlot` / `ImpactSfxVolume` / `ImpactVoiceCount`
+  三个 Export 与一套多声部播放器。主人实测后要求**投弹不出声**，第一版只是把槽位留空
+  （「靠配置关掉」——随时会被谁填回去），第二版**把整套机制整段删除**：
+  `BulletEffect` 里现在没有任何 `AudioStreamPlayer`，弹体在结构上就发不出声音。
+  测试相应改成断言**代码里不存在音效路径**，而不是断言某个槽位为空；
+  搜这类「已经删掉的东西」前要先剥掉注释（`code_only()`），
+  否则说明它被删掉的那段文档本身会把名字搜出来。
 
 ### 第三轮调整（flying 的时序与速度）
 

@@ -34,7 +34,7 @@
 | 名称 | 场景 | 说明 |
 |------|------|------|
 | `bullet` | `effects/bullet_effect.tscn` | 从攻击者向目标打出一串子弹，固定 10 发（`ProjectileFlightSeconds = 0.3`） |
-| `bombing` | `effects/bombing_effect.tscn` | 航弹，**弹数 = 攻击力**（场景里 `ProjectileCount = 0` 表示用调用方给的数量）；`ProjectileFlightSeconds = 1.5`，比子弹慢得多才有投弹感；**当前不播命中音效**（`ImpactSfxSlot` 留空，`ImpactSfxVolume = 0.7` 留着方便以后恢复） |
+| `bombing` | `effects/bombing_effect.tscn` | 航弹，**弹数 = 攻击力**（场景里 `ProjectileCount = 0` 表示用调用方给的数量）；`ProjectileFlightSeconds = 1.5`，比子弹慢得多才有投弹感；**不发声**（`BulletEffect` 里没有任何音效代码，不是靠配置关掉的） |
 | `smoke` | `effects/smoke_effect.tscn` | 在指定位置冒一下烟 |
 | `flying` | `effects/flying_effect.tscn` | 让**触发它的那张卡**升起（`RiseDuration`，**与转向同时完成**）-> 在瞄准角上左右摆 `SwayDegrees`（一个来回 `SwaySecondsPerCycle`）-> 落回（`LandDuration`，连角度一起还原），期间抬高层级压住其他卡；音效取 `[sfx] flyby` |
 | `airstrike` | `effects/air_strike_effect.tscn` | **空袭 = 飞掠 + 盘旋时投弹**：起飞 -> （边盘旋边投弹）-> 降落。投的是 `bombing` 子特效，所以弹数仍是攻击力；`StrikeEffectName` 留空则退化成纯飞掠 |

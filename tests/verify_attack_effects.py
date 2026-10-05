@@ -125,6 +125,21 @@ def lacking_chinese_doc(cs_text, export_names):
     return lacking
 
 
+def code_only(cs_text):
+    """去掉整行注释后的 C# 代码。
+
+    断言「某段机制已经不存在」时必须先剥掉注释：说明「这东西删掉了」的文档
+    本身就会写出那个名字，拿全文去搜会把自己的说明当成残留。
+    """
+    keep = []
+    for line in cs_text.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("//"):
+            continue
+        keep.append(line.split("//")[0] if "//" in line else line)
+    return "\n".join(keep)
+
+
 def scene_paths(text):
     """取出 EffectRegistry.ScenePaths 里的 名字 -> 路径。"""
     block = method(text, "private static readonly Dictionary<string, string> ScenePaths",
@@ -281,22 +296,16 @@ def main():
                          "把飞行时长传给每一发弹体"))
     results.append(check("[Export] public int StaggerMaxMs" in bullet_effect, "错开间隔也是 Export"))
 
-    # 命中音效：每发各响一声，且要能叠着响
-    results.append(check("[Export] public string ImpactSfxSlot" in bullet_effect, "命中音效槽位是 Export"))
-    results.append(check("[Export] public float ImpactSfxVolume" in bullet_effect, "命中音量是 Export"))
-    results.append(check("[Export] public int ImpactVoiceCount" in bullet_effect, "声部数是 Export"))
-    results.append(check("new AudioStreamPlayer[ImpactVoiceCount]" in bullet_effect,
-                         "按声部数建多个播放器（一个播放器会让后一声掐掉前一声）"))
-    results.append(check('Bus = SfxBus' in bullet_effect and 'SfxBus = "SFX"' in bullet_effect,
-                         "命中音效走 SFX 总线，与战场既有战斗音效一致"))
-    results.append(check("Mathf.LinearToDb(Mathf.Clamp(ImpactSfxVolume, 0.0001f, 1f))" in bullet_effect,
-                         "线性音量换算成 dB"))
-    results.append(check("string.IsNullOrWhiteSpace(ImpactSfxSlot)" in bullet_effect,
-                         "槽位为空就不建播放器（bullet 不受影响）"))
+    # 弹体**完全不发声**。
+    # 曾经有过一套「每发命中各播一声」的机制（ImpactSfxSlot/Volume/VoiceCount），
+    # 但航弹连发时每发各炸一声会糊成一片，已整段删除。现在钉的不是「槽位留空」
+    # ——那种「靠配置关掉」的做法随时会被谁填回去——而是**代码里根本没有这条路**。
+    results.append(check(not re.search(r"ImpactSfx|ImpactVoice|AudioStreamPlayer", code_only(bullet_effect)),
+                         "BulletEffect 里没有任何音效代码（结构上就不会响）"))
     release = method(bullet_effect, "private async Task PlayAndReleaseBullet(", "\n}")
     results.append(check("await bullet.Play(positions, time);" in release
-                         and release.index("PlayImpactSfx()") > release.index("await bullet.Play("),
-                         "命中音效挂在「弹体飞抵」之后（bullet.Play 正是在那一刻返回）"))
+                         and "PlayImpactSfx" not in release,
+                         "飞抵目标那一刻只做回收，不放任何声音"))
 
     bombing_scene = (ROOT / "effects" / "bombing_effect.tscn").read_text(encoding="utf-8")
     results.append(check('path="res://core_logic/BulletEffect.cs"' in bombing_scene,
@@ -304,15 +313,13 @@ def main():
     results.append(check('ProjectileScenePath = "res://bin/bomb.tscn"' in bombing_scene,
                          "bombing 用航弹弹体"))
     results.append(check("ProjectileCount = 0" in bombing_scene, "bombing 弹数交给攻击力决定"))
-    results.append(check('ImpactSfxSlot = ""' in bombing_scene,
-                         "bombing 不播命中音效（槽位留空）"))
-    results.append(check("ImpactSfxVolume = 0.7" in bombing_scene,
-                         "音量 0.7 留着，方便以后恢复音效时不用重调"))
+    results.append(check(not re.search(r"ImpactSfx|AudioStreamPlayer", bombing_scene),
+                         "bombing 场景里没有任何音效配置"))
     results.append(check("ProjectileFlightSeconds = 1.5" in bombing_scene,
                          "航弹飞行 1.5 秒（原来写死 0.3，太快）"))
     bullets_scene = (ROOT / "effects" / "bullet_effect.tscn").read_text(encoding="utf-8")
-    results.append(check('ImpactSfxSlot = ""' in bullets_scene,
-                         "bullet 的命中音效槽位显式留空（不播，行为与从前一致）"))
+    results.append(check(not re.search(r"ImpactSfx|AudioStreamPlayer", bullets_scene),
+                         "bullet 场景里也没有音效配置（子弹本来就不响）"))
 
     bomb_scene = (ROOT / "bin" / "bomb.tscn").read_text(encoding="utf-8")
     results.append(check('path="res://bin/Bullet.cs"' in bomb_scene, "航弹复用 Bullet 脚本（运动方式照 bullet）"))

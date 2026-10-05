@@ -19,9 +19,3 @@ ProjectileCount = 10
 StaggerMaxMs = 100
 ; 每发子弹飞完全程要几秒
 ProjectileFlightSeconds = 0.3
-; 每发命中时播放的音效槽位，对应 configs/music.ini 的 [sfx] 段。留空 = 不播（子弹不配命中音效）
-ImpactSfxSlot = ""
-; 命中音效音量（线性值，1 = 原音量）。槽位留空时这项不起作用
-ImpactSfxVolume = 1.0
-; 命中音效的声部数。槽位留空时这项不起作用
-ImpactVoiceCount = 6

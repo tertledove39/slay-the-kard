@@ -19,9 +19,3 @@ ProjectileCount = 0
 ProjectileFlightSeconds = 1.5
 ; 相邻两发之间最多错开多少毫秒（实际取 0~本值之间的随机数）
 StaggerMaxMs = 100
-; 每发命中时播放的音效槽位，对应 configs/music.ini 的 [sfx] 段。留空 = 不播（当前就是留空）
-ImpactSfxSlot = ""
-; 命中音效音量（线性值，1 = 原音量）。槽位留空时不起作用，留着方便以后恢复音效
-ImpactSfxVolume = 0.7
-; 命中音效的声部数。多发弹体错开命中，声部少了后一声会掐掉前一声
-ImpactVoiceCount = 6
