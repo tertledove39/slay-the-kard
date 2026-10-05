@@ -103,7 +103,7 @@ def main():
 
     # ==================== ② flying ====================
     print("\n--- ② flying 飞掠 ---")
-    for field in ["RiseHeight", "RiseScale", "SwayAmplitude", "SwayCycles",
+    for field in ["RiseHeight", "RiseScale", "SwayDegrees", "SwayCycles",
                   "Duration", "TopZIndex", "SfxSlot"]:
         results.append(check(f"[Export] public float {field}" in flying
                              or f"[Export] public int {field}" in flying
@@ -111,23 +111,44 @@ def main():
                              f"{field} 是 Export（调手感不必改代码）"))
 
     results.append(check("private async Task RiseAsync(" in flying
-                         and "private async Task SwayAsync(" in flying
+                         and "private async Task AimAsync(" in flying
+                         and "private async Task SwayAroundAimAsync(" in flying
                          and "private async Task LandAsync(" in flying,
-                         "升起 / 摆动 / 落回 三段分开"))
+                         "升起 / 转向目标 / 在瞄准角上摆动 / 落回 四段分开"))
     results.append(check("baseScale * RiseScale" in flying, "漂浮时轻微放大"))
     results.append(check("basePosition + new Vector2(0f, -RiseHeight)" in flying, "往上升"))
-    sway = method(flying, "private async Task SwayAsync(", "private async Task LandAsync(")
+
+    # 转向：幅度由「攻击者→目标」的方向决定，而不是固定角度
+    aim = method(flying, "private static float AimRotationOffset(", "private async Task RiseAsync(")
+    results.append(check("positions[1] - positions[0]" in aim, "方向取自 攻击者→目标"))
+    results.append(check("direction.Angle() + Mathf.Pi / 2f" in aim,
+                         "让卡的「上边」对准目标（与 Bullet 的朝向约定一致）"))
+    results.append(check("direction.LengthSquared() < 0.0001f" in aim,
+                         "攻击者与目标重合时不乱转"))
+
+    set_ = method(flying, "private async Task AimAsync(", "private async Task SwayAroundAimAsync(")
+    results.append(check('TweenProperty(card, "rotation", toRotation, duration)' in set_,
+                         "转的是 rotation（不是左右平移）"))
+    results.append(check("Tween.TransitionType.Sine" in set_ and "Tween.EaseType.InOut" in set_,
+                         "转向是慢速 + 缓动"))
+
+    sway = method(flying, "private async Task SwayAroundAimAsync(", "private async Task LandAsync(")
     results.append(check("SwayCycles * 2f" in sway, "摆动来回数由 SwayCycles 决定"))
-    results.append(check('tween.TweenProperty(card, "position:x", basePosition.X, step)' in sway,
-                         "最后摆回中线（否则落点会偏一整个摆幅）"))
+    results.append(check("Mathf.DegToRad(SwayDegrees)" in sway, "摆幅是角度（DegToRad），不是像素"))
+    results.append(check("aimRotation + (index % 2 == 0 ? offset : -offset)" in sway,
+                         "摆动是「在瞄准角的基础上」左右偏，不是绕 0 度摆"))
+    results.append(check('tween.TweenProperty(card, "rotation", aimRotation, step)' in sway,
+                         "最后停在瞄准角上（落回才不会斜着停住）"))
 
     results.append(check("source.isUnderCardEffect = true;" in flying, "漂浮期间标记「特效在管这张卡」"))
     results.append(check("source.ZIndex = TopZIndex;" in flying, "抬高层级压住其他卡"))
-    fin = method(flying, "finally", "private async Task RiseAsync(")
+    fin = method(flying, "finally", "private static float AimRotationOffset(")
     results.append(check("source.Position = basePosition;" in fin
+                         and "source.Scale = baseScale;" in fin
+                         and "source.Rotation = baseRotation;" in fin
                          and "source.ZIndex = baseZIndex;" in fin
                          and "source.isUnderCardEffect = false;" in fin,
-                         "finally 里还原位置/缩放/层级/标记（中途出错也不能让它永远浮着）"))
+                         "finally 里还原位置/缩放/角度/层级/标记（中途出错也不能让它永远浮着斜着）"))
     results.append(check("MusicManager.Instance?.PickSfx(SfxSlot)" in flying, "音效走 [sfx] 槽位"))
     results.append(check('SfxSlot = "flyby"' in flying, "默认槽位名 flyby"))
 
@@ -155,12 +176,34 @@ def main():
                          "按场景路径取弹体"))
     results.append(check("[Export] public int StaggerMaxMs" in bullet_effect, "错开间隔也是 Export"))
 
+    # 命中音效：每发各响一声，且要能叠着响
+    results.append(check("[Export] public string ImpactSfxSlot" in bullet_effect, "命中音效槽位是 Export"))
+    results.append(check("[Export] public float ImpactSfxVolume" in bullet_effect, "命中音量是 Export"))
+    results.append(check("[Export] public int ImpactVoiceCount" in bullet_effect, "声部数是 Export"))
+    results.append(check("new AudioStreamPlayer[ImpactVoiceCount]" in bullet_effect,
+                         "按声部数建多个播放器（一个播放器会让后一声掐掉前一声）"))
+    results.append(check('Bus = SfxBus' in bullet_effect and 'SfxBus = "SFX"' in bullet_effect,
+                         "命中音效走 SFX 总线，与战场既有战斗音效一致"))
+    results.append(check("Mathf.LinearToDb(Mathf.Clamp(ImpactSfxVolume, 0.0001f, 1f))" in bullet_effect,
+                         "线性音量换算成 dB"))
+    results.append(check("string.IsNullOrWhiteSpace(ImpactSfxSlot)" in bullet_effect,
+                         "槽位为空就不建播放器（bullet 不受影响）"))
+    release = method(bullet_effect, "private async Task PlayAndReleaseBullet(", "\n}")
+    results.append(check("await bullet.Play(positions, time);" in release
+                         and release.index("PlayImpactSfx()") > release.index("await bullet.Play("),
+                         "命中音效挂在「弹体飞抵」之后（bullet.Play 正是在那一刻返回）"))
+
     bombing_scene = (ROOT / "effects" / "bombing_effect.tscn").read_text(encoding="utf-8")
     results.append(check('path="res://core_logic/BulletEffect.cs"' in bombing_scene,
                          "bombing 复用 BulletEffect 脚本（不写第二个类）"))
     results.append(check('ProjectileScenePath = "res://bin/bomb.tscn"' in bombing_scene,
                          "bombing 用航弹弹体"))
     results.append(check("ProjectileCount = 0" in bombing_scene, "bombing 弹数交给攻击力决定"))
+    results.append(check('ImpactSfxSlot = "dead"' in bombing_scene, "bombing 每发命中配爆炸音效"))
+    results.append(check("ImpactSfxVolume = 0.7" in bombing_scene, "爆炸音效音量 70%"))
+    bullets_scene = (ROOT / "effects" / "bullet_effect.tscn").read_text(encoding="utf-8")
+    results.append(check("ImpactSfxSlot" not in bullets_scene,
+                         "bullet 不写命中音效，行为与从前一致"))
 
     bomb_scene = (ROOT / "bin" / "bomb.tscn").read_text(encoding="utf-8")
     results.append(check('path="res://bin/Bullet.cs"' in bomb_scene, "航弹复用 Bullet 脚本（运动方式照 bullet）"))

@@ -32,9 +32,9 @@
 | 名称 | 场景 | 说明 |
 |------|------|------|
 | `bullet` | `effects/bullet_effect.tscn` | 从攻击者向目标打出一串子弹，固定 10 发 |
-| `bombing` | `effects/bombing_effect.tscn` | 航弹，**弹数 = 攻击力**（场景里 `ProjectileCount = 0` 表示用调用方给的数量） |
+| `bombing` | `effects/bombing_effect.tscn` | 航弹，**弹数 = 攻击力**（场景里 `ProjectileCount = 0` 表示用调用方给的数量）；**每发命中各响一声爆炸音效**（`ImpactSfxSlot = dead`，音量 `ImpactSfxVolume = 0.7`，多声部叠播） |
 | `smoke` | `effects/smoke_effect.tscn` | 在指定位置冒一下烟 |
-| `flying` | `effects/flying_effect.tscn` | 让**触发它的那张卡**升起 -> 轻微放大 -> 左右摆 -> 落回，期间抬高层级压住其他卡；音效取 `[sfx] flyby` |
+| `flying` | `effects/flying_effect.tscn` | 让**触发它的那张卡**升起 -> 放大 -> **转向被攻击的目标**（慢速缓动）-> 在瞄准角上左右摆 `SwayDegrees`（默认 10°）-> 落回，期间抬高层级压住其他卡；音效取 `[sfx] flyby` |
 
 `bombing`与`bullet`共用`BulletEffect`脚本，差别只在场景 Export 出去的「弹体场景」与「弹数」——生成、随机错开、回池那套逻辑不写第二遍。
 

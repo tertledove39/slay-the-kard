@@ -14,3 +14,6 @@ script = ExtResource("1")
 ProjectileScenePath = "res://bin/bomb.tscn"
 ProjectileCount = 0
 StaggerMaxMs = 100
+ImpactSfxSlot = "dead"
+ImpactSfxVolume = 0.7
+ImpactVoiceCount = 6
