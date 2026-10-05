@@ -236,6 +236,27 @@ public static class BattleStateManager
         return _areaIntensity.TryGetValue(areaName, out int value) ? value : -1;
     }
 
+    /// <summary>
+    /// 读出全部区域的剩余烈度（区域名 → 烈度），供**存档**序列化用。
+    /// 返回副本，调用方改它不会影响内部状态。
+    /// </summary>
+    public static Dictionary<string, int> ReadAllAreaIntensity() => new(_areaIntensity);
+
+    /// <summary>
+    /// 整表写回区域烈度，供**读档**还原用。会先清空，避免旧局的残留混进来。
+    /// 只收 >0 的项：0 与「没进过这个区域」在 <see cref="ReadAreaIntensity"/> 里
+    /// 都返回「没有」，混在一起会让存档多出一堆没意义的键。
+    /// </summary>
+    public static void RestoreAreaIntensity(Dictionary<string, int> values)
+    {
+        _areaIntensity.Clear();
+        if (values == null) return;
+        foreach (var pair in values)
+        {
+            if (pair.Value > 0) _areaIntensity[pair.Key] = pair.Value;
+        }
+    }
+
     /// <summary>进入区域时按 areaTimes 初始化烈度；已初始化的区域不会被重置</summary>
     public static void EnsureAreaIntensity(string areaName, int areaTimes)
     {

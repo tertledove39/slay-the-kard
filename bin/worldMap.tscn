@@ -102,12 +102,21 @@ texture_pressed = ExtResource("3_kanex")
 texture_hover = ExtResource("4_ord10")
 stretch_mode = 0
 
+[node name="SettingsButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 100.0
+offset_bottom = 46.0
+theme_override_font_sizes/font_size = 24
+text = "设置"
+
 [node name="pointNum" type="Label" parent="."]
 layout_mode = 0
 offset_left = 86.0
-offset_top = 25.0
+offset_top = 75.0
 offset_right = 212.0
-offset_bottom = 86.0
+offset_bottom = 136.0
 text = "1"
 label_settings = SubResource("LabelSettings_cs12g")
 
@@ -129,21 +138,21 @@ text = "卡组"
 
 [node name="pointPic" type="Sprite2D" parent="."]
 modulate = Color(1.6845763e-06, 0.706827, 9.62615e-07, 1)
-position = Vector2(49, 55)
+position = Vector2(49, 105)
 texture = ExtResource("6_kanex")
 
 [node name="heartPic" type="Sprite2D" parent="."]
 modulate = Color(0.7335228, 0.21810421, 0.21165666, 1)
-position = Vector2(47, 145)
+position = Vector2(47, 195)
 scale = Vector2(0.578125, 0.578125)
 texture = ExtResource("7_hearts")
 
 [node name="hpNum" type="Label" parent="."]
 layout_mode = 0
 offset_left = 84.0
-offset_top = 115.0
+offset_top = 165.0
 offset_right = 210.0
-offset_bottom = 176.0
+offset_bottom = 226.0
 text = "5"
 label_settings = SubResource("LabelSettings_cs12g")
 

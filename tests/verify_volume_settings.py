@@ -14,6 +14,7 @@ def main():
     settings = (ROOT / "bin" / "setting.ini").read_text(encoding="utf-8")
     manager = (ROOT / "bin" / "SettingsManager.cs").read_text(encoding="utf-8")
     menu = (ROOT / "bin" / "SettingsMenu.cs").read_text(encoding="utf-8")
+    row = (ROOT / "bin" / "SettingRow.cs").read_text(encoding="utf-8")
     buses = (ROOT / "default_bus_layout.tres").read_text(encoding="utf-8")
     music = (ROOT / "core_logic" / "MusicManager.cs").read_text(encoding="utf-8")
     battle = (ROOT / "bin" / "battleField.tscn").read_text(encoding="utf-8")
@@ -21,7 +22,12 @@ def main():
     results = [
         check(all(key in settings for key in ("key=master_volume", "key=music_volume", "key=sfx_volume", "key=ui_volume")), "four volume settings are configured"),
         check(settings.count("min=0") == 4 and settings.count("max=100") == 4, "volume bounds are configurable"),
-        check('item.Type == "float"' in menu and "new HSlider" in menu, "settings menu builds numeric sliders"),
+        # 滑条行的构建已抽到 bin/SettingRow.cs，设置界面与暂停菜单共用一份
+        # （原先 `new HSlider` 直接写在 SettingsMenu 里，暂停菜单要用就只能抄一遍）。
+        check('item.Type == "float"' in menu
+              and "SettingRow.AddFloatSlider(list, item)" in menu
+              and "new HSlider" in row and "new HSlider" not in menu,
+              "settings menu builds numeric sliders (shared SettingRow)"),
         check("user://settings.cfg" in manager and "SaveUserValues" in manager, "settings persist in user storage"),
         check("AudioServer.SetBusVolumeDb" in manager and "AudioServer.SetBusMute" in manager, "volume values control audio buses"),
         check("EnsureAudioBuses();" in manager and "AudioServer.AddBus()" in manager and "AudioServer.SetBusSend" in manager, "missing category buses are created before applying volume"),

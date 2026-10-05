@@ -108,6 +108,16 @@ texture_normal = ExtResource("5_yx2c1")
 texture_pressed = ExtResource("6_pdf0m")
 texture_disabled = ExtResource("7_lxbgj")
 
+[node name="SettingsButton" type="Button" parent="."]
+z_index = 1000
+layout_mode = 0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 100.0
+offset_bottom = 46.0
+theme_override_font_sizes/font_size = 24
+text = "设置"
+
 [node name="Place1" parent="." instance=ExtResource("8_r58wv")]
 position = Vector2(270, 20)
 

@@ -324,3 +324,50 @@
 | `EffectAttribute` class | 效果的attribute元数据：IconName / Description / IsTrait / TraitName / IconTint |
 | `IconCache` static class | 图标缓存，预加载/获取trait图标纹理 |
 | `Change` struct | ChangeType + Value，用于缓冲的属性变更 |
+
+### `SaveManager` (bin/SaveManager.cs)
+
+**存档 / 读档**，单存档位，落在 `user://save.cfg`（Godot `ConfigFile`，与 `SettingsManager` 的
+`user://settings.cfg` 同一套路）。四个入口：`Save()` / `Load()` / `Delete()` / `HasSave()`。
+
+存的是 `BattleStateManager` 的**本局进度** + 一个**战斗 id**（`SelectedEnemy`，如 `berlin`）：
+
+| 字段 | 用途 |
+|------|------|
+| `enemy` / `area` / `inBattle` | 战斗 id、所在区域、**存档时在不在战斗中** |
+| `hp` / `points` | 血量、物资点 |
+| `area` 段 ×7 | 各区域解锁状态 |
+| `intensity` 段 ×N | 各区域剩余烈度（`ReadAllAreaIntensity` / `RestoreAreaIntensity`） |
+| `deck` | 卡组（逗号分隔的卡 id） |
+| `store` 段 | 商店库存队列 + 7 个货架（含折扣与已售） |
+
+`ResolveScenePath()` 按 `IsCampaignMode` 决定读档后进哪：真 → `battleField.tscn`（**重打这一场**），
+假 → `worldMap.tscn`。版本号对不上时 `Load()` 返回 false、忽略旧档——宁可让玩家重开一局，
+也不要用半截数据把状态弄坏。
+
+> **战斗内的棋盘不还原**（手牌、场上单位、指挥点）。老板要的是「保存战斗的 id」，那就只存 id。
+> 详见 `NOTICE.md` 的「存档 / 读档约定」。
+
+### `PauseMenu` : CanvasLayer (bin/PauseMenu.cs + bin/pause_menu.tscn)
+
+**暂停菜单**：音量区 + **两个由调用方传入**的动作（`PauseAction`：文案 / 回调 / 可选确认文案）。
+
+| 界面 | 动作一 | 动作二 |
+|------|--------|--------|
+| 战斗 `battlefield_` | **认输** | **保存并退出** |
+| 世界地图 `WorldMap` | **放弃** | **保存并退出** |
+
+菜单自己**不知道**这是战斗还是世界地图，所以一个场景服务两边（规范 A）。
+`PauseMenu.Show(host, a1, a2, onClosed)` 是唯一入口；`IsOpen` 让调用方在它开着时忽略其它输入
+（战斗还要 `ForbidControl()` / `AllowControl()` 成对锁放）。ESC 关菜单，确认框开着时 ESC 让位。
+
+### `UiConfirm` (bin/UiConfirm.cs)
+
+**二次确认弹窗的唯一实现**。Godot 的 `ConfirmationDialog` 没有「等结果」的 await 形式，
+所以用 `TaskCompletionSource` 把「确定 / 取消 / 右上角关闭」三个信号收成一个 `Task<bool>`。
+暂停菜单的「认输 / 放弃」与主菜单「开始」时的覆盖确认都用它。
+
+### `SettingRow` (bin/SettingRow.cs)
+
+**设置行的唯一实现**：名称 + 滑条 + 右侧数值。设置界面（`SettingsMenu`）与暂停菜单共用。
+改完走 `SettingsManager.SetFloat`——它**立即应用并落盘**，所以不需要「保存设置」这一步。

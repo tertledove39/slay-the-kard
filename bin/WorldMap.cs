@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
+using System.Threading.Tasks;
 
 
 
@@ -204,9 +205,13 @@ public partial class WorldMap : Control
         ConnectHover("store");
         ConnectHover("deck");
 
-        // 世界地图界面的**所有**按钮都响按键音（7 个区域按钮 + store + deck）。
+        // 世界地图界面的**所有**按钮都响按键音（7 个区域按钮 + store + deck + 设置）。
         // 递归挂载而不是逐个写名字：以后在场景里加按钮不用回来补这一行。
         UiClickSound.AttachAll(this);
+
+        // 左上角的设置按钮：与 ESC 同一个入口（见 OpenPauseMenu）
+        var settingsBtn = GetNodeOrNull<Button>("SettingsButton");
+        if (settingsBtn != null) settingsBtn.Pressed += OpenPauseMenu;
 
         RefreshAreaStates();
     }
@@ -280,6 +285,16 @@ public partial class WorldMap : Control
 
     public override void _Input(InputEvent @event)
     {
+        // ESC 开关暂停菜单（设置 / 放弃 / 保存并退出）。菜单自己开着时由它处理 ESC，
+        // 所以这里只在**没开**的时候响应，不会一按就开了又关。
+        if (@event is InputEventKey escEvent && escEvent.Pressed && !escEvent.Echo
+            && escEvent.Keycode == Key.Escape && !PauseMenu.IsOpen)
+        {
+            OpenPauseMenu();
+            AcceptEvent();
+            return;
+        }
+
         // 按 ` 键切换控制台，吞掉事件防止字符残留
         if (@event is InputEventKey keyEvent && keyEvent.Pressed && keyEvent.Keycode == Key.Quoteleft)
         {
@@ -566,6 +581,56 @@ public partial class WorldMap : Control
     {
         _eventOverlayActive = false;
         DismissChooseMission();
+    }
+
+    // ============================ 暂停菜单 ============================
+
+    /// <summary>
+    /// 打开暂停菜单（ESC 或左上角的设置按钮）。与战斗那边**共用同一个菜单场景**，
+    /// 差别只在传进去的两个动作：这里是「放弃 / 保存并退出」。
+    ///
+    /// 打开期间锁住区域按钮（`_eventOverlayActive` 复用同一套判定，
+    /// 它本来就在 `OnAreaPressed` 开头挡着），关掉时解锁。
+    /// </summary>
+    private void OpenPauseMenu()
+    {
+        if (PauseMenu.IsOpen) return;
+
+        bool overlayBefore = _eventOverlayActive;
+        _eventOverlayActive = true;
+
+        PauseMenu.Show(this,
+            action1: new PauseAction
+            {
+                Text = "放弃",
+                ConfirmText = "放弃会**删掉这个存档**并回到主界面，本局进度不再保留。确定吗？",
+                OnPressed = AbandonAsync,
+            },
+            action2: new PauseAction
+            {
+                Text = "保存并退出",
+                OnPressed = SaveAndQuitAsync,
+            },
+            onClosed: () => _eventOverlayActive = overlayBefore);
+    }
+
+    /// <summary>
+    /// **放弃**：删档 + 重置整局进度 + 回主界面。
+    /// 重置进度不是可选项——不重置的话「继续」会因为没有存档而不可用，
+    /// 但内存里的卡组/区域还留着上一局的，从开始按钮进来就是脏状态。
+    /// </summary>
+    private async Task AbandonAsync()
+    {
+        SaveManager.Delete();
+        BattleStateManager.ResetCampaignProgress();
+        await SceneLoader.ChangeSceneAsync(this, "res://bin/start_menu.tscn");
+    }
+
+    /// <summary>**保存并退出**：把世界地图的状态写盘，然后回主菜单。</summary>
+    private async Task SaveAndQuitAsync()
+    {
+        SaveManager.Save();
+        await SceneLoader.ChangeSceneAsync(this, "res://bin/start_menu.tscn");
     }
 
     /// <summary>只关闭面板、保留本次抽到的任务——供「返回」按钮使用。</summary>

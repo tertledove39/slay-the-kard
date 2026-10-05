@@ -147,6 +147,22 @@ SwaySecondsPerCycle = 4.0
 | 事件 | `bin/event.ini` |
 | 背景音乐槽位 `[music]` 与音效槽位 `[sfx]` | `configs/music.ini` |
 | 设置项与音量滑块 | `bin/setting.ini` |
+| **本局存档**（单存档位，运行时生成、不在仓库里） | `user://save.cfg` |
+
+### 存档 / 读档约定
+
+- **存档只有一份**（`user://save.cfg`），由一个 `SaveManager` 统一读写。**不要再开第二份序列化**。
+- 存的是 `BattleStateManager` 的**本局进度** + 一个**战斗 id**（`SelectedEnemy`，如 `berlin`）。
+  读档靠 `IsCampaignMode` 判断回哪：真 → `bin/battleField.tscn`，假 → `bin/worldMap.tscn`。
+- **战斗内的棋盘不还原**（手牌、场上单位、指挥点）。读档是**重新打这一场**，
+  不是从半途接着下——老板要的是「保存战斗的 id」，那就只存 id。
+- **「当前抽到的那三个任务」不进存档**：它是 `WorldMap` 的瞬时交互状态
+  （`_drawnArea` / `_drawnIds`，关面板或离开地图就作废）。真正的进度——烈度、解锁、
+  血量、物资、卡组、商店——全都存。读档后那三个选项重新抽一次。
+- **认输不要另写一套失败流程**：把玩家总部防御打到 0、再 `await CheckIfAnyUnitDiedAsync()`
+  即可，扣血规则/结算面板/血尽重置都已经在 `RemoveCard(myHq)` 那条链路上。
+  复制一套的话，以后改血量规则就会漏掉认输这条路。
+- 烈度是在**战斗结束时**消耗的，所以认输之后这一场照样算数、不会被白打。
 
 ---
 

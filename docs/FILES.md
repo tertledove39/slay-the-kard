@@ -20,6 +20,10 @@
 | StoreHpShop.cs | 商店「买血」入口（`Store` 的 partial 部分；拆出来是因为 Store.cs 加上这块会破 300 行的红线） |
 | bin/ConsoleStyle.cs | 调试控制台的外观（战斗与世界地图共用）：浅黑色、非圆角、无边框。原先两个文件各写了一遍同样的样式，现收敛到这一处 |
 | bin/UiClickSound.cs | **按键音**的统一入口（`[sfx] button`）。`AttachAll(root)` 递归给界面里所有按钮挂上，`Attach(button)` 给单个按钮挂。世界地图界面（9 个按钮）+ 战斗界面的「下一回合」用它；播放委托给 `MusicManager.PlaySfx` |
+| bin/SaveManager.cs | **存档 / 读档**（单存档位，`user://save.cfg`）。存的是 `BattleStateManager` 的本局进度 + 一个战斗 id（`SelectedEnemy`，如 berlin）——读档靠 `IsCampaignMode` 判断回战斗还是回世界地图。**战斗内的棋盘不还原**，读档是重打这一场 |
+| bin/UiConfirm.cs | **二次确认弹窗**的唯一实现（`ConfirmationDialog` 没有 await 形式，用 `TaskCompletionSource` 把「确定/取消/关闭」三个信号收成一个 Task）。暂停菜单的「认输/放弃」与主菜单的覆盖确认都用它 |
+| bin/SettingRow.cs | **设置行的唯一实现**（名称 + 滑条 + 数值）。设置界面与暂停菜单共用；改完走 `SettingsManager.SetFloat`，立即生效并落盘 |
+| bin/PauseMenu.cs / bin/pause_menu.tscn | **暂停菜单**：音量区 + 两个**由调用方传入**的动作。战斗传「认输/保存并退出」、世界地图传「放弃/保存并退出」——一个菜单服务两个界面 |
 | bin/EventEffectRunner.cs | 事件选项效果的解析与执行（从 EventScene 拆出） |
 | bin/EventCardPreview.cs | 事件选项的「会加入哪些卡」悬浮预览（只画卡，无底板无边框无文字）；场景在 bin/event_card_preview.tscn |
 | bin/event_card_preview.tscn | 上述预览面板的场景 |

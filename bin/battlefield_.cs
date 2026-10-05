@@ -529,6 +529,9 @@ Player player1;
 Player player2;
     private cardBase_ myHq;
 
+    /// <summary>左上角的设置按钮（场景里的 `SettingsButton`）。与 ESC 走同一个入口。</summary>
+    private Button settingsButton;
+
     /// <summary>
     /// 检查卡牌是否在合法区域内
     /// </summary>
@@ -602,6 +605,14 @@ private const int OpeningHandSize = 5;
         buttonNextTurn           = GetNode<TextureButton>("NextTurnButton");
         // 「下一回合」按下时响一声按键音（战斗界面里只有它用这个音）。
         UiClickSound.Attach(buttonNextTurn);
+
+        // 左上角的设置按钮：与 ESC 同一个入口（见 OpenPauseMenu）
+        settingsButton = GetNodeOrNull<Button>("SettingsButton");
+        if (settingsButton != null)
+        {
+            settingsButton.Pressed += OpenPauseMenu;
+            UiClickSound.Attach(settingsButton);
+        }
 
         // 初始化卡组：优先复用WorldMap已缓存的卡牌数据，避免重复解析card.ini
         if (BattleStateManager.IsCardDataCached)
@@ -1548,6 +1559,17 @@ InputState currentInputState = InputState.nil;
 
     public override void _Input(InputEvent @event)
     {
+    // ESC 开关暂停菜单（设置 / 认输 / 保存并退出）。
+    // 菜单自己开着的时候由它处理 ESC（`PauseMenu._Input` 先 AcceptEvent），
+    // 所以这里只在**没开**的时候响应，不会一按就开了又关。
+    if (@event is InputEventKey escEvent && escEvent.Pressed && !escEvent.Echo
+        && escEvent.Keycode == Key.Escape && !PauseMenu.IsOpen)
+    {
+        OpenPauseMenu();
+        AcceptEvent();
+        return;
+    }
+
     // 按`键开关控制台
     if (@event is InputEventKey keyEvent && keyEvent.Pressed && keyEvent.Keycode == Key.Quoteleft)
     {
@@ -3996,6 +4018,71 @@ InputState currentInputState = InputState.nil;
         card.Dead();
         RefreshAllBeGuardianedStatus();
         _displayOrderDirty = true;
+    }
+
+    // ============================ 暂停菜单 ============================
+
+    /// <summary>
+    /// 打开暂停菜单（ESC 或左上角的设置按钮，两个入口都走这里）。
+    ///
+    /// 打开期间 `ForbidControl()` 锁住战场输入——菜单盖在上面，底下还能拖牌就乱套了。
+    /// 关掉时 `AllowControl()` 解锁，两个必须成对（`ForbidControl` 是计数的，
+    /// 所以这里只会抵消自己那一次）。
+    /// </summary>
+    private void OpenPauseMenu()
+    {
+        if (PauseMenu.IsOpen) return;
+
+        // 结算/失败面板已经盖住了就不叠第二层（那时 ForbidControl 也早被调过，
+        // 再锁一次会让回合结束时的解锁算错账）。
+        var endNode = GetNodeOrNull<End>("end");
+        if (endNode != null && endNode.Visible) return;
+
+        ForbidControl();
+        PauseMenu.Show(this,
+            action1: new PauseAction
+            {
+                Text = "认输",
+                ConfirmText = "认输会立刻让总部沦陷，并按规则扣血。确定吗？",
+                OnPressed = SurrenderAsync,
+            },
+            action2: new PauseAction
+            {
+                Text = "保存并退出",
+                OnPressed = SaveAndQuitAsync,
+            },
+            onClosed: AllowControl);
+    }
+
+    /// <summary>
+    /// **认输**：把玩家总部防御打到 0，然后走**既有**的死亡判定。
+    ///
+    /// 不另写一套「失败」——`RemoveCard(myHq)` 里那条链路已经管着扣血规则
+    /// （area7 清零 / boss -2 / 其余 -1）、结算面板、以及血尽时的进度重置。
+    /// 复制一套的话，以后改血量规则就会漏掉认输这条路。
+    ///
+    /// 烈度是在**战斗结束时**才消耗的（见 `ReturnToWorldMapAfterVictory`），
+    /// 所以认输之后这一场照样算数，不会被白打。
+    /// </summary>
+    private async Task SurrenderAsync()
+    {
+        if (myHq == null || !IsInstanceValid(myHq) || defeatTransitionStarted) return;
+
+        GD.Print($"[Battle] 认输：{BattleStateManager.SelectedEnemy} 玩家总部防御归零");
+        await myHq.LoseDefence(myHq.ReadDefence());
+        await CheckIfAnyUnitDiedAsync();
+    }
+
+    /// <summary>
+    /// **保存并退出**：把当前进度写盘，然后回主菜单。
+    ///
+    /// 存的是「这一场是哪一场」（`SelectedEnemy`）+ 整个世界地图进度。
+    /// **战斗内的棋盘不存**——读档是重新打这一场，不是从半途接着下（见 `SaveManager`）。
+    /// </summary>
+    private async Task SaveAndQuitAsync()
+    {
+        SaveManager.Save();
+        await SceneLoader.ChangeSceneAsync(this, "res://bin/start_menu.tscn");
     }
 
     private async Task ReturnToStartMenuAfterDefeat()
