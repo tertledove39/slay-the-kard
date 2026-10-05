@@ -33,9 +33,12 @@ public static class EffectRegistry
         // 「弹体场景」与「弹数」——所以这里是两个场景、不是两个类。
         ["bombing"] = "res://effects/bombing_effect.tscn",
         ["flying"] = "res://effects/flying_effect.tscn",
-        // airstrike = 飞掠 + 盘旋时投弹。脚本继承 FlyingEffect，只覆写「停留」那一段，
-        // 所以这里没有第三个实现，只是换了一套 Export。
-        ["airstrike"] = "res://effects/air_strike_effect.tscn"
+        // airstrike = 飞掠 + 投弹；strafe = 飞掠 + 打枪。
+        // 两个场景挂的是**同一个脚本**（AirStrikeEffect），差别只在 Export 出去的
+        // `StrikeEffectName`（bombing / bullet）——所以这里不是两套实现，是两套 Export。
+        // 再加「飞起来干别的」（火箭弹、机枪扫射……）同样只是再加一个场景。
+        ["airstrike"] = "res://effects/air_strike_effect.tscn",
+        ["strafe"] = "res://effects/strafe_effect.tscn"
     };
 
     /// <summary>
@@ -51,7 +54,8 @@ public static class EffectRegistry
     private static readonly HashSet<string> SelfVoicedNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "flying",
-        "airstrike"
+        "airstrike",
+        "strafe"
     };
 
     /// <summary>

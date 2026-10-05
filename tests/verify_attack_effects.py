@@ -13,9 +13,11 @@
   · `bombing` 与 `bullet` **共用 BulletEffect 脚本**，差别只在场景里 Export 出去的
     「弹体场景」与「弹数」——不写第二个类。
   · 弹体池按场景路径分池：子弹与航弹混在一个队列里会串味。
-  4) 新增 `airstrike`：投弹要**夹在飞掠中间**（起飞 → 投弹 → 降落）。
+  4) 新增 `airstrike`：子特效要**夹在飞掠中间**（起飞 → 打 → 降落）。
      拼接写法做不到这一点，所以 `AirStrikeEffect` 继承 `FlyingEffect`
-     并只覆写「停留」那一段，运动代码仍只有一份。
+     并只覆写 `DuringRiseAsync`，运动代码仍只有一份。
+  5) 新增 `strafe`：与 `airstrike` 同脚本同节奏，只把子特效从 `bombing` 换成 `bullet`。
+     **「其他不变」由「两个场景的非注释行做差集只差子特效名」这条断言守着。**
 
 关于中文注释的落点：`.tscn` 里的 `;` 注释**留不住**——在 Godot 编辑器里保存一次
 就会被整段抹掉，取值恰好等于 C# 默认值的属性也会被省略。所以本测试把中文说明
@@ -484,6 +486,34 @@ def main():
         results.append(check(rel is not None
                              and "AudioStreamPlayer" in (ROOT / rel.replace("res://", "")).read_text(encoding="utf-8"),
                              f"{name} 确实自带播放器（不是写了个空名字）"))
+
+    # ==================== ⑥ strafe 扫射（飞掠 + 打枪） ====================
+    # 「起飞后发射子弹」不是新动画，只是 airstrike 换了个子特效——
+    # AirStrikeEffect 的 StrikeEffectName 本来就是「起飞时打什么」的开关。
+    # 这一节钉住「**同一份脚本、只换 Export**」，防止有人又写第二个类。
+    print("\n--- ⑥ strafe 扫射（飞掠 + 打枪）---")
+    strafe_scene = (ROOT / "effects" / "strafe_effect.tscn").read_text(encoding="utf-8")
+    results.append(check("strafe" in paths, "注册了 strafe"))
+    results.append(check('path="res://core_logic/AirStrikeEffect.cs"' in strafe_scene,
+                         "strafe 复用 AirStrikeEffect 脚本（不写第二个类）"))
+    results.append(check('StrikeEffectName = "bullet"' in strafe_scene,
+                         "子特效换成 bullet（起飞即打枪）"))
+    results.append(check("SwaySecondsPerCycle = 0.5" in strafe_scene,
+                         "盘旋时间与 airstrike 一致"))
+    # 「其他不变」：两个场景除了 StrikeEffectName 应当**完全一样**
+    airstrike_lines = {l for l in airstrike_scene.split("\n") if l.strip() and not l.startswith(";")}
+    strafe_lines = {l for l in strafe_scene.split("\n") if l.strip() and not l.startswith(";")}
+    only_airstrike = airstrike_lines - strafe_lines
+    only_strafe = strafe_lines - airstrike_lines
+    results.append(check(all("StrikeEffectName" in l or "node name=" in l for l in only_airstrike | only_strafe),
+                         f"两个场景只差子特效名与节点名（airstrike 独有: {only_airstrike}；strafe 独有: {only_strafe}）"))
+    results.append(check('"strafe"' in method(effect, "HashSet<string> SelfVoicedNames",
+                                              "public static bool ReplacesFiringSound"),
+                         "strafe 也算自带音效（与 airstrike 同规格，不叠通用开火声）"))
+    card_ini = CARD_INI.read_text(encoding="utf-8-sig")
+    # 取固定长度窗口：按 `[` 切会切到段标题自己那一个（它就以 `[` 开头）
+    donkey = card_ini[card_ini.index("[毛驴]"):][:400]
+    results.append(check("attackEffect = strafe" in donkey, "毛驴改用 strafe"))
 
     # ==================== 弹体池 ====================
     print("\n--- 弹体池按场景路径分池 ---")

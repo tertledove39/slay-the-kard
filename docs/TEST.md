@@ -761,6 +761,26 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 `if(cardInPlaces== null) return null;`，按 `return null;` 切会当场截断。
 **切片要按内容定位，或者干脆取固定长度窗口。**
 
+### 第八轮调整（新增 `strafe` 扫射）
+
+要求：新增一种攻击动画——把「起飞投弹」换成「起飞后发射子弹」，其他不变；毛驴改用它。
+
+**一行 C# 都没改。** `AirStrikeEffect.StrikeEffectName` 本来就是「起飞时打什么」的开关
+（当初把它做成 `[Export]` 就是为了这一天），所以新动画 = **新场景 + 改 `card.ini` 一个值**：
+
+- 新建 `effects/strafe_effect.tscn`，挂 `AirStrikeEffect` 脚本，`StrikeEffectName = "bullet"`；
+- `EffectRegistry.ScenePaths` 加 `["strafe"]`；`SelfVoicedNames` 加 `"strafe"`（与 `airstrike` 同规格）；
+- 毛驴（`cards/card.ini`，战斗机，攻击 2）`attackEffect = bullet` → `strafe`。
+
+测试里那两条是重点：
+
+- **「两个场景只差子特效名与节点名」**：把两个 `.tscn` 的非注释行做差集，除了
+  `StrikeEffectName` 与 `[node name=...]`，不该有别的差异。这条断言就是「其他不变」的机器版。
+- `strafe` 场景挂的必须是 `AirStrikeEffect.cs`——防止有人又写第二个类。
+
+> `StrikeEffectName` 与 `FlightEase` 一样，在 `.tscn` 里写错是**静默生效**的，
+> 所以两轮的 Export 值都用临时 GDScript 读出来实测过（`bombing` / `bullet` 各自正确）。
+
 ### 场景里 export 的值要带中文注释
 
 `.tscn` 的导出值在 Inspector 里只显示英文字段名，看不出含义，所以约定在**上一行**写一行

@@ -39,6 +39,7 @@
 | `smoke` | `effects/smoke_effect.tscn` | 在指定位置冒一下烟 |
 | `flying` | `effects/flying_effect.tscn` | 让**触发它的那张卡**升起（`RiseDuration`，只移动位置 + 轻微放大）-> 原地悬停 `SwaySecondsPerCycle × SwayCycles` 秒 -> 落回（`LandDuration`，连角度一起还原），期间抬高层级压住其他卡；音效取 `[sfx] flyby`。**全程不转角度**（`SwayDegrees` 默认 0 = 完全静止悬停；调大才在卡自己的原始角度上左右摆） |
 | `airstrike` | `effects/air_strike_effect.tscn` | **空袭 = 飞掠 + 投弹**：**刚开始起飞就把航弹扔出去** -> 悬停（`SwaySecondsPerCycle = 0.5`，比 `flying` 那个短一半）-> 降落。投的是 `bombing` 子特效，所以弹数仍是攻击力；`StrikeEffectName` 留空则退化成纯飞掠 |
+| `strafe` | `effects/strafe_effect.tscn` | **扫射 = 飞掠 + 打枪**：与 `airstrike` **是同一个脚本、同一套节奏**，只把 `StrikeEffectName` 换成 `bullet`（起飞即打出 10 发子弹）。毛驴用这个 |
 
 `bombing`与`bullet`共用`BulletEffect`脚本，差别只在场景 Export 出去的「弹体场景」与「弹数」——生成、随机错开、回池那套逻辑不写第二遍。
 
@@ -49,13 +50,16 @@
 | `bin/bullet.tscn` | 不写（吃默认 `InOut`） | 起步慢、中间快、**收尾减速**——机枪原来的样子，没动 |
 | `bin/bomb.tscn` | `0`（`In`） | **一直加速、不减速**；`In` 的最快点正好是 tween 结束那一刻，而隐藏就挂在那一刻，所以表现是「到最快时直接消失」 |
 
-`airstrike`与`flying`的关系是**继承**：`AirStrikeEffect : FlyingEffect`，只覆写 `DuringRiseAsync`（= 投弹），升起/悬停/降落/还原/音效全部沿用父类，所以「卡飘起来」这套运动也只有一份实现。三个特效的对应关系：
+`airstrike`与`strafe`是**同一个脚本、两个场景**：`AirStrikeEffect : FlyingEffect`，只覆写 `DuringRiseAsync`（= 起飞时打什么），升起/悬停/降落/还原/音效全部沿用父类。两者**唯一的差别**是 Export 出去的 `StrikeEffectName`（`bombing` / `bullet`）——所以再加「飞起来干别的」（火箭弹等）也只是再加一个场景，**不必写第二个类**。
+
+**特效的对应关系**：
 
 | 想要的节奏 | 写法 |
 |---|---|
 | 只有飞掠 | `attackEffect = flying` |
-| 飞掠与投弹同时开跑（两段各自跑一遍） | `attackEffect = flying,bombing` |
+| 飞掠与投弹同时开跑（两段各自跑一遍，不夹在中间） | `attackEffect = flying,bombing` |
 | 起飞即投弹 -> 悬停 -> 降落 | `attackEffect = airstrike` |
+| 起飞即打枪 -> 悬停 -> 降落 | `attackEffect = strafe` |
 
 单位当前攻击力为0时，主动攻击、普通反击和伏击均不会播放`attackEffect`。攻击力大于0但伤害被重甲或免疫修正为0时仍会播放。
 

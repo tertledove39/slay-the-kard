@@ -94,11 +94,18 @@
 
 ### `AirStrikeEffect` : FlyingEffect (core_logic/AirStrikeEffect.cs)
 
-空袭特效：轰炸机攻击时**刚开始起飞，航弹就一起扔出去**，投完了原地悬停一下再落回桌面。投弹夹在飞掠中间，所以拼接写法（`attackEffect = flying,bombing`）做不到，必须由一个特效自己掌握节奏。
+「飞起来打一下」的特效：卡牌**刚开始起飞，子特效就一起打出去**，打完了原地悬停一下再落回桌面。这一段夹在飞掠中间，所以拼接写法（`attackEffect = flying,bombing`）做不到，必须由一个特效自己掌握节奏。
 
-只覆写 `DuringRiseAsync` = 投弹。投弹本身不在这里实现，而是把 `StrikeEffectName`（默认 `bombing`）当**子特效**播一遍，弹数、飞行时长、错开间隔仍然配在 `effects/bombing_effect.tscn` 里。升起/悬停/降落/还原/飞掠音效全部沿用父类——「卡飘起来」这套运动只有一份实现。
+**一个脚本、两个场景**，靠 Export 的 `StrikeEffectName` 区分（与 `bullet`/`bombing` 共用 `BulletEffect` 是同一个套路）：
 
-> 投弹最初挂在 `StayAsync`（等起飞演完才投），实机反馈「炮弹发射得太晚」——起飞那一段有整整一秒。现在挂到 `DuringRiseAsync`，卡刚一离地航弹就已经在飞了。
+| 场景 | `StrikeEffectName` | 表现 |
+|------|--------------------|------|
+| `effects/air_strike_effect.tscn`（`airstrike`） | `bombing` | 起飞即**投弹**，弹数 = 攻击力 |
+| `effects/strafe_effect.tscn`（`strafe`） | `bullet` | 起飞即**打枪**，固定 10 发 |
+
+只覆写 `DuringRiseAsync`。子特效本身不在这里实现，而是从 `EffectRegistry` 取出来播一遍，弹数/飞行时长/错开间隔仍然配在各自那个场景里。升起/悬停/降落/还原/飞掠音效全部沿用父类——「卡飘起来」这套运动只有一份实现。
+
+> 子特效最初挂在 `StayAsync`（等起飞演完才打），实机反馈「炮弹发射得太晚」——起飞那一段有整整一秒。现在挂到 `DuringRiseAsync`，卡刚一离地弹就已经在飞了。
 
 ### `SmokeEffect` : Effect (core_logic/SmokeEffect.cs)
 
