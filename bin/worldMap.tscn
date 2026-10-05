@@ -113,20 +113,18 @@ label_settings = SubResource("LabelSettings_cs12g")
 
 [node name="store" type="Button" parent="."]
 layout_mode = 0
-offset_left = 1401.0
-offset_top = 91.0
-offset_right = 1553.0
-offset_bottom = 159.0
+offset_left = 1447.0
+offset_right = 1599.0
+offset_bottom = 68.0
 theme_override_font_sizes/font_size = 40
-text = "store"
+text = "军需处"
 
 [node name="deck" type="Button" parent="."]
 layout_mode = 0
-offset_left = 1401.0
-offset_top = 182.0
-offset_right = 1550.0
-offset_bottom = 240.0
-theme_override_font_sizes/font_size = 30
+offset_left = 1296.0
+offset_right = 1447.0
+offset_bottom = 68.0
+theme_override_font_sizes/font_size = 40
 text = "卡组"
 
 [node name="pointPic" type="Sprite2D" parent="."]
@@ -142,10 +140,10 @@ texture = ExtResource("7_hearts")
 
 [node name="hpNum" type="Label" parent="."]
 layout_mode = 0
-offset_left = 86.0
-offset_top = 118.0
-offset_right = 212.0
-offset_bottom = 179.0
+offset_left = 84.0
+offset_top = 115.0
+offset_right = 210.0
+offset_bottom = 176.0
 text = "5"
 label_settings = SubResource("LabelSettings_cs12g")
 

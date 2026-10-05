@@ -80,7 +80,7 @@
 | 区域池 | `bin/AreaPool.ini` |
 | 玩家初始卡组 | `bin/deck.ini` |
 | 事件 | `bin/event.ini` |
-| 背景音乐槽位 | `configs/music.ini` |
+| 背景音乐槽位 `[music]` 与音效槽位 `[sfx]` | `configs/music.ini` |
 | 设置项与音量滑块 | `bin/setting.ini` |
 
 ---

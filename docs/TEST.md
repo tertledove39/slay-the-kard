@@ -511,3 +511,45 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
   `FriendlyCardDrawn` 已消失。另断言 `AnimateCostRoll` 的 `IsInsideTree()` 保护
   排在 `GetNode<Label>("cost")` **之前**——牌堆里的卡不在场景树上，
   这层保护放晚了照样空引用。
+
+## 时点触发后的死亡检查
+
+测试脚本：`tests/verify_trigger_death_check.py`（14 条）。
+
+实机反馈：「场上有女狙击手，打出一张机动防御之后，有单位变成 0 血但是没死亡」。
+
+`ExecuteCommandAndDiscard` 里的死亡检查排在时点**之前**，只覆盖了指令自身的效果；
+而 `damage(n)` 是缓存型变更，时点跑完时目标防御已经是 0，只是没人再查一次。
+
+- **修复点**：断言 `FriendlyCommandPlayed` 时点之后**还有一次** `CheckIfAnyUnitDiedAsync()`
+  （用 `rindex` 取最后一次——第一次排在时点之前是正常的，两次都要在）。
+- **观察点**：解析 `card.ini` 的 `[女狙击手]`，断言它确实挂在 `FriendlyCommandPlayed` 上、
+  效果里带 `damage(` 且目标取自 `GetRandomEnemyTarget`（即「能打死人」且必须靠死亡检查收尾）。
+- **邻居防回归**：`Move()` 的 `Moving` 时点、`AddCardToPlace()` 的 `FriendlyUnitEnteringField`
+  时点，都断言「先 `ResumeDeathCheck()` 再查死亡」，防止重构时被删掉。
+- **已知缺口留痕**：断言 `TriggerFriendlyCardDrawn` 仍是发后不理，且该缺口已写进
+  `docs/BUGS.md` 第 49 条。这样一旦有人修好它，测试会提醒同步文档。
+
+## 阵亡爆炸音效随机池
+
+测试脚本：`tests/verify_explosion_sfx.py`（21 条）。
+
+需求：爆炸音效改成在 `assest/爆炸3.wav`～`爆炸21.wav` 里随机播，**下划线开头的不要用**
+（`_爆炸16` / `_爆炸17` / `_爆炸19` 是未采用的版本）。
+
+实现复用了 `configs/music.ini` 已有的「槽位 + 逗号分隔 + 随机抽一条」机制，
+音效放在独立的 `[sfx]` 段，与 BGM 的「播完再切」调度分开。
+
+- **规则不许漂**：不写死 16 个文件名，而是**按需求规则现算**——扫 `assest/` 取
+  `爆炸3`～`爆炸21`、排除下划线开头的，再断言配置里的清单与现算结果**完全相等**。
+  这样「删了文件忘了改配置」「加了新音没配进去」「不小心把 `_爆炸16` 列进来」三种情况都会红。
+- **两层排除**：既断言清单里没有 `_` 前缀项，也断言那些 `_` 文件确实存在于磁盘上
+  （证明这条规则不是在空跑）。
+- **复用而非重写**：断言 `[music]` 与 `[sfx]` 走同一个 `LoadSection`，
+  防止有人给音效另写一份 ini 解析。
+- **失败要退而不哑**：断言 `PickSfx` 在槽位缺失/加载失败时返回 `null`，
+  且 `PlayDeadSound` 只在非 null 时才覆盖 `Stream`——否则一次配置写错会让爆炸彻底没声音。
+- **顺带一类错**：遍历全项目 `.tscn` 的 `AudioStream` 外部引用，断言目标文件都存在。
+  `battleField.tscn` 曾引用不存在的 `res://assest/机枪.wav`（实际只有 `机枪_低.wav` /
+  `机枪_高.wav`），Godot 只在控制台报一行 `Resource file not found`，游戏照跑，
+  很容易被忽略。

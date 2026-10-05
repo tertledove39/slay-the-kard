@@ -2,13 +2,13 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://bnmjyfgrpscsr"
-path="res://.godot/imported/机枪2.wav-88073bdbdf13272c61ca0e4bb1290ccf.sample"
+uid="uid://djeflaill3fkb"
+path="res://.godot/imported/大火炮.wav-3b2e8460641bf8907f44a864742ebc69.sample"
 
 [deps]
 
-source_file="res://assest/机枪2.wav"
-dest_files=["res://.godot/imported/机枪2.wav-88073bdbdf13272c61ca0e4bb1290ccf.sample"]
+source_file="res://assest/大火炮.wav"
+dest_files=["res://.godot/imported/大火炮.wav-3b2e8460641bf8907f44a864742ebc69.sample"]
 
 [params]
 

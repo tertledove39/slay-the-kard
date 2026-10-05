@@ -2,13 +2,13 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://53li202hb7gj"
-path="res://.godot/imported/爆炸16.wav-0349913fcc4cf88aa1039a39014b8e98.sample"
+uid="uid://4jfpen8mihy8"
+path="res://.godot/imported/_爆炸17.wav-442455eca019121e1360f517b5afa95b.sample"
 
 [deps]
 
-source_file="res://assest/爆炸16.wav"
-dest_files=["res://.godot/imported/爆炸16.wav-0349913fcc4cf88aa1039a39014b8e98.sample"]
+source_file="res://assest/_爆炸17.wav"
+dest_files=["res://.godot/imported/_爆炸17.wav-442455eca019121e1360f517b5afa95b.sample"]
 
 [params]
 

@@ -2,13 +2,13 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://bewqf6jympe8i"
-path="res://.godot/imported/爆炸17.wav-55976bc93426e683ba983aeac9ec5039.sample"
+uid="uid://bncj8rlyn1ae1"
+path="res://.godot/imported/机枪_高.wav-ac6f1137a60dae2525a9da8cb9802095.sample"
 
 [deps]
 
-source_file="res://assest/爆炸17.wav"
-dest_files=["res://.godot/imported/爆炸17.wav-55976bc93426e683ba983aeac9ec5039.sample"]
+source_file="res://assest/机枪_高.wav"
+dest_files=["res://.godot/imported/机枪_高.wav-ac6f1137a60dae2525a9da8cb9802095.sample"]
 
 [params]
 

@@ -208,9 +208,9 @@ public partial class ChooseMission : Control
         var eventData = BattleStateManager.GetEvent(eventId);
         if (eventData == null) return;
 
+        // 事件期间收起本面板、锁住区域按钮等等，都由 EventScene 自己通过
+        // WorldMap.EnterEventOverlay / ExitEventOverlay 负责（它会沿父链找到世界地图）。
+        // 这里不要再自己关一次——同一个职责两处实现，改一处就会漏一处。
         await EventScene.Show(this, eventData, _areaName);
-
-        if (GetParent() is WorldMap wm)
-            wm.DismissChooseMission();
     }
 }

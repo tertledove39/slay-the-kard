@@ -39,18 +39,36 @@ public partial class EventScene : CanvasLayer
 
         // 事件期间收起任务选择面板，但**保留**本次抽到的那一批（走 CloseMissionPanel
         // 而不是 Dismiss）：事件结束后玩家回到地图，看到的还是同样三个选项。
-        if (parent is WorldMap map)
-            map.EnterEventOverlay();
+        //
+        // ⚠️ 这里必须**向上找** WorldMap，不能写 `parent is WorldMap`：
+        // 事件的开场是 ChooseMission.StartEvent → EventScene.Show(this, ...)，
+        // 传进来的 parent 是**任务选择面板**而不是世界地图，直接判类型会永远为 false，
+        // 面板收不起来、区域按钮也锁不住（暗幕已改成不拦鼠标，点击就会穿透过去）。
+        var map = FindWorldMap(parent);
+        map?.EnterEventOverlay();
 
         bool campaignCompleted = await scene.Run(eventData, areaName);
         scene.QueueFree();
 
         // 事件结算完毕才丢弃这一批——烈度已经被这次事件消耗掉了
-        if (parent is WorldMap wm)
-            wm.ExitEventOverlay();
+        map?.ExitEventOverlay();
 
         if (campaignCompleted)
             await CampaignVictory.ShowAndReturnToMenu(parent);
+    }
+
+    /// <summary>
+    /// 从任意节点向上找所属的世界地图。事件叠层的调用方可能是世界地图本身，
+    /// 也可能是它下面的任务选择面板，所以要沿父链找而不是直接判类型。
+    /// </summary>
+    private static WorldMap FindWorldMap(Node from)
+    {
+        for (var node = from; node != null; node = node.GetParent())
+        {
+            if (node is WorldMap map)
+                return map;
+        }
+        return null;
     }
 
     /// <summary>

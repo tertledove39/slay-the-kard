@@ -104,7 +104,7 @@
 | `GetEffect("effectString")` | 为targets附加效果字符串 |
 | `AddTrait(name)` / `RemoveTrait(name)` | 添加/移除targets特性 |
 | `Refresh` | 刷新targets的行动次数 |
-| `Retreat` | 使targets撤退（前线→支援线，支援线→手牌/弃牌） |
+| `Retreat` | 使targets撤退（前线→支援线，支援线→手牌/弃牌）。**总部会被拒绝**——这是唯一能把场上卡变成手牌卡的出口，总部一旦进手牌就可能被「随机弃一张手牌」弃掉并直接判负 |
 | `Discard` | 标记targets为待弃置 |
 | `DiscardWithTarget` | 弃置targets（支持手牌，直接播放弃牌动画） |
 | `drawCard` | 抽result张卡（最少1张） |
@@ -573,6 +573,19 @@ battleStart=myHq|heal(&hp*10)[icon=heal,description=开局:每有1条命,友方�
 | BeingAddedToField | 单位被加入战场时 |
 | BePicked | 被指向（被选为目标时） |
 | FriendlyCommandPlayed | 友方打出指令时（在 `ExecuteCommandAndDiscard` 中、该指令自身效果结算之后触发） |
+
+> ⚠️ **时点里的效果一样能打死人，跑完时点必须有人做死亡检查。**
+> `damage()` / `Heal()` 一类是**缓存型变更**，由 `ParseAndExecuteEffect` 末尾的
+> `ExecuteChangeLists()` 落地——所以时点跑完时目标防御可能已经是 0，但**单位不会自己死**，
+> 必须由调用方 await `CheckIfAnyUnitDiedAsync()`。
+> `[女狙击手]` 的 `FriendlyCommandPlayed:GetRandomEnemyTarget|damage(2)` 就栽在这上面：
+> `ExecuteCommandAndDiscard` 里的死亡检查排在时点**之前**，于是单位顶着 0 防杵在场上
+> （见 `BUGS.md` 第 48 条）。新增「会造成伤害的时点」时，务必确认时点之后有检查。
+>
+> 已经写对的参照：`Move()`（`Moving` 时点 → `ResumeDeathCheck()` → 查死亡）、
+> `AddCardToPlace()`（`FriendlyUnitEnteringField` 之后同样）。
+> `TriggerFriendlyCardDrawn()`（`FriendlyCardDrawn:` 时点）原先也是发后不理、之后无人查死亡，
+> 已一并改为 `async Task` 并在时点后补检查，见 `BUGS.md` 第 49 条。
 
 **前缀必须与上表逐字一致（含大小写）。** `TriggerUnitEffects` 的判定是：
 

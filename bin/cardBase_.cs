@@ -180,6 +180,16 @@ public partial class cardBase_ : Control
             attackAble = 0;
         }
 
+        // 已宣布弃置、正等着死亡检查移除的单位，不能因为回合刷新又「复活」。
+        // RetreatUnit 是先 DisableCombatAbility + 挂待弃置标记，而敌方回合开头的
+        // RefreshCardsInField(enemy) 跑在死亡检查之前——不挡这一下，被撤退的敌方单位
+        // 会被刷回 attackAble = 1，AI 照样把它派出去打你一下。
+        if (shouldBeRemoved == 1)
+        {
+            moveAble = 0;
+            attackAble = 0;
+        }
+
         UpdateMoveableLight();
     }
     
@@ -991,6 +1001,29 @@ public partial class cardBase_ : Control
         hasMobilize = HasTrait(UnitTraits.Mobilize);
         hasAmbushActive = HasTrait(UnitTraits.Ambush);
 
+        // ===== 生命周期状态必须归零 =====
+        // SetCardInformation 是每张卡唯一的初始化入口——**对象池取回的卡
+        // （ResourceManager.AcquireEmptyCard*）与 GetCardTemplate().Duplicate() 出来的卡
+        // 都要走这里**。原先它只重置数值，这两项会被带着走：
+        //   · shouldBeRemoved 残留 1：手牌也在 cardInPlaces 里（AddCardToHand 会调
+        //     AddToBattleField），下一次死亡检查就会把它当成「待弃置」弃掉并移除。
+        //     表现就是「打着打着场上的卡莫名被弃」。
+        //   · isDiscarding 残留 true：RefreshAllCardDisplayOrder 会一直跳过它，
+        //     表现就是「弃牌之后卡不会回正」。
+        shouldBeRemoved = 0;
+        isDiscarding = false;
+        ChangeList.Clear();
+
+        // ===== 属性文字的颜色必须由本实例独占 =====
+        // 三个属性 Label 的 LabelSettings 是从 cardbase.tscn 实例化的子资源，而
+        // GetCardTemplate().Duplicate()（卡组重建、战后奖励都走它）会让多张卡共用同一份。
+        // FlashAttributeWithColor 是**直接改 LabelSettings.FontColor** 的，于是改一张就连累
+        // 全部——「打出标准弹药后，卡牌奖励里的 cost 全变绿、数值却没变」正是这么来的。
+        // 这里给三个 Label 各复制一份，从根上杜绝串色。
+        OwnAttributeLabelSettings("attack");
+        OwnAttributeLabelSettings("defence");
+        OwnAttributeLabelSettings("cost");
+
         // 初始化历史追踪值
         initialAttack = attack;
         initialDefence = defence;
@@ -1009,6 +1042,23 @@ public partial class cardBase_ : Control
 /// <summary>
 /// 将内存中的状态和现实出来的刷新一下，一般用于卡牌信息改变的时候
 /// </summary>
+    /// <summary>
+    /// 让某个属性 Label 持有自己独占的 LabelSettings 副本。
+    ///
+    /// 见 `SetCardInformation` 里的说明：卡牌的 LabelSettings 可能被多张卡共用
+    /// （`GetCardTemplate().Duplicate()` 出来的卡组卡与奖励卡就是共用的），
+    /// 而 `FlashAttributeWithColor` 直接改 `LabelSettings.FontColor`，
+    /// 不先变成独占副本就会「一张卡改色、全体跟色」。
+    /// </summary>
+    private void OwnAttributeLabelSettings(string labelName)
+    {
+        var label = GetNodeOrNull<Label>(labelName);
+        if (label?.LabelSettings == null)
+            return;
+
+        label.LabelSettings = label.LabelSettings.Duplicate() as LabelSettings;
+    }
+
     /// <summary>
     /// 根据traits位标记自动合成加黑描述前缀。不包含效果描述，仅trait名。
     /// </summary>
@@ -1792,6 +1842,12 @@ public partial class cardBase_ : Control
       /// </summary>
     private async void FlashAttributeWithColor(string attributeName, int currentValue, int initialValue, int extremeValue, bool isInverted = false)
     {
+        // 不在场景树上的卡（牌堆里的卡就是这种）不做任何视觉动作。
+        // 它们的数值照改不误，但改色是纯展示行为：既没人看得见，
+        // 而 LabelSettings 又可能是跨卡共享的，改了只会连累别的卡。
+        if (!IsInsideTree())
+            return;
+
           // 根据属性名获取对应的Label节点
         Label targetLabel = attributeName switch
         {

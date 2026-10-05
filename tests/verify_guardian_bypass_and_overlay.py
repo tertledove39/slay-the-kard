@@ -73,8 +73,21 @@ def main():
     print("\n--- ⑥ 事件期间允许查看商店与卡组 ---")
     results.append(check("bg.MouseFilter = Control.MouseFilterEnum.Ignore;" in event,
                          "事件暗幕不再拦鼠标"))
-    results.append(check("map.EnterEventOverlay();" in event, "进事件时通知世界地图"))
-    results.append(check("wm.ExitEventOverlay();" in event, "事件结算后交还"))
+    results.append(check("map?.EnterEventOverlay();" in event, "进事件时通知世界地图"))
+    results.append(check("map?.ExitEventOverlay();" in event, "事件结算后交还"))
+
+    # 关键回归：事件的开场是 ChooseMission.StartEvent → Show(this, ...)，
+    # 传进来的 parent 是任务选择面板而不是世界地图，直接判 `parent is WorldMap` 恒为 false，
+    # 面板收不起来、区域按钮也锁不住。必须沿父链向上找。
+    results.append(check("private static WorldMap FindWorldMap(Node from)" in event,
+                         "用 FindWorldMap 沿父链找世界地图"))
+    results.append(check("var map = FindWorldMap(parent);" in event, "Show 里走 FindWorldMap"))
+    # 只看真正的代码行，注释里为了说明原因保留了这个写法的名字
+    event_code = "\n".join(l for l in event.split("\n") if not l.lstrip().startswith("//"))
+    results.append(check("parent is WorldMap" not in event_code,
+                         "代码里不再直接判 parent 的类型（那正是这次翻车的写法）"))
+    results.append(check("for (var node = from; node != null; node = node.GetParent())" in event,
+                         "FindWorldMap 逐级向上"))
 
     results.append(check("private bool _eventOverlayActive;" in world, "世界地图有事件期状态位"))
     enter = world[world.index("public void EnterEventOverlay()"):world.index("public void ExitEventOverlay()")]

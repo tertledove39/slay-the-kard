@@ -129,6 +129,14 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 | 大小写 | 槽位名忽略大小写 |
 | 注释 | 只能用分号`;`；`iniHandler`不把`#`当注释，含`=`的`#`行会成为垃圾键 |
 
+#### `[sfx]` 段：音效槽位
+
+与`[music]`**同格式**（逗号分隔、随机抽一条），区别只在语义：音效没有「播完再切」的调度，**每次播放各抽一条**。代码走`MusicManager.PickSfx(slot)`，返回`AudioStream`（带缓存，不重复读盘），调用方自己赋值给`AudioStreamPlayer.Stream`再播。
+
+- `dead`：单位阵亡时的爆炸音效。素材范围是`assest/爆炸3.wav`～`爆炸21.wav`，**下划线开头的未采用版本不列入**（`_爆炸16`/`_爆炸17`/`_爆炸19`）
+
+调用方：`battlefield_.PlayDeadSound()`，槽位名常量是`DeadSfxSlot`。抽不到（槽位没配/加载失败）时保留场景里原有的那条，不会变成没声音。
+
 完整说明见`docs/MUSIC.md`。
 
 ### bin/setting.ini

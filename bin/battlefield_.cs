@@ -122,6 +122,9 @@ public partial class battlefield_ : Control
     /// <summary>撤退结算后、交给死亡检查前的缓冲（毫秒）。</summary>
     private const int RetreatSettleDelayMs = 100;
 
+    /// <summary>阵亡爆炸音效所在的音效槽位名，对应 configs/music.ini 的 [sfx] 段。</summary>
+    private const string DeadSfxSlot = "dead";
+
     /// <summary>
     /// 多张单位卡被同时弃置时，卡与卡之间错开的起飞间隔（秒）。
     /// `cardBase_.DiscardCard()` 单张就要 3.5 秒（飞入1 + 停留1 + 飞出1.5），
@@ -895,11 +898,21 @@ private const int OpeningHandSize = 5;
     }
 
 /// <summary>
-/// 播放死亡音效
+/// 播放死亡音效（单位阵亡的爆炸声）。
+///
+/// 音效不再是场景里写死的那一条：每次播放从 `configs/music.ini` 的 `[sfx] dead`
+/// 槽位里随机抽一条爆炸 wav（清单里已排除下划线开头的未采用版本）。
+/// 抽不到（槽位没配 / 加载失败）就保持场景里原有的那条，不会变成没声音。
 /// </summary>
 /// <param name="id"></param>
     void PlayDeadSound(int id)
     {
+        var stream = MusicManager.Instance?.PickSfx(DeadSfxSlot);
+        if (stream != null)
+        {
+            deadSound.Stream = stream;
+        }
+
         //if (deadSound.Playing != true)
         {
             deadSound.Play();
@@ -1922,9 +1935,20 @@ InputState currentInputState = InputState.nil;
 
     }
 
-    public void TriggerFriendlyCardDrawn(cardBase_ card)
+    /// <summary>
+    /// 「友方抽到卡」时点。
+    ///
+    /// 这里必须 **await 并且补一次死亡检查**，理由和「打出指令」那条一模一样：
+    /// 时点里的效果一样能打死人（`damage()` 是缓存型变更，由 `ParseAndExecuteEffect`
+    /// 末尾的 `ExecuteChangeLists()` 落地），而这条路径原先写成 `_ = TriggerUnitEffects(...)`
+    /// ——发后不理，之后没有任何人查死亡。当前挂在 `FriendlyCardDrawn:` 上的效果只有减费，
+    /// 所以还没暴露（见 BUGS.md 第 49 条）；一旦有卡写成「抽牌时造成伤害」，
+    /// 就会重演「0 血不死」。
+    /// </summary>
+    public async Task TriggerFriendlyCardDrawn(cardBase_ card)
     {
-        _ = TriggerUnitEffects("FriendlyCardDrawn", card, new List<cardBase_> { card });
+        await TriggerUnitEffects("FriendlyCardDrawn", card, new List<cardBase_> { card });
+        await CheckIfAnyUnitDiedAsync();
     }
 
     /// <summary>
@@ -3185,6 +3209,16 @@ InputState currentInputState = InputState.nil;
         {
             card.DisableCombatAbility();
         }
+
+        // 待弃置的单位即使**没有任何效果点名要弃它**，也会在这里被无条件移除——
+        // 只要它的 shouldBeRemoved 是 1。这条日志是为了让「卡莫名被弃」当场可查：
+        // 打出来的 id / 阵营 / 是不是总部，足以判断是哪个效果点名的、还是状态泄漏带进来的。
+        foreach (var card in discardUnits)
+        {
+            GD.Print($"[Discard] 待弃置移除: id={card.id} 阵营={card.GetIsFriend()} "
+                   + $"isHq={card.isHq} cardType={card.cardType} 状态={card.getState()}");
+        }
+
         await DiscardUnitsWithStagger(discardUnits);
 
         deathCheckRequested |= deadUnits.Count > 0;
@@ -5412,6 +5446,21 @@ InputState currentInputState = InputState.nil;
         if (unit == null || unit.getState() != CardState.placed)
             return;
 
+        // 总部不能撤退。
+        //
+        // 这是本函数唯一能把一张**场上卡**变成**手牌卡**的出口，而总部一旦进了手牌就
+        // 彻底失控：它会被手牌布局引擎当成普通手牌摆放，会被 DiscardRandomly 之类
+        // 「随机弃一张手牌」的效果抽中，然后 RemoveCard(myHq) 直接把这一局判负。
+        // 控制台是 `ParseAndExecuteEffect(cmd, myHq, null, myHq)`——targets 就是友方总部，
+        // 所以在那儿敲一句 retreat 就能把总部送进手牌。
+        // 卡牌那条路（aUnit / aFriendlyUnit / aFrontLineUnit / ${allTargets.unit}）
+        // 本来就在 IsValidTarget 里排除了总部，这里补上总闸。
+        if (unit.isHq == HQ.hq)
+        {
+            GD.Print($"[Retreat] 总部不能被撤退，已忽略: {unit.id}");
+            return;
+        }
+
         var unitPlace = unit.GetMyPlace();
         if (unitPlace == null)
             return;
@@ -5590,6 +5639,12 @@ InputState currentInputState = InputState.nil;
         // 必须放在自身效果结算之后——结算完毕才算真正「打出过」这张指令。
         // 两处打出入口（_Input 的无目标/有目标分支）都经由本函数，故只需挂这里一处。
         await TriggerUnitEffects("FriendlyCommandPlayed", commandCard);
+
+        // 上面那次死亡检查只覆盖了**指令自身**的效果。时点里的效果一样能打死人
+        // （「女狙击手」的 FriendlyCommandPlayed:GetRandomEnemyTarget|damage(2) 就在这条
+        // 路径上），而 damage(n) 是缓存型变更，跑完时点后目标防御已经是 0 了。
+        // 这里不再查一次，单位就会顶着 0 防杵在场上不死。
+        await CheckIfAnyUnitDiedAsync();
     }
 
     /// <summary>
@@ -6160,6 +6215,15 @@ public class Player
     /// <param name="card"></param>
     public async Task AddCardToHand(cardBase_ card)
     {
+        // 总部不该出现在手牌里。这是「进手牌」的唯一入口，在这里喊一声，
+        // 任何把总部送进手牌的路径都会在控制台留下痕迹（含它当时的状态）。
+        if (card != null && card.isHq == HQ.hq)
+        {
+            GD.Print($"[AddCardToHand] 总部 {card.id} 被加入手牌！"
+                   + $"状态={card.getState()} 我方={card.GetIsFriend()}——"
+                   + "总部只应待在支援阵线，请查调用方");
+        }
+
         // 如果手牌已满，直接弃掉（动画后台播放，不阻塞效果结算）
         if (cardsInHand.Count >= maxHandSize)
         {
@@ -6485,7 +6549,7 @@ public class Player
             card.Visible = true;
             await AddCardToHand(card);
             SetLastDrawnCards(new List<cardBase_> { card });
-            battlefield.TriggerFriendlyCardDrawn(card);
+            await battlefield.TriggerFriendlyCardDrawn(card);
         }
         
     }
@@ -6675,6 +6739,18 @@ public class Player
 
             int index = random.Next(cardsInHand.Count);
             var card = cardsInHand[index];
+
+            // 总部绝不该出现在手牌里。真出现了说明有别的路径破坏了
+            // 「总部只待在支援阵线」这条不变量（已知的一条是 RetreatUnit，
+            // 已在那边堵住）。这里兜一手，别让它被当普通手牌弃掉——
+            // RemoveCard(myHq) 会直接判负。留下日志，便于回头追是谁放进去的。
+            if (card.isHq == HQ.hq)
+            {
+                GD.Print($"[DiscardRandomly] 手牌里出现总部 {card.id}（isHq={card.isHq}，"
+                       + $"状态={card.getState()}），已跳过不弃置。请查是哪条路径把它放进手牌的");
+                continue;
+            }
+
             RemoveFromHand(card);
             await card.DiscardCard();
             battlefield.RemoveCard(card);

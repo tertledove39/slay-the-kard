@@ -67,6 +67,7 @@
 | `bin/deck.ini` | 玩家初始卡组配置 |
 | `bin/event.ini` | 剧情事件配置，每个section一个事件；由`bin/AreaPool.ini`分配到各区域 |
 | `bin/setting.ini` | 开始菜单设置项配置；每个 section 定义一个动态设置控件 |
+| `configs/music.ini` | `[music]` 段为BGM槽位、`[sfx]` 段为音效槽位；两段同格式（逗号分隔、随机抽一条），见 docs/MUSIC.md |
 
 ## 测试文件
 
@@ -97,3 +98,6 @@
 | `tests/verify_combat_action_timing.py` | 拖拽被打断后的兜底收尾、行动能力按阵营刷新、被撤退单位禁战、弃置动画错开 |
 | `tests/verify_enemy_scripts_and_spawn.py` | `DiscardPlayerRandomly` 语义、刷兵指令吃表达式、`battleStart=` 开局效果 |
 | `tests/verify_guardian_bypass_and_overlay.py` | 火炮/轰炸机无视守护、事件期间可开商店与卡组、标准弹药改打手牌+牌堆 |
+| `tests/verify_card_state_lifecycle.py` | 复用卡牌的生命周期状态归零（shouldBeRemoved / isDiscarding / LabelSettings 独占） |
+| `tests/verify_trigger_death_check.py` | 时点触发里的效果打死人后必须有死亡检查（女狙击手 + 机动防御那条） |
+| `tests/verify_explosion_sfx.py` | 阵亡爆炸音效随机池（爆炸3~21 且排除下划线开头）、`[sfx]` 槽位复用、场景引用的音频文件必须存在 |

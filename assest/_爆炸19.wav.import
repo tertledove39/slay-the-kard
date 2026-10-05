@@ -2,13 +2,13 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://n457aijs51do"
-path="res://.godot/imported/飞机飞过.wav-6c28013127cfa8369500fba01f14e61f.sample"
+uid="uid://dsep6w2ncmpxk"
+path="res://.godot/imported/_爆炸19.wav-cc6a14bdb867cce0f35c81de2657975f.sample"
 
 [deps]
 
-source_file="res://assest/飞机飞过.wav"
-dest_files=["res://.godot/imported/飞机飞过.wav-6c28013127cfa8369500fba01f14e61f.sample"]
+source_file="res://assest/_爆炸19.wav"
+dest_files=["res://.godot/imported/_爆炸19.wav-cc6a14bdb867cce0f35c81de2657975f.sample"]
 
 [params]
 

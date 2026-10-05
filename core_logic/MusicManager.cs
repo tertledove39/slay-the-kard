@@ -24,6 +24,16 @@ public partial class MusicManager : Node
     // 槽位名按忽略大小写比较：battleBGM_DonBend 与 battleBGM_donbend 等价。
     // 若区分大小写，写错时会静默回退到通用战斗BGM，属于很难排查的失败模式。
     private readonly Dictionary<string, string[]> slotPaths = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 音效槽位，来自 configs/music.ini 的 [sfx] 段。与 [music] 段同格式（逗号分隔、随机抽一条），
+    /// 区别只在语义：BGM 有「播完再切」的调度、音效每次播放各抽一条，两者互不干扰。
+    /// </summary>
+    private readonly Dictionary<string, string[]> sfxPaths = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>音效流缓存：同一条 wav 只读一次盘。</summary>
+    private readonly Dictionary<string, AudioStream> sfxStreamCache = new(StringComparer.OrdinalIgnoreCase);
+
     private readonly Random rnd = new();
     private AudioStreamPlayer player;
     private string currentSlot = "";
@@ -158,6 +168,41 @@ public partial class MusicManager : Node
         return paths[index];
     }
 
+    /// <summary>
+    /// 从 [sfx] 段的某个槽位里随机取一条音效并加载。
+    ///
+    /// 与 BGM 的区别只有两点：① 每次播放各抽一条，不像 BGM 那样有「播完再切」的调度；
+    /// ② 抽到和上一次同一条也没关系（爆炸声连着响同一条很自然），所以不复用
+    /// `PickPath` 里那段「避开正在播放的那首」的逻辑——那是 BGM 的连续性需求。
+    ///
+    /// 路径为空、槽位不存在或加载失败时返回 null，调用方保持原音效即可。
+    /// </summary>
+    public AudioStream PickSfx(string slot)
+    {
+        if (string.IsNullOrWhiteSpace(slot)
+            || !sfxPaths.TryGetValue(slot, out string[] paths)
+            || paths.Length == 0)
+        {
+            return null;
+        }
+
+        string path = paths[rnd.Next(paths.Length)];
+
+        if (sfxStreamCache.TryGetValue(path, out AudioStream cached) && cached != null)
+            return cached;
+
+        AudioStream stream = ResourceLoader.Load<AudioStream>(path);
+        if (stream == null)
+        {
+            GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} MusicManager.cs: 音效槽位 {slot} "
+                         + $"加载失败 {path}（检查 configs/music.ini 的 [sfx] 段路径）");
+            return null;
+        }
+
+        sfxStreamCache[path] = stream;
+        return stream;
+    }
+
     public void StopMusic()
     {
         currentSlot = "";
@@ -188,17 +233,28 @@ public partial class MusicManager : Node
     private void LoadConfig()
     {
         slotPaths.Clear();
+        sfxPaths.Clear();
         if (!FileAccess.FileExists(ConfigPath)) return;
         string content = FileAccess.Open(ConfigPath, FileAccess.ModeFlags.Read).GetAsText();
         var ini = new IniFile();
         using var stream = new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
         ini.Load(stream);
-        if (!ini.HasSection("music")) return;
+
         // [music] 段下每个键都成为一个槽位，battleBGM_<预设名> 因此无需额外解析逻辑
-        foreach (var key in ini.GetSectionKeys("music"))
+        LoadSection(ini, "music", slotPaths);
+        // [sfx] 段同格式：每个键是一个音效槽位，值可写多条（逗号分隔），每次播放随机抽一条
+        LoadSection(ini, "sfx", sfxPaths);
+    }
+
+    /// <summary>把一个段里的每个键读成一个槽位（值按逗号拆成候选列表）。两个段格式相同，共用这一段解析。</summary>
+    private static void LoadSection(IniFile ini, string section, Dictionary<string, string[]> target)
+    {
+        if (!ini.HasSection(section)) return;
+
+        foreach (var key in ini.GetSectionKeys(section))
         {
-            string[] paths = ParsePaths(ini["music"][key].GetString());
-            if (paths.Length > 0) slotPaths[key] = paths;
+            string[] paths = ParsePaths(ini[section][key].GetString());
+            if (paths.Length > 0) target[key] = paths;
         }
     }
 }

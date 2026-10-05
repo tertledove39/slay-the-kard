@@ -537,3 +537,89 @@ private void RecordCardsObtained(List<cardBase_> cards, IsFriend side)
 
 待确认：用户看到的到底是哪个总部。若为敌方总部（berlin）不显示，则需查
 `BuildAttributePanel` 的渲染链（图标位置、缓存比较、`RefreshState` 时机）。
+
+### 48. 「友方指令打出」时点里的伤害打不死人
+
+**现象**：场上有女狙击手，打出一张机动防御之后，有单位变成 0 血但没死亡。
+
+**根因**：`ExecuteCommandAndDiscard` 里死亡检查排在时点**之前**——
+
+```csharp
+await ParseAndExecuteEffect(commandCard.effect, commandCard, targets);
+await CheckIfAnyUnitDiedAsync();          // 只覆盖「指令自身的效果」
+await TriggerUnitEffects("FriendlyCommandPlayed", commandCard);   // 时点跑完函数就结束了
+```
+
+女狙击手的效果是 `FriendlyCommandPlayed:GetRandomEnemyTarget|damage(2)`。
+`damage(n)` 是**缓存型变更**，由 `ParseAndExecuteEffect` 末尾的 `ExecuteChangeLists()`
+落地——所以时点跑完时目标防御确实已经是 0，只是没人再查一次死亡。
+
+**修复**：在 `FriendlyCommandPlayed` 时点之后补一次 `await CheckIfAnyUnitDiedAsync();`。
+
+**回归**：`tests/verify_trigger_death_check.py`。
+
+### 49. `FriendlyCardDrawn` 时点同样缺死亡检查（已修）
+
+**根因**：`TriggerFriendlyCardDrawn()` 是 `_ = TriggerUnitEffects("FriendlyCardDrawn", card)`
+的**发后不理**包装，由 `Player.DrawCard()` 调用，之后没有任何死亡检查。与第 48 条同源。
+当前挂在 `FriendlyCardDrawn:` 上的效果只有减费（如旧版标准弹药），所以还没暴露；
+一旦有卡写成「抽牌时造成伤害」，就会重演「0 血不死」。
+
+**修复**：`TriggerFriendlyCardDrawn` 改为 `public async Task`，内部 `await` 时点后补
+`await CheckIfAnyUnitDiedAsync()`；唯一调用点 `Player.DrawCard` 改为 `await`。
+
+**为什么没有上移到 `TriggerUnitEffects` 统一处理**：32 个调用点里多数
+（`Attack` 内 8 处、`Move`、`AddCardToPlace`、死亡流程自循环）各自已有正确的检查时机，
+有的还处在 `PauseDeathCheck()` 区间内。统一塞进函数末尾虽然能让调用方「谁也不用记」，
+却一次性改变所有时点的时序；静态推演它能终止（重入只会把 `deathCheckRequested`
+置真、多跑一轮定点循环），但无法在静态层面验证。故先逐点补齐，统一入口留待实机确认。
+
+**回归**：`tests/verify_trigger_death_check.py`。
+
+### 50. 「卡莫名被弃」的诊断日志（配合第 51 条的排查）
+
+`ProcessDeadUnitsOnceAsync` 里，只要 `shouldBeRemoved == 1` 就会被无条件移除——
+**即使没有任何效果点名要弃它**。现在移除前打一行日志（id / 阵营 / isHq / cardType / 状态），
+让「卡莫名被弃」当场可查：是哪个效果点名的、还是状态泄漏带进来的。
+
+### 51. 控制台敲 `retreat` 会把友方总部塞进手牌，之后被 `discardrandomly` 弃掉
+
+**现象**：控制台输入 `discardrandomly(9)` 时，总部也一起被弃掉了。
+
+**根因**：`RetreatUnit()` 从不检查目标是不是总部，而它的友方分支有一条
+「回手牌」出口：
+
+```csharp
+if (isFriendly)
+{
+    if (player1.GetCardsInHand().Count < 9)
+    {
+        unitPlace.UnbondCard();
+        unit.ClearMyPlace();
+        unit.DisableCombatAbility();
+        await player1.AddCardToHand(unit);   // ← 总部也会被塞进手牌
+        return;
+    }
+}
+```
+
+**这是全项目唯一能把一张「场上卡」变成「手牌卡」的出口。** 而控制台的执行入口是
+`ParseAndExecuteEffect(cmd, myHq, null, myHq)`——`targets` 就是友方总部，
+所以在那儿敲一句 `retreat` 就能把总部送进手牌。总部进了手牌之后彻底失控：
+它被手牌布局引擎当普通手牌摆放，被 `DiscardRandomly` 这类「随机弃一张手牌」的效果
+抽中，然后 `RemoveCard(myHq)` 直接把这一局判负。
+
+**卡牌那条路是安全的**：`IsValidTarget` 里 `aUnit` / `aFriendlyUnit` / `aFrontLineUnit`
+都要求 `isHq == HQ.normalCard`，`${allTargets.unit}` 也排除总部；而**仅有**两个用
+`anyTarget` 的卡（暴风雪、合成橡胶）效果里没有 `Retreat` / `Discard`。
+所以只有控制台能把它喂进去。
+
+**修复**（三层，从源头到兜底）：
+
+1. `RetreatUnit()` 开头拦截 `unit.isHq == HQ.hq`，直接返回并留日志——补上总闸；
+2. `Player.AddCardToHand(cardBase_)` 对进手牌的总部留日志——这是进手牌的唯一入口，
+   任何别的路径把总部送进来都会当场留痕；
+3. `Player.DiscardRandomly()` 跳过手牌里的总部并留日志——双保险，
+   避免「总部被当普通手牌弃掉 → 直接判负」这个最坏结果。
+
+**回归**：`tests/verify_card_state_lifecycle.py`。

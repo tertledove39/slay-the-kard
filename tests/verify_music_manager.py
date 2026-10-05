@@ -139,8 +139,14 @@ def main():
     edge = [
         check('Dictionary<string, string[]> slotPaths = new(StringComparer.OrdinalIgnoreCase)' in music,
               "槽位名忽略大小写，写错大小写不会静默失效"),
-        check('if (paths.Length > 0) slotPaths[key] = paths;' in music,
+        # 原断言盯的是 LoadConfig 里那行内联写入。加入 [sfx] 段时把两段的读取抽成了
+        # 共用的 LoadSection（避免同一份 ini 解析写两遍），于是写入目标由 slotPaths
+        # 变成形参 target——**意图没变**（空值槽位不进表），只是位置从内联挪进了函数。
+        check('if (paths.Length > 0) target[key] = paths;' in music,
               "空值槽位不进入槽位表，HasSlot 返回 false 而非空路径"),
+        check('LoadSection(ini, "music", slotPaths);' in music
+              and 'LoadSection(ini, "sfx", sfxPaths);' in music,
+              "[music] 与 [sfx] 共用同一段解析，没有第二份实现"),
         check('if (path == currentPath && player.Playing)' in startslot_body,
               "换槽位抽到同一首时保持连续，不从头重播"),
         check('GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} MusicManager.cs: failed to load {path}");' in music,
