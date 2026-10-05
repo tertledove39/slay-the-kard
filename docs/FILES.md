@@ -23,8 +23,8 @@
 | bin/EventCardPreview.cs | 事件选项的「会加入哪些卡」悬浮预览（只画卡，无底板无边框无文字）；场景在 bin/event_card_preview.tscn |
 | bin/event_card_preview.tscn | 上述预览面板的场景 |
 | core_logic/Effect.cs | 特效基类 `Effect` 与注册表 `EffectRegistry`（名字 -> 场景路径）。`Play` 的入参除坐标外还有 `source`（触发它的单位）与 `count`（生成几个） |
-| core_logic/FlyingEffect.cs | **飞掠特效**：让触发它的那张卡升起（位置 + 轻微放大）-> 原地悬停 -> 落回，期间抬高层级压住其他卡。**全程不转角度**（`SwayDegrees` 默认 0 = 静止悬停）。参数全部 Export 在 `effects/flying_effect.tscn`。三段中的**悬停**是 `protected virtual Task StayAsync(...)`，子类可在此捎带做别的事 |
-| core_logic/AirStrikeEffect.cs | **空袭特效** `AirStrikeEffect : FlyingEffect`，只覆写 `StayAsync` = 一边悬停一边投弹；投弹是播一遍 `StrikeEffectName`（默认 `bombing`）子特效。升起/降落/还原/音效全部沿用父类 |
+| core_logic/FlyingEffect.cs | **飞掠特效**：让触发它的那张卡升起（位置 + 轻微放大）-> 原地悬停 -> 落回，期间抬高层级压住其他卡（`TopZIndex`，**必须低于手牌的 20**）。**全程不转角度**（`SwayDegrees` 默认 0 = 静止悬停）。参数全部 Export 在 `effects/flying_effect.tscn`。两个钩子：`DuringRiseAsync`（与起飞并行的事）与 `StayAsync`（悬停阶段） |
+| core_logic/AirStrikeEffect.cs | **空袭特效** `AirStrikeEffect : FlyingEffect`，只覆写 `DuringRiseAsync` = **起飞的同时投弹**；投弹是播一遍 `StrikeEffectName`（默认 `bombing`）子特效。升起/悬停/降落/还原/音效全部沿用父类 |
 | bin/bomb.tscn | 航弹弹体（复用 `bin/Bullet.cs`，贴图 `assest/航弹.png`），供 `bombing` 特效用 |
 | effects/bombing_effect.tscn | `bombing` 特效：复用 `BulletEffect` 脚本，`ProjectileScenePath=bin/bomb.tscn`、`ProjectileCount=0`（0 = 用攻击力）、`ProjectileFlightSeconds=1.5` |
 | effects/flying_effect.tscn | 上述飞掠特效的场景（一个 Control + SFX 总线上的 AudioStreamPlayer） |

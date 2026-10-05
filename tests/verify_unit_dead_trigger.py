@@ -27,21 +27,40 @@ def test1_trigger_calls_exist():
     print("[PASS] 测试1: FriendlyUnitDead / EnemyUnitDead 触发调用存在")
 
 
-def test2_trigger_after_remove_card():
-    """验证触发调用位于 RemoveCard 之后"""
+def test2_corpse_is_marked_before_death_triggers():
+    """验证死亡触发看不到「还没消失的尸体」。
+
+    阵亡的卡现在会在场上停留 1 秒才消失（`PlayDeathPresentationAsync`），
+    所以 `RemoveCard` 不再紧挨着死亡触发。但「触发范围 = 场上所有 placed 单位」
+    这条语义不能变——靠的是**在触发之前先把状态打成 destroyed**：
+    `TriggerUnitEffects` 只挑 `state == placed` 的单位，destroyed 的尸体会被跳过。
+    """
     content = read_battlefield_cs()
 
     func_start = content.find('async Task CheckIfAnyUnitDiedAsync()')
     func_end = content.find('async void OnNextTurnButtonPressed', func_start)
     func_body = content[func_start:func_end]
 
-    remove_pos = func_body.find('RemoveCard(deadUnit);')
+    mark_pos = func_body.find('deadUnit.setState(CardState.destroyed);')
+    disable_pos = func_body.find('deadUnit.DisableCombatAbility();')
     friendly_pos = func_body.find('TriggerUnitEffects("FriendlyUnitDead"')
     enemy_pos = func_body.find('TriggerUnitEffects("EnemyUnitDead"')
 
-    assert friendly_pos > remove_pos, "FriendlyUnitDead 触发应在 RemoveCard 之后"
-    assert enemy_pos > remove_pos, "EnemyUnitDead 触发应在 RemoveCard 之后"
-    print("[PASS] 测试2: 触发调用位于 RemoveCard 之后（确保死亡单位已从场上移除）")
+    assert mark_pos != -1, "阵亡后必须立刻把状态打成 destroyed（否则下一轮死亡检查会重复统计）"
+    assert friendly_pos > mark_pos, "FriendlyUnitDead 触发必须在标记 destroyed 之后"
+    assert enemy_pos > mark_pos, "EnemyUnitDead 触发必须在标记 destroyed 之后"
+    assert 0 < disable_pos < friendly_pos, "停场那一拍里战力必须已经关掉"
+
+    # 死亡触发仍然只看 placed —— 上面那条标记之所以成立，全靠这个过滤
+    assert 'x.getState() == CardState.placed' in content, \
+        "TriggerUnitEffects 必须只挑 placed 单位，否则尸体会被算进场上的单位"
+
+    # 卡最终还是要被移出战场，只是挪进了表现方法里
+    pres_start = content.find('private async Task PlayDeathPresentationAsync')
+    assert pres_start != -1, "缺少阵亡表现方法"
+    pres_body = content[pres_start:pres_start + 1200]
+    assert 'RemoveCard(card);' in pres_body, "阵亡表现里要把卡移出战场"
+    print("[PASS] 测试2: 阵亡卡先标记 destroyed 再触发死亡时点（停场 1 秒也不重复统计）")
 
 
 def test3_friend_enemy_distinction():
@@ -124,7 +143,7 @@ if __name__ == '__main__':
 
     tests = [
         test1_trigger_calls_exist,
-        test2_trigger_after_remove_card,
+        test2_corpse_is_marked_before_death_triggers,
         test3_friend_enemy_distinction,
         test4_trigger_semantics,
         test5_effect_usage_in_card_ini,

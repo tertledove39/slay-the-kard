@@ -623,3 +623,49 @@ if (isFriendly)
    避免「总部被当普通手牌弃掉 → 直接判负」这个最坏结果。
 
 **回归**：`tests/verify_card_state_lifecycle.py`。
+
+### 52. 弃置/阵亡动画中的卡压在手牌上面
+
+**症状**：实机反馈「起飞的单位不应该挡在手牌上面」。
+
+**根因**（查出来两处，其中一处是真 bug）：
+
+1. **真 bug**：`battlefield_.cs` 里 `private int _discardZCounter = 50;`，阵亡/弃置动画
+   每张卡取一个递增的层级。手牌是 **20**，50 已经在上头——于是弃牌动画整段盖住
+   玩家正要点的牌。而且它**无限自增**，弃到第 10 张时已经 59。
+2. **历史坑**：飞掠抬起的卡在场景里曾写死 `TopZIndex = 200`。**场景值优先于 C# 默认值**，
+   所以那段时间它当然压住手牌；后来编辑器保存时因为「与 C# 默认值相同」把这一行省略了，
+   值才回到默认的 15。
+
+**修复**：
+
+- 弃置层级收敛成 `DiscardZBase(11)`..`DiscardZMax(19)`，经 `NextDiscardZIndex()` 取号并
+  **封顶**（宁可几张同层，也不许爬到手牌之上）；每批弃置前 `ResetDiscardZCounter()`，
+  让批内顺序从下往上。两条弃置路径（`DiscardUnitsWithStagger` / `CardDiscardAndRemove`）
+  走同一个取号函数。
+- `FlyingEffect.TopZIndex` 默认值改成 **12**，并在注释里写明「上限卡死在手牌 20 以下」。
+- 完整的层级表与那条唯一不变式（**除拖拽与选项 UI，任何临时浮起来的卡都必须低于手牌**）
+  记进 `docs/NOTICE.md`。
+
+**回归**：`tests/verify_card_layering.py`。
+
+### 53. 投弹要等起飞演完才开始（太晚）；阵亡到爆炸之间没有停顿
+
+**症状**：① 航弹要等卡飞起来整整一秒才开始扔；② 单位防御归零的一瞬间就消失并爆炸，
+「中弹」与「爆炸」挤在同一帧里，看不清。
+
+**修复**：
+
+1. `FlyingEffect` 新增 `DuringRiseAsync` 钩子（与起飞**并行**，父类用 `WhenAll` 把它和
+   升起等在一起）；`AirStrikeEffect` 把投弹从 `StayAsync` 挪到它上面——卡刚一离地，
+   航弹已经在飞。用 `WhenAll` 而不是 fire-and-forget 是刻意的：否则会出现
+   「卡已落回桌面、航弹还在半路」，而且特效节点回收时会把没播完的弹一起删掉。
+2. `ProcessDeadUnitAsync` 拆出 `PlayDeathPresentationAsync`：卡在场上停留 1 秒
+   （`DeathPresentationDelaySeconds`）-> 消失 -> 冒烟 + 爆炸声。调用方**不 await**
+   它，阵亡检查的时序不被纯表现拖住；**停留前先 `setState(CardState.destroyed)`**，
+   这样 `IsDeadPlacedUnit` 不会把它当新的阵亡重复统计，
+   `TriggerUnitEffects`（只挑 `state == placed`）也不会点到这具「还没消失的尸体」。
+
+**回归**：`tests/verify_attack_effects.py`、`tests/verify_attack_death_timing.py`、
+`tests/verify_unit_dead_trigger.py`（测试 2 相应重写——原断言钉的是
+「触发在 `RemoveCard` 之后」，`RemoveCard` 挪进表现方法后它会变成永远成立的空断言）。

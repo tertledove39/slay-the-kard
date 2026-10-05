@@ -58,10 +58,14 @@ public partial class FlyingEffect : Effect
     [Export] public float LandDuration = 1.5f;
 
     /// <summary>
-    /// 漂浮期间用的 ZIndex，要高于场上其他卡的 10。
-    /// （手牌是 20，但悬停的是场上卡、不会跟手牌在屏幕上重叠，所以不必比 20 高。）
+    /// 漂浮期间用的 ZIndex。卡牌层级的总约定见 `docs/NOTICE.md`：
+    /// 场上卡 10 &lt; **本值** &lt; 手牌 20 &lt; 手牌悬停 30 &lt; 选项 UI 40 &lt; 拖拽 100。
+    ///
+    /// 抬起来是为了压住**场上其他卡**（那才是"升高"的视觉线索），
+    /// 但**绝不能盖住手牌**——手牌是玩家随时要点的，被压住就没法操作了。
+    /// 所以上限卡死在 20 以下，留出余量取 12。
     /// </summary>
-    [Export] public int TopZIndex = 15;
+    [Export] public int TopZIndex = 12;
 
     /// <summary>飞掠音效所在的槽位名，对应 configs/music.ini 的 [sfx] 段。</summary>
     [Export] public string SfxSlot = "flyby";
@@ -100,7 +104,12 @@ public partial class FlyingEffect : Effect
 
         try
         {
-            await RiseAsync(source, basePosition, baseScale, RiseDuration * scale);
+            // 与起飞同时开跑的那件事（默认没有）。和升起 `WhenAll` 等在一起，
+            // 是为了不让它在降落之后还留着没跑完——那会让卡已经落回桌面、
+            // 特效节点却还被占用着，回收时把没播完的东西一起删掉。
+            Task during = DuringRiseAsync(source, positions, count);
+            await Task.WhenAll(RiseAsync(source, basePosition, baseScale, RiseDuration * scale), during);
+
             await StayAsync(source, positions, baseRotation, SwaySecondsPerCycle * SwayCycles * scale, count);
             await LandAsync(source, basePosition, baseScale, baseRotation, LandDuration * scale);
         }
@@ -117,6 +126,16 @@ public partial class FlyingEffect : Effect
             }
         }
     }
+
+    /// <summary>
+    /// 与**起飞同时**开跑的事（默认什么都不做）。返回的 Task 会和升起一起被等待，
+    /// 所以它比升起长也没关系——起飞那段会一直等它。
+    ///
+    /// `AirStrikeEffect` 用它把投弹提前到起飞那一刻：等升起演完（整整一秒）再投弹
+    /// 会觉得炮弹出得太晚。
+    /// </summary>
+    protected virtual Task DuringRiseAsync(cardBase_ card, IReadOnlyList<Vector2> positions, int count)
+        => Task.CompletedTask;
 
     /// <summary>
     /// **升起**：往上移动 + 轻微放大，两件事在 `duration` 内同时完成。

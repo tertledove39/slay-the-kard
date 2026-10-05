@@ -87,14 +87,17 @@
 
 | 成员 | 说明 |
 |------|------|
-| `Play(...)` | 升起 `RiseAsync` -> 悬停 `StayAsync` -> 落回 `LandAsync` |
+| `Play(...)` | 升起（含并行的事）`RiseAsync` -> 悬停 `StayAsync` -> 落回 `LandAsync` |
+| `protected virtual Task DuringRiseAsync(card, positions, count)` | 与**起飞同时**开跑的事，默认什么都不做。父类把它和升起 `WhenAll` 等在一起，所以它比升起长也没关系——起飞那段会一直等它 |
 | `protected virtual async Task StayAsync(card, positions, baseRotation, stayDuration, count)` | 悬停阶段。`SwayDegrees` 为 0（默认）时是**原地静止悬停**（只等够时间，不建 tween）；调大了才在卡自己的原始角度上左右摆。子类覆写它即可在这段时间里捎带做别的事 |
 
 ### `AirStrikeEffect` : FlyingEffect (core_logic/AirStrikeEffect.cs)
 
-空袭特效：轰炸机攻击时**先飞起来，在悬停的过程中把航弹扔下去，投完再落回桌面**。投弹夹在飞掠中间，所以拼接写法（`attackEffect = flying,bombing`）做不到，必须由一个特效自己掌握节奏。
+空袭特效：轰炸机攻击时**刚开始起飞，航弹就一起扔出去**，投完了原地悬停一下再落回桌面。投弹夹在飞掠中间，所以拼接写法（`attackEffect = flying,bombing`）做不到，必须由一个特效自己掌握节奏。
 
-只覆写 `StayAsync`：`Task.WhenAll(悬停, 投弹)`，两件事同时开跑、谁后结束等谁。投弹本身不在这里实现，而是把 `StrikeEffectName`（默认 `bombing`）当**子特效**播一遍，弹数、飞行时长、错开间隔仍然配在 `effects/bombing_effect.tscn` 里。升起/降落/还原/飞掠音效全部沿用父类——「卡飘起来」这套运动只有一份实现。
+只覆写 `DuringRiseAsync` = 投弹。投弹本身不在这里实现，而是把 `StrikeEffectName`（默认 `bombing`）当**子特效**播一遍，弹数、飞行时长、错开间隔仍然配在 `effects/bombing_effect.tscn` 里。升起/悬停/降落/还原/飞掠音效全部沿用父类——「卡飘起来」这套运动只有一份实现。
+
+> 投弹最初挂在 `StayAsync`（等起飞演完才投），实机反馈「炮弹发射得太晚」——起飞那一段有整整一秒。现在挂到 `DuringRiseAsync`，卡刚一离地航弹就已经在飞了。
 
 ### `SmokeEffect` : Effect (core_logic/SmokeEffect.cs)
 

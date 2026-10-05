@@ -139,6 +139,14 @@ public partial class battlefield_ : Control
     private const float DiscardStaggerSeconds = 0.5f;
 
     /// <summary>
+    /// 单位阵亡之后，卡在场上**停留多久**才消失并冒烟、爆炸（秒）。
+    ///
+    /// 防御力归零的那一瞬间就消失，观感是「中弹」和「爆炸」挤在同一帧里，
+    /// 看不清发生了什么。留一拍之后，玩家能先看到血条归零、再看到那声爆炸。
+    /// </summary>
+    private const float DeathPresentationDelaySeconds = 1f;
+
+    /// <summary>
     /// 自定义内存变量：在当前战场场景中持久保存
     /// </summary>
     private Dictionary<string, int> memoryVariables = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -3274,6 +3282,10 @@ InputState currentInputState = InputState.nil;
     {
         var tasks = new List<Task>(cards.Count);
 
+        // 每批重置一次层级基数：同一批里后弃的压在前面的上面，但整批都待在
+        // [DiscardZBase, DiscardZMax] 这段区间里——也就是**始终在手牌下面**。
+        ResetDiscardZCounter();
+
         for (int i = 0; i < cards.Count; i++)
         {
             var card = cards[i];
@@ -3281,7 +3293,7 @@ InputState currentInputState = InputState.nil;
 
             // isDiscarding 让刷新显示顺序时跳过这张卡，避免动画期间 ZIndex 被打回默认值
             card.isDiscarding = true;
-            card.ZIndex = _discardZCounter++;
+            card.ZIndex = NextDiscardZIndex();
             tasks.Add(FinishUnitDiscard(card));
 
             if (i < cards.Count - 1)
@@ -3303,6 +3315,27 @@ InputState currentInputState = InputState.nil;
     private static bool IsDeadPlacedUnit(cardBase_ card)
     {
         return card != null && card.getState() == CardState.placed && card.ReadDefence() <= 0;
+    }
+
+    /// <summary>
+    /// 阵亡表现：让卡在场上**停留一拍**，再消失并冒烟、爆炸。
+    ///
+    /// 纯表现，**不参与任何结算**——调用方不 await 它，阵亡检查的时序
+    /// （`ResumeDeathCheck` / `AllowControl`）不该被一段动画拖住；
+    /// 多个单位同时阵亡时也各算各的，不会一个等一个。
+    ///
+    /// 位置在调用时就取好了（`deathCenter`），因为下面这一步会把卡回收掉。
+    /// </summary>
+    private async Task PlayDeathPresentationAsync(cardBase_ card, Vector2 deathCenter)
+    {
+        if (DeathPresentationDelaySeconds > 0f)
+            await ToSignal(GetTree().CreateTimer(DeathPresentationDelaySeconds), SceneTreeTimer.SignalName.Timeout);
+
+        if (!IsInstanceValid(card)) return;
+
+        RemoveCard(card);
+        StartEffect("smoke", new List<Vector2> { deathCenter });
+        PlayDeadSound(1);
     }
 
     private async Task ProcessDeadUnitAsync(cardBase_ deadUnit)
@@ -3334,9 +3367,18 @@ InputState currentInputState = InputState.nil;
         await TriggerUnitEffects("Dead", deadUnit, checkOnlySourceCard: true);
         IsFriend side = deadUnit.GetIsFriend();
         Vector2 deathCenter = GetCardCenter(deadUnit);
-        RemoveCard(deadUnit);
-        StartEffect("smoke", new List<Vector2> { deathCenter });
-        PlayDeadSound(1);
+
+        // 立刻把状态打成 destroyed，但节点先在场上留一拍才消失（见 PlayDeathPresentationAsync）。
+        // 这一步是延迟的关键前提，不是可有可无的标记：
+        //   · IsDeadPlacedUnit 要求 state == placed，所以不会被下一轮死亡检查重复统计；
+        //   · TriggerUnitEffects 只挑 state == placed 的单位（battlefield_.cs:1937），
+        //     所以下面那两条死亡触发不会点到这具「还没消失的尸体」。
+        // 战斗能力也一并关掉：这一拍里它已经没有防御力了，不该还能被选去做什么。
+        deadUnit.setState(CardState.destroyed);
+        deadUnit.DisableCombatAbility();
+
+        _ = PlayDeathPresentationAsync(deadUnit, deathCenter);
+
         if (side == IsFriend.friend) await TriggerUnitEffects("FriendlyUnitDead", deadUnit);
         else if (side == IsFriend.enemy) await TriggerUnitEffects("EnemyUnitDead", deadUnit);
     }
@@ -3731,7 +3773,26 @@ InputState currentInputState = InputState.nil;
         await CheckIfAnyUnitDiedAsync();
     }
 
-    private int _discardZCounter = 50;
+    /// <summary>
+    /// 阵亡/弃置动画期间用的层级区间。**下限要高于场上卡（10），上限必须低于手牌（20）。**
+    ///
+    /// 从前这里是 `private int _discardZCounter = 50;`——从 50 起一路递增，
+    /// 于是弃牌动画整段都压在**手牌上面**：玩家正要点的牌被一张正在飞走的牌盖住。
+    /// 卡牌层级的总约定见 `docs/NOTICE.md`。
+    /// </summary>
+    private const int DiscardZBase = 11;
+    private const int DiscardZMax = 19;
+
+    private int _discardZCounter = DiscardZBase;
+
+    /// <summary>
+    /// 取下一个弃置动画用的层级。超出区间就**封顶**——宁可几张同层，
+    /// 也不许因为"后弃的要在上面"而爬到手牌之上。
+    /// </summary>
+    private int NextDiscardZIndex() => Math.Min(_discardZCounter++, DiscardZMax);
+
+    /// <summary>一批弃置开始前重置，让同一批里的先后顺序从下往上排。</summary>
+    private void ResetDiscardZCounter() => _discardZCounter = DiscardZBase;
 
     /// <summary>
     /// 播放弃牌动画并在完成后移除（fire-and-forget，Z-index递增确保后弃置的在上方）
@@ -3739,7 +3800,7 @@ InputState currentInputState = InputState.nil;
     public async Task CardDiscardAndRemove(cardBase_ card)
     {
         card.isDiscarding = true;
-        card.ZIndex = _discardZCounter++;
+        card.ZIndex = NextDiscardZIndex();
         await card.DiscardCard();
         RemoveCard(card);
     }

@@ -37,7 +37,7 @@
 | `bombing` | `effects/bombing_effect.tscn` | 航弹，**弹数 = 攻击力**（场景里 `ProjectileCount = 0` 表示用调用方给的数量）；`ProjectileFlightSeconds = 1.5`，比子弹慢得多才有投弹感；**不发声**（`BulletEffect` 里没有任何音效代码，不是靠配置关掉的） |
 | `smoke` | `effects/smoke_effect.tscn` | 在指定位置冒一下烟 |
 | `flying` | `effects/flying_effect.tscn` | 让**触发它的那张卡**升起（`RiseDuration`，只移动位置 + 轻微放大）-> 原地悬停 `SwaySecondsPerCycle × SwayCycles` 秒 -> 落回（`LandDuration`，连角度一起还原），期间抬高层级压住其他卡；音效取 `[sfx] flyby`。**全程不转角度**（`SwayDegrees` 默认 0 = 完全静止悬停；调大才在卡自己的原始角度上左右摆） |
-| `airstrike` | `effects/air_strike_effect.tscn` | **空袭 = 飞掠 + 盘旋时投弹**：起飞 -> （边盘旋边投弹）-> 降落。投的是 `bombing` 子特效，所以弹数仍是攻击力；`StrikeEffectName` 留空则退化成纯飞掠 |
+| `airstrike` | `effects/air_strike_effect.tscn` | **空袭 = 飞掠 + 投弹**：**刚开始起飞就把航弹扔出去** -> 悬停 -> 降落。投的是 `bombing` 子特效，所以弹数仍是攻击力；`StrikeEffectName` 留空则退化成纯飞掠 |
 
 `bombing`与`bullet`共用`BulletEffect`脚本，差别只在场景 Export 出去的「弹体场景」与「弹数」——生成、随机错开、回池那套逻辑不写第二遍。
 
@@ -46,8 +46,8 @@
 | 想要的节奏 | 写法 |
 |---|---|
 | 只有飞掠 | `attackEffect = flying` |
-| 飞掠与投弹同时开跑（起飞的同时航弹已经在飞） | `attackEffect = flying,bombing` |
-| 起飞 -> 盘旋投弹 -> 降落 | `attackEffect = airstrike` |
+| 飞掠与投弹同时开跑（两段各自跑一遍） | `attackEffect = flying,bombing` |
+| 起飞即投弹 -> 悬停 -> 降落 | `attackEffect = airstrike` |
 
 单位当前攻击力为0时，主动攻击、普通反击和伏击均不会播放`attackEffect`。攻击力大于0但伤害被重甲或免疫修正为0时仍会播放。
 

@@ -133,10 +133,13 @@ def code_only(cs_text):
     """
     keep = []
     for line in cs_text.split("\n"):
-        stripped = line.strip()
-        if stripped.startswith("//"):
+        if line.strip().startswith("//"):
             continue
-        keep.append(line.split("//")[0] if "//" in line else line)
+        # 行尾注释只在 `//` 不在字符串里时才切——`"res://..."` 里也有两个斜杠。
+        cut = line.find("//")
+        if cut >= 0 and line[:cut].count('"') % 2 == 0:
+            line = line[:cut]
+        keep.append(line)
     return "\n".join(keep)
 
 
@@ -374,24 +377,36 @@ def main():
 
     results.append(check("class AirStrikeEffect : FlyingEffect" in airstrike,
                          "继承 FlyingEffect（运动代码只有一份，不复制）"))
-    results.append(check("protected override async Task StayAsync(" in airstrike,
-                         "只覆写「停留」那一段"))
-    results.append(check("Task hover = base.StayAsync(" in airstrike
-                         and "Task strike = StrikeAsync(" in airstrike
-                         and "await Task.WhenAll(hover, strike);" in airstrike,
-                         "边悬停边投弹（两件事同时开跑，谁后结束等谁）"))
-    results.append(check("RiseAsync" not in airstrike and "LandAsync" not in airstrike
-                         and "SwayAsync" not in airstrike,
-                         "起飞/降落/摆动的实现没有搬过来（搬了就是第二份实现）"))
+    results.append(check("protected override Task DuringRiseAsync(" in airstrike,
+                         "只覆写「起飞时并行的那件事」"))
+    results.append(check("=> StrikeAsync(positions, count);" in airstrike,
+                         "投弹与起飞**同时**开跑（实机反馈：等起飞演完再投太晚）"))
+    airstrike_code = code_only(airstrike)
+    results.append(check("StayAsync" not in airstrike_code,
+                         "不再覆写悬停那一段——投弹已经挪到起飞阶段"))
+    # 断言按**完整方法签名**查，不能只查 `RiseAsync`——父类那个钩子叫 `DuringRiseAsync`，
+    # 子串匹配会把「覆写钩子」误判成「抄了一份升起实现」。
+    results.append(check("private async Task RiseAsync(" not in airstrike_code
+                         and "private async Task LandAsync(" not in airstrike_code
+                         and "private async Task SwayAsync(" not in airstrike_code,
+                         "升起/降落/摆动的实现没有搬过来（搬了就是第二份实现）"))
 
     # 父类必须留出这个钩子，而且三段顺序要显式可见
+    rise_hook = method(flying, "protected virtual Task DuringRiseAsync(", "private async Task RiseAsync(")
+    results.append(check("=> Task.CompletedTask;" in rise_hook,
+                         "父类默认「起飞时不附带任何事」"))
+    results.append(check("protected virtual Task DuringRiseAsync(" in flying, "起飞并行的钩子是 virtual"))
+    play_body = method(flying, "Task during = DuringRiseAsync(source", "await StayAsync(source")
+    results.append(check("Task during = DuringRiseAsync(source, positions, count);" in play_body
+                         and "Task.WhenAll(RiseAsync(source" in play_body,
+                         "起飞与那件事 WhenAll 等在一起（不会留着没跑完就降落）"))
     stay_hook = method(flying, "protected virtual async Task StayAsync(", "private async Task SwayAsync(")
     results.append(check("await SwayAsync(card, baseRotation, stayDuration);" in stay_hook,
                          "父类默认实现仍是「摆幅非 0 才摆」"))
     results.append(check("protected virtual async Task StayAsync(" in flying, "父类的悬停阶段是 virtual"))
-    play_body = method(flying, "await RiseAsync(source", "await LandAsync(source")
-    results.append(check("await StayAsync(source, positions, baseRotation," in play_body,
-                         "三段顺序：升起 → 悬停 → 落回"))
+    after = method(flying, "Task.WhenAll(RiseAsync(source", "await LandAsync(source")
+    results.append(check("await StayAsync(source, positions, baseRotation," in after,
+                         "三段顺序：升起（含并行的事）→ 悬停 → 落回"))
 
     # 投弹是「子特效」，弹数/时长仍在 bombing 场景里配，这里只决定何时开投
     results.append(check('EffectRegistry.Create(StrikeEffectName)' in airstrike,

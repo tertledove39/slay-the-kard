@@ -579,10 +579,12 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
   同时看 `isDiscarding || isUnderCardEffect`。
 - **「夹在中间」拼不出来，只能继承**。要的是「升起 → 投弹 → 落回」，而
   `attackEffect = flying,bombing` 只能做到两段各自开跑（总时长取较长者）。
-  所以 `AirStrikeEffect : FlyingEffect`，**只覆写「悬停」那一段**（`StayAsync`）=
-  `Task.WhenAll(悬停, 投弹)`。测试同时钉住反面：`AirStrikeEffect` 里
-  **不得出现** `RiseAsync` / `LandAsync` / `SwayAsync`——
+  所以 `AirStrikeEffect : FlyingEffect`，**只覆写一个钩子**（`DuringRiseAsync`）=
+  投弹。测试同时钉住反面：`AirStrikeEffect` 里**不得出现**
+  `private async Task RiseAsync(` / `LandAsync(` / `SwayAsync(`——
   出现任何一个就说明运动代码被抄了第二份。
+  （断言要按**完整方法签名**查：父类那个钩子叫 `DuringRiseAsync`，
+  只查 `RiseAsync` 会把「覆写钩子」误判成「抄了一份升起实现」。）
 - **投弹是子特效，不是第二套弹道**。`airstrike` 通过
   `EffectRegistry.Create(StrikeEffectName)` 播一遍已注册的 `bombing`，弹数
   （`count` = 攻击力）、飞行时长、错开间隔都还留在 `bombing` 场景里。
@@ -670,6 +672,40 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 测试的相应改法：反向断言 `AimRotationOffset` / `RiseAndAimAsync` / `SwayAroundAimAsync`
 **都不存在**；`RiseAsync` 里**不含 `rotation`**（这就是「不转向」）；摆动绕的是 `baseRotation`；
 `SwayDegrees` 默认值必须是 `0f`。
+
+### 第五轮调整（三条实机反馈）
+
+**① 起飞的单位挡在手牌上面。** 查出来两件事：
+
+- 飞掠抬起的卡在源里是 `TopZIndex = 15`（低于手牌的 20），但**场景里曾经写死过
+  `TopZIndex = 200`**——场景值优先于 C# 默认值，那段时间它当然压住手牌。
+  现在默认值改成 **12**（场上 10 与手牌 20 之间），并在 `NOTICE.md` 记下这个坑。
+- **`_discardZCounter = 50`** 是**确实**会压住手牌的：阵亡/弃置动画的层级从 50 起
+  一路自增，50 > 20。现在改成 `[DiscardZBase(11), DiscardZMax(19)]` 区间取号并**封顶**
+  （宁可几张同层，也不许爬到手牌之上），每批弃置前 `ResetDiscardZCounter()`。
+
+新增 `tests/verify_card_layering.py`（18 条）专门钉这条链子：抬起卡与弃置动画的层级
+都必须落在 10 与 20 之间；递增必须封顶；两条弃置路径走同一个取号函数。
+`NOTICE.md` 里补了完整的层级表和那条唯一不变式。
+
+**② 炮弹发射得太晚。** airstrike 的投弹原来挂在 `StayAsync`——要等起飞那整整一秒演完
+才开始投。`FlyingEffect` 新增 `DuringRiseAsync` 钩子（与起飞**并行**，父类用 `WhenAll`
+把它和升起等在一起），`AirStrikeEffect` 把投弹挂上去：卡刚一离地，航弹已经在飞了。
+用 `WhenAll` 而不是 fire-and-forget 是刻意的——否则会出现「卡已落回桌面、航弹还在半路」，
+而且特效节点被回收时会把没播完的弹一起删掉。
+
+**③ 阵亡到爆炸之间加 1 秒延迟。** `ProcessDeadUnitAsync` 里拆出
+`PlayDeathPresentationAsync`：卡在场上**停留 1 秒**（`DeathPresentationDelaySeconds`）
+-> 消失 -> 冒烟 + 爆炸声。两个关键点：
+
+- **调用方不 await 它**（`_ = PlayDeathPresentationAsync(...)`）。阵亡检查的时序
+  （`ResumeDeathCheck` / `AllowControl`）不该被一段纯表现拖住；多个单位同时阵亡时
+  也各算各的，不会一个等一个。
+- **停留前必须先把状态打成 `destroyed`**。`IsDeadPlacedUnit` 要求 `state == placed`，
+  所以不会被下一轮死亡检查重复统计；`TriggerUnitEffects` 也只挑 `state == placed`
+  的单位（`battlefield_.cs:1937`），所以死亡时点不会点到这具「还没消失的尸体」。
+  `verify_unit_dead_trigger.py` 的测试 2 相应重写成钉这条（原来是钉「触发在 RemoveCard
+  之后」——`RemoveCard` 挪进表现方法后，那条断言会变成一个永远成立的空断言）。
 
 ### 场景里 export 的值要带中文注释
 

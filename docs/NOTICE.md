@@ -72,6 +72,34 @@
 - 所有数字/字符串应配入配置文件（cards/card.ini、bin/AreaPool.ini 等）
 - 同一数据只能在一处配置，禁止多处硬编码
 
+### 卡牌层级（`ZIndex`）约定
+
+卡牌与特效的层级数字散在几个文件里，改之前先看这张表——**上界是硬约束**：
+
+| 层 | 数字 | 写在哪 |
+|---|---|---|
+| 场上的普通卡 | 10 | `battlefield_.cs` 的 `RefreshAllCardDisplayOrder()` |
+| **阵亡/弃置动画中的卡** | 11..19（`DiscardZBase`..`DiscardZMax`） | 同上，经 `NextDiscardZIndex()` 取号 |
+| **飞掠/空袭抬起的卡** | 12（`FlyingEffect.TopZIndex`） | `core_logic/FlyingEffect.cs` |
+| **手牌** | 20 | `RefreshAllCardDisplayOrder()` |
+| 悬停的手牌 | 30 | 同上 |
+| 选项 UI 里的卡 | 40 | 同上 |
+| 正被拖拽的卡 | 100 | `cardNowChoose.ZIndex` |
+| 控制台 / 顶层 UI | 1000 | 同上 |
+
+**唯一的不变式：除了拖拽与选项 UI，任何「临时浮起来」的卡都必须低于手牌 20。**
+手牌是玩家随时要点的东西，被盖住就没法操作了。
+
+两条踩过的坑：
+
+- `_discardZCounter` 曾经是 `= 50` 且无限自增——弃牌动画整段压在**手牌上面**。
+  现在改成 `[DiscardZBase, DiscardZMax]` 区间内取号并**封顶**（宁可几张同层），
+  每批弃置前由 `ResetDiscardZCounter()` 重置。
+- 飞掠抬起的卡曾经在场景里写死 `TopZIndex = 200`。**场景值优先于 C# 默认值**，
+  所以改 C# 默认值不会立刻生效——要连场景里那一行一起改（或删掉让它吃默认值）。
+
+由 `tests/verify_card_layering.py` 守着：抬起卡与弃置动画的层级都必须在 10 与 20 之间。
+
 ### export 的中文说明写在 C# 的 `/// <summary>` 上，不要指望 `.tscn`
 
 `.tscn` 里确实可以写分号注释（**必须单独成行**，写在属性行尾会被当成值的一部分）：

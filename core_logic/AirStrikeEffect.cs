@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 /// <summary>
 /// 「空袭」特效：飞掠 **+** 投弹。
 ///
-/// 轰炸机攻击时的完整编排是——卡牌**先飞起来**，在**盘旋的过程中把航弹扔下去**，
-/// 投完了再落回桌面。投弹夹在飞掠的中间，而不是「飞完全程再投弹」，
+/// 轰炸机攻击时的完整编排是——卡牌**刚开始起飞，航弹就一起扔出去**，
+/// 投完了原地悬停一下再落回桌面。投弹夹在飞掠的中间，而不是「飞完全程再投弹」，
 /// 所以拼不出来：`attackEffect = flying,bombing` 那种写法只能做到一个演完接一个。
 /// 节奏必须由**一个**特效自己掌握，这就是本类存在的理由。
 ///
@@ -28,19 +28,17 @@ public partial class AirStrikeEffect : FlyingEffect
     [Export] public string StrikeEffectName = "bombing";
 
     /// <summary>
-    /// 悬停 = **一边悬停一边投弹**。两件事同时开跑，谁后结束就等谁：
-    /// 父类给的悬停时间一秒都不会少，投弹也不会把降落提前。
+    /// **投弹与起飞同时开始**。
     ///
-    /// 悬停比投弹短时，飞机会投完弹后继续悬停到时间结束——这是刻意的，
-    /// 宁可多停一会儿，也不要让卡在航弹还在飞的时候就落回桌面。
+    /// 一开始是等起飞演完（`StayAsync`）才投，实机反馈「炮弹发射得太晚」——
+    /// 起飞那一段有整整一秒，航弹要比它先出去。现在挂在 `DuringRiseAsync` 上：
+    /// 卡刚开始往上飘，航弹就已经在飞了。
+    ///
+    /// 父类会把这一支和升起 `WhenAll` 等在一起，所以**起飞那段会自动延长到投弹结束**，
+    /// 投完弹才开始悬停、降落——不会出现「卡已经落回桌面、航弹还在半路」。
     /// </summary>
-    protected override async Task StayAsync(cardBase_ card, IReadOnlyList<Vector2> positions,
-                                            float baseRotation, float stayDuration, int count)
-    {
-        Task hover = base.StayAsync(card, positions, baseRotation, stayDuration, count);
-        Task strike = StrikeAsync(positions, count);
-        await Task.WhenAll(hover, strike);
-    }
+    protected override Task DuringRiseAsync(cardBase_ card, IReadOnlyList<Vector2> positions, int count)
+        => StrikeAsync(positions, count);
 
     /// <summary>
     /// 播一遍投弹子特效。`count` 原样传下去——`bombing` 场景里弹数配的是 0，
