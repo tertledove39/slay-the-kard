@@ -159,6 +159,17 @@ public partial class battlefield_ : Control
     private const string DefaultCommandPlayEffect = "sfx(咚)";
 
     /// <summary>
+    /// 步兵进场音的档位边界，按 `attack + defence` 分（需求方给的规则）：
+    /// ≤ `SmallMax` 小 / 到 `MediumMax` 为止是中 / 再往上是大。
+    /// 槽位名只在这里出现一处，音频文件配在 `configs/music.ini` 的 `[sfx]` 段。
+    /// </summary>
+    private const int InfantryVoiceSmallMax = 4;
+    private const int InfantryVoiceMediumMax = 8;
+    private const string InfantryVoiceSmallSlot = "infantry_small";
+    private const string InfantryVoiceMediumSlot = "infantry_medium";
+    private const string InfantryVoiceLargeSlot = "infantry_large";
+
+    /// <summary>
     /// 自定义内存变量：在当前战场场景中持久保存
     /// </summary>
     private Dictionary<string, int> memoryVariables = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -872,17 +883,48 @@ private const int OpeningHandSize = 5;
 
 
 
+    /// <summary>
+    /// 播「这张卡被打出」时的效果。**卡上写了 `playEffect` 就一律以卡为准**，
+    /// 没写的才按兵种兜底：
+    /// - 指令卡 → 一声「咚」（`DefaultCommandPlayEffect`）；
+    /// - 步兵 → 按身材选一档进场脚步声（`InfantryDeployEffect`）；
+    /// - 其它（坦克 / 飞机 / 火炮 / 总部）→ 什么都不播。
+    ///
+    /// 这个函数是**所有「卡进场」路径的汇聚点**，所以两件事都挂在这里就够：
+    /// - 从手牌拖上场的走 `Move()`（`isDeployedFromHand`，同时触发 `Deployed`）；
+    /// - 效果刷进场的走 `AddCardToPlace()`（同时触发 `BeingAddedToField`）。
+    /// 在场上挪位置的单位两条都不满足，不会重播。
+    /// </summary>
     private void PlayCardEffect(cardBase_ card)
     {
         if (card == null || !IsInstanceValid(card)) return;
 
-        // 指令卡默认喊一声「咚」：卡上没写 playEffect 时用它。
-        // 卡上写了的（8 张带语音的）以卡为准，所以这里只在**指令卡 + 没写**时才兜底。
         string effect = card.playEffect;
-        if (string.IsNullOrWhiteSpace(effect) && card.cardType == CardTypes.Command)
-            effect = DefaultCommandPlayEffect;
+        if (string.IsNullOrWhiteSpace(effect))
+        {
+            effect = card.cardType == CardTypes.Command ? DefaultCommandPlayEffect : InfantryDeployEffect(card);
+        }
 
         StartEffect(effect, new List<Vector2> { GetCardCenter(card) }, null, card);
+    }
+
+    /// <summary>
+    /// 步兵进场音：按 `attack + defence` 分三档——≤`InfantryVoiceSmallMax` 小、
+    /// 到 `InfantryVoiceMediumMax` 为止是中、再往上是大。不是步兵、或是总部，返回 `null`。
+    ///
+    /// 取的是**进场那一刻的当前值**，也就是卡面值：`PlayCardEffect` 排在
+    /// `Deployed` / `BeingAddedToField` 之前，「部署时 +1/+1」那类还没结算。
+    ///
+    /// 档位边界与槽位名只写在这里一处，音频文件本身配在 `configs/music.ini` 的 `[sfx]` 段。
+    /// </summary>
+    private static string InfantryDeployEffect(cardBase_ card)
+    {
+        if (card.cardType != CardTypes.Infantry || card.isHq == HQ.hq) return null;
+
+        int size = card.ReadAttack() + card.ReadDefence();
+        if (size <= InfantryVoiceSmallMax) return $"sfx({InfantryVoiceSmallSlot})";
+        if (size <= InfantryVoiceMediumMax) return $"sfx({InfantryVoiceMediumSlot})";
+        return $"sfx({InfantryVoiceLargeSlot})";
     }
 
     private bool PlayAttackEffect(cardBase_ from, cardBase_ to)

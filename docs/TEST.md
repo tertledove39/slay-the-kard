@@ -862,6 +862,32 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 测试补 7 条，其中一条是交叉核对：**常量里写的槽位名必须在 `[sfx]` 段里存在**——
 拼错的话整批 86 张指令卡一起静默没声。
 
+### 第十二轮调整（步兵进场音，按身材分三档）
+
+需求：新增 3 个 `AU_Infantry_*` 素材，步兵**部署**与**加入战场**时都播；
+按 `attack + defence` 分档——≤4 小、5~8 中、≥9 大。三处不确定由主人定：**以卡为准**、
+**双方都播**、**取进场那一刻的当前值**。
+
+**一个关键发现让改动变得很小**：这两条进场路径**已经汇聚到同一个函数** `PlayCardEffect`——
+从手牌拖上场走 `Move()`（`isDeployedFromHand`，同时触发 `Deployed`），
+效果刷进场走 `AddCardToPlace()`（同时触发 `BeingAddedToField`）。
+所以挂在 `PlayCardEffect` 上就一处覆盖两条路，而且**在场上挪位置的单位两条都不满足、不会重播**。
+
+判定写成 `InfantryDeployEffect(card)`：`cardType != Infantry || isHq == HQ.hq` 直接返回 null
+（**总部的 `cardType` 也是 `Infantry`**，不排掉的话开局摆总部也会响一声）。
+
+测试补 17 条，其中两条值得记：
+
+- **把规则当规格来验**：从源码里读出 `InfantryVoiceSmallMax` / `InfantryVoiceMediumMax`，
+  在 Python 里重新算一遍 `1→小 / 4→小 / 5→中 / 8→中 / 9→大 / 18→大`。
+  这比断言「源码里有 `<= 4`」结实——改常量而忘了改规则会红。
+- 三条音频的存在与 `.import`、三个槽位名与代码常量对得上（拼错就整批步兵静默没声）。
+
+顺带核对了一遍真实数据：46 张非总部步兵分成 **15 小 / 21 中 / 10 大**。
+
+切片又踩了一次坑：`Move` 后面不是 `MoveUnit`，按「下一个方法名」切直接 `ValueError`。
+固定长度窗口才是稳的（这条在第十轮已经记过一次）。
+
 ### 场景里 export 的值要带中文注释
 
 `.tscn` 的导出值在 Inspector 里只显示英文字段名，看不出含义，所以约定在**上一行**写一行

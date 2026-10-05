@@ -171,9 +171,8 @@ def main():
     play_card = method(battle, "private void PlayCardEffect(cardBase_ card)", "\n}")
     results.append(check("string effect = card.playEffect;" in play_card,
                          "先取卡上写的 playEffect（自带语音的那 8 张以卡为准）"))
-    results.append(check("if (string.IsNullOrWhiteSpace(effect) && card.cardType == CardTypes.Command)" in play_card
-                         and "effect = DefaultCommandPlayEffect;" in play_card,
-                         "只在「指令卡 + 没写 playEffect」时兜底"))
+    # 具体的兜底表达式在 ⑥ 里统一钉（那里同时管步兵那一支），这里只确认用的是这个常量
+    results.append(check("DefaultCommandPlayEffect" in play_card, "指令卡兜底用的是那个常量"))
     results.append(check("StartEffect(effect," in play_card, "最终播的是兜底后的那一份"))
     results.append(check("咚" in slots, "[sfx] 段里配了「咚」槽位"))
     # 交叉核对：常量里写的槽位必须真的在 [sfx] 段里 —— 拼错就整批指令卡静默没声
@@ -190,6 +189,65 @@ def main():
         if not re.search(r"(?m)^playEffect\s*=", section):
             defaulted += 1
     results.append(check(defaulted > 0, f"确实有指令卡没写 playEffect（{defaulted} 张走默认音）"))
+
+    # ==================== ⑥ 步兵进场音（三档） ====================
+    # 规则：attack + defence = 总身材；≤4 小 / 5~8 中 / ≥9 大。
+    # 进场有两条路，但它们都汇聚到 PlayCardEffect（见该方法的注释），所以只需挂一处。
+    print("\n--- ⑥ 步兵进场音（三档） ---")
+    results.append(check("private static string InfantryDeployEffect(cardBase_ card)" in battle,
+                         "有独立的档位判定函数"))
+    tier_fn = method(battle, "private static string InfantryDeployEffect(cardBase_ card)",
+                     "\n    }")
+    results.append(check("card.cardType != CardTypes.Infantry || card.isHq == HQ.hq" in tier_fn,
+                         "只对步兵生效，且排除总部（总部的 cardType 也是 Infantry）"))
+    results.append(check("card.ReadAttack() + card.ReadDefence()" in tier_fn,
+                         "按 attack + defence 判档"))
+    results.append(check("InfantryVoiceSmallSlot" in tier_fn and "InfantryVoiceMediumSlot" in tier_fn
+                         and "InfantryVoiceLargeSlot" in tier_fn,
+                         "三档各自的槽位名都走常量（不在方法里裸写）"))
+
+    # 边界按**需求方给的规则**验一遍：把常量读出来重新算一遍分档
+    limits = {k: int(re.search(rf"{k} = (\d+);", battle).group(1))
+              for k in ("InfantryVoiceSmallMax", "InfantryVoiceMediumMax")}
+    def tier(total):
+        if total <= limits["InfantryVoiceSmallMax"]:
+            return "small"
+        return "medium" if total <= limits["InfantryVoiceMediumMax"] else "large"
+
+    results.append(check([tier(n) for n in (1, 4, 5, 8, 9, 18)]
+                         == ["small", "small", "medium", "medium", "large", "large"],
+                         f"分档边界符合规则（≤{limits['InfantryVoiceSmallMax']} 小 / "
+                         f"5~{limits['InfantryVoiceMediumMax']} 中 / ≥{limits['InfantryVoiceMediumMax']+1} 大）"))
+
+    # 三条音频得配上，槽位名还得和代码常量对得上
+    for const in ("InfantryVoiceSmallSlot", "InfantryVoiceMediumSlot", "InfantryVoiceLargeSlot"):
+        name = re.search(rf'{const} = "(.+?)";', battle)
+        results.append(check(name is not None and name.group(1) in slots,
+                             f"{const} 指向的槽位「{name.group(1) if name else '?'}」在 [sfx] 段里存在"))
+    for name in ("infantry_small", "infantry_medium", "infantry_large"):
+        for f in slots.get(name, []):
+            src = ROOT / f.replace("res://", "")
+            results.append(check(src.exists(), f"{name} → {src.name} 存在"))
+            results.append(check(Path(str(src) + ".import").exists(),
+                                 f"{name} 的 {src.name} 已被 Godot 导入"))
+
+    # 挂载点：没写 playEffect 的步兵走兜底；写了的一律以卡为准
+    results.append(check("effect = card.cardType == CardTypes.Command ? DefaultCommandPlayEffect : InfantryDeployEffect(card);"
+                         in play_card,
+                         "PlayCardEffect 里：指令卡用「咚」、步兵用进场音"))
+    cond = play_card.index("if (string.IsNullOrWhiteSpace(effect))")
+    assign = play_card.index("effect = card.cardType == CardTypes.Command")
+    results.append(check(cond < assign, "**卡上有 playEffect 就不兜底**——兜底在空白判断里面"))
+    # 两条进场路径都走 PlayCardEffect
+    results.append(check("PlayCardEffect(card);" in
+                         method(battle, "async Task AddCardToPlace(cardBase_ card, place_ place)", "await TriggerUnitEffects(\"BeingAddedToField\""),
+                         "效果刷进场（AddCardToPlace）走 PlayCardEffect"))
+    # 取固定长度窗口：`Move` 很长，按「下一个方法名」切既脆又容易切错
+    move = battle[battle.index("async Task Move(cardBase_ card, place_ position)"):][:6000]
+    results.append(check("if (isDeployedFromHand)" in move and "PlayCardEffect(card);" in move,
+                         "从手牌部署（Move）也走 PlayCardEffect，且只在 isDeployedFromHand 时"))
+    results.append(check("GetMyPlace() == null" in move,
+                         "isDeployedFromHand 判据：没有格子 = 从手牌来的"))
 
     failed = results.count(False)
     print(f"\nResult: {len(results) - failed} passed, {failed} failed")

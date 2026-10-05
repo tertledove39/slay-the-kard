@@ -89,13 +89,32 @@
 | 拖拉机厂 | `拉伸` | `assest/拉伸.wav` |
 | 预备役 | `预备役` | `assest/预备役.wav` |
 
-**指令卡的默认音**：指令卡（`cardType = Command`）**没写 `playEffect`** 时，默认播一声「咚」（`[sfx]` 的 `咚` 槽位 = `assest/咚.wav`）。
+#### 没写 `playEffect` 时的兜底
 
-- 常量在 `battlefield_.cs`：`DefaultCommandPlayEffect = "sfx(咚)"`，判定在 `PlayCardEffect` 里。
-- **上面那 8 张带语音的以卡为准**，不走默认。
-- 单位卡不受影响（部署音是另一回事）。
-- 做成默认值而不是在 86 张指令卡上各写一行：那是同一个值抄 86 遍（规范 E），而且以后每加一张指令卡都要记得补——漏了就静默没声。
-- 音效文件本身仍只配在 `[sfx]` 段一处。
+**所有「卡进场」的路径都汇聚到 `battlefield_.PlayCardEffect`**，兜底就只写在那里一处：
+
+| 卡的兵种 | 没写 `playEffect` 时 | 常量 |
+|----------|---------------------|------|
+| 指令卡 `Command` | 一声「咚」（`[sfx]` 的 `咚` = `assest/咚.wav`） | `DefaultCommandPlayEffect` |
+| 步兵 `Infantry`（**总部除外**） | 按身材选一档进场脚步声 | `InfantryVoice*Slot` |
+| 其它（坦克 / 飞机 / 火炮 / 总部） | 什么都不播 | — |
+
+**卡上写了 `playEffect` 就一律以卡为准**，兜底不生效（那 8 张带语音的指令卡就是这样）。
+
+**步兵进场音**（`AU_Infantry_*` 三个素材）：
+
+| 档 | `attack + defence` | 槽位 | 素材 |
+|----|--------------------|------|------|
+| 小 | ≤ 4（`InfantryVoiceSmallMax`） | `infantry_small` | `assest/AU_infantry_small_move_03.wav` |
+| 中 | 5 ~ 8（`InfantryVoiceMediumMax`） | `infantry_medium` | `assest/AU_Infantry_medium_Move_04.wav` |
+| 大 | ≥ 9 | `infantry_large` | `assest/AU_Infantry_Large_Move_02.wav` |
+
+- 取的是**进场那一刻的当前值**（= 卡面值）：`PlayCardEffect` 排在 `Deployed` / `BeingAddedToField` **之前**，「部署时 +1/+1」那类还没结算。
+- **两条进场路径都覆盖，且不会重复播**：从手牌拖上场走 `Move()`（`isDeployedFromHand`，同时触发 `Deployed`）；效果刷进场走 `AddCardToPlace()`（同时触发 `BeingAddedToField`）。在场上挪位置的单位两条都不满足。
+- **双方都播**（敌我步兵进场都响）。
+- 总部虽然 `cardType` 也是 `Infantry`，但按 `isHq` 排除掉了。
+
+**为什么做成兜底而不是逐卡写**：86 张指令卡、46 张步兵卡，逐卡写就是同一个值抄上百遍（规范 E），而且以后每加一张卡都要记得补——漏了就静默没声。音效文件本身仍只配在 `[sfx]` 段一处。
 
 **加一句新语音只要两步**：`[sfx]` 段写一行、卡上写 `playEffect = sfx(名字)`。不用新建场景、不用改注册表。
 
