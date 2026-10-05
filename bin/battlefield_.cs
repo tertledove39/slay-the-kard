@@ -209,6 +209,24 @@ public partial class battlefield_ : Control
     private const string TankAttackName = "TankAttack";
 
     /// <summary>
+    /// **飞机**没写 `attackEffect` 时的默认攻击动画——两种飞机各一条，都是「飞掠 + 打一下」：
+    ///
+    /// | 兵种 | 默认 | 表现 |
+    /// |------|------|------|
+    /// | 战斗机 `Plane` | `strafe` | 起飞即**扫射**（10 发子弹）→ 悬停 → 降落 |
+    /// | 轰炸机 `Bomber` | `airstrike` | 起飞即**投弹**（弹数 = 攻击力）→ 悬停 → 降落 |
+    ///
+    /// 这两条本来是毛驴与伊尔2M 各自卡上的配置，现在提升成兵种默认：13 张飞机卡
+    /// 一个 `attackEffect` 都不用写，新加的飞机也自动有。
+    ///
+    /// **开火声会跟着变，而且是两样的**：`strafe` **不在** `NoFiringSoundNames` 里
+    /// （它打的就是子弹，那声机枪正是要的），`airstrike` 在名单里（炸弹配机枪是串味）。
+    /// 改这两条默认值时记得连 `EffectRegistry.NoFiringSoundNames` 一起看。
+    /// </summary>
+    private const string PlaneStrikeEffect = "strafe";
+    private const string BomberStrikeEffect = "airstrike";
+
+    /// <summary>
     /// 坦克炮的 `[sfx]` 槽位。**开火音只有中/大两套素材，小的也归 medium**（需求方指定）；
     /// 命中音完全不分档。
     /// </summary>
@@ -1093,7 +1111,31 @@ private const int OpeningHandSize = 5;
         if (from == null) return null;
         if (!string.IsNullOrWhiteSpace(from.attackEffect)) return from.attackEffect;
 
-        return TankAttackEffectFor(from);
+        return DefaultAttackEffect(from);
+    }
+
+    /// <summary>
+    /// 没写 `attackEffect` 时的**兵种默认攻击动画**——「哪个兵种默认打什么」只在这一个函数里判。
+    ///
+    /// | 兵种 | 默认 | 常量 |
+    /// |------|------|------|
+    /// | 战斗机 `Plane` | `strafe`（飞掠 + 扫射） | `PlaneStrikeEffect` |
+    /// | 轰炸机 `Bomber` | `airstrike`（飞掠 + 投弹） | `BomberStrikeEffect` |
+    /// | 坦克 `Tank` / 火炮 `Artillery` | `TankAttack(命中音槽位)` | `TankAttackEffectFor` |
+    /// | 步兵 / 指令 / 总部 | 无（返回 `null`，不播特效） | — |
+    ///
+    /// 抽出来而不是把 `switch` 塞进 `ResolveAttackEffect`：那个函数要说的是
+    /// 「卡上写了就用卡上的」，这里要说的是「没写的话按兵种给什么」，两件事。
+    /// </summary>
+    private static string DefaultAttackEffect(cardBase_ from)
+    {
+        return from.cardType switch
+        {
+            CardTypes.Plane => PlaneStrikeEffect,
+            CardTypes.Bomber => BomberStrikeEffect,
+            CardTypes.Tank or CardTypes.Artillery => TankAttackEffectFor(from),
+            _ => null
+        };
     }
 
     /// <summary>

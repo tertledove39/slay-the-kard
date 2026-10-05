@@ -41,8 +41,8 @@
 | `smoke` | `effects/smoke_effect.tscn` | 在指定位置冒一下烟（阵亡用） |
 | `smoke_small` | `effects/smoke_small_effect.tscn` | **同一个 `SmokeEffect` 脚本、同一张贴图**，只把 `SizeScale` 调小 —— 坦克炮的炮口烟与落点烟用它。所以这**不是第二套实现，是一个 Export 值**（与 `bullet`/`bombing`/`TankAttack` 同一套路） |
 | `flying` | `effects/flying_effect.tscn` | 让**触发它的那张卡**升起（`RiseDuration`，只移动位置 + 轻微放大）-> 原地悬停 `SwaySecondsPerCycle × SwayCycles` 秒 -> 落回（`LandDuration`，连角度一起还原），期间抬高层级压住其他卡；音效取 `[sfx] flyby`。**全程不转角度**（`SwayDegrees` 默认 0 = 完全静止悬停；调大才在卡自己的原始角度上左右摆） |
-| `airstrike` | `effects/air_strike_effect.tscn` | **空袭 = 飞掠 + 投弹**：**刚开始起飞就把航弹扔出去** -> 悬停（`SwaySecondsPerCycle = 0.5`，比 `flying` 那个短一半）-> 降落。投的是 `bombing` 子特效，所以弹数仍是攻击力；`StrikeEffectName` 留空则退化成纯飞掠 |
-| `strafe` | `effects/strafe_effect.tscn` | **扫射 = 飞掠 + 打枪**：与 `airstrike` **是同一个脚本、同一套节奏**，只把 `StrikeEffectName` 换成 `bullet`（起飞即打出 10 发子弹）。毛驴用这个 |
+| `airstrike` | `effects/air_strike_effect.tscn` | **空袭 = 飞掠 + 投弹**：**刚开始起飞就把航弹扔出去** -> 悬停（`SwaySecondsPerCycle = 0.5`，比 `flying` 那个短一半）-> 降落。投的是 `bombing` 子特效，所以弹数仍是攻击力；`StrikeEffectName` 留空则退化成纯飞掠。**轰炸机的兵种默认** |
+| `strafe` | `effects/strafe_effect.tscn` | **扫射 = 飞掠 + 打枪**：与 `airstrike` **是同一个脚本、同一套节奏**，只把 `StrikeEffectName` 换成 `bullet`（起飞即打出 10 发子弹）。**战斗机的兵种默认** |
 | `sfx` | `effects/sound_effect.tscn` | **只放一段音效**，不画任何东西。放什么由**特效名的参数**指定：`playEffect = sfx(严冬)`。所以全项目共用这一个场景，卡牌语音不必一音效一场景 |
 
 `bullet`、`bombing`、`TankAttack`**三个场景共用 `BulletEffect` 脚本**，差别只在场景 Export 出去的「弹体场景 / 弹数 / 飞行时长」，以及**名字带不带参数**——生成、随机错开、回池那套逻辑不写第二遍。
@@ -66,6 +66,25 @@
 | 起飞即打枪 -> 悬停 -> 降落 | `attackEffect = strafe` |
 
 单位当前攻击力为0时，主动攻击、普通反击和伏击均不会播放`attackEffect`。攻击力大于0但伤害被重甲或免疫修正为0时仍会播放。
+
+#### 没写 `attackEffect` 时的**兵种默认**
+
+「哪个兵种默认打什么」只写在 `battlefield_.DefaultAttackEffect` 一处。**13 张飞机卡与
+28 张坦克/火炮卡一个 `attackEffect` 都不用写**，新加的同类卡也自动有：
+
+| 兵种 | 默认 | 表现 | 常量 |
+|------|------|------|------|
+| 战斗机 `Plane` | `strafe` | 起飞即**扫射**（10 发子弹）→ 悬停 → 降落 | `PlaneStrikeEffect` |
+| 轰炸机 `Bomber` | `airstrike` | 起飞即**投弹**（弹数 = 攻击力）→ 悬停 → 降落 | `BomberStrikeEffect` |
+| 坦克 `Tank` / 火炮 `Artillery` | `TankAttack(命中音槽位)` | 打一发炮弹（炮口/落点各一小股烟） | `TankAttackName` |
+| 步兵 / 指令 / 总部 | **无**（`null`，不播特效） | — | — |
+
+> 卡上写了就以卡为准。目前**只有喀秋莎**写了（`bullet,sfx(katyusha_fire)`，火箭炮组合）。
+
+**这两条默认与开火声是绑在一起调的**——`strafe` **不在** `NoFiringSoundNames` 里
+（它打的就是子弹，那声机枪正是要的），`airstrike` **在**名单里（炸弹配机枪是串味）。
+改默认动画时**记得连 `EffectRegistry.NoFiringSoundNames` 一起看**，
+`tests/verify_attack_effects.py` 的第 ④b 节把这两条联动钉住了。
 
 #### 特效名可以带参数：`名字(参数)`
 

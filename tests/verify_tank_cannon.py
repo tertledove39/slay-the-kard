@@ -117,7 +117,10 @@ def main():
     resolve = method(battle, "private static string ResolveAttackEffect(", "private static string TankAttackEffectFor(")
     results.append(check("if (!string.IsNullOrWhiteSpace(from.attackEffect)) return from.attackEffect;" in resolve,
                          "卡上写了就以卡为准"))
-    results.append(check("return TankAttackEffectFor(from);" in resolve, "没写则用兵种默认（坦克与火炮）"))
+    # 兜底现在统一走 DefaultAttackEffect（坦克/火炮、战斗机、轰炸机都在那一张表里），
+    # 坦克那一支仍是 TankAttackEffectFor。所以这里钉的是「转交给那张兵种表」。
+    results.append(check("return DefaultAttackEffect(from);" in resolve,
+                         "没写则转交兵种默认表（坦克与火炮那一支仍是 TankAttackEffectFor）"))
     results.append(check("AttackEffect = \"TankAttack\";" not in battle.replace("TankAttackName = \"TankAttack\";", ""),
                          "常量名已从 TankAttackEffect 改成 TankAttackName（它只是名字那一段，不再等于整串）"))
 

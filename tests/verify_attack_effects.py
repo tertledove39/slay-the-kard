@@ -569,10 +569,71 @@ def main():
                          "盘旋时间减半（1.0 -> 0.5 秒）"))
 
     card_ini = CARD_INI.read_text(encoding="utf-8-sig")
-    il2 = method(card_ini, "[伊尔2m]", "[伊尔10]")
-    results.append(check("attackEffect = airstrike" in il2, "伊尔2M 改用 airstrike"))
     results.append(check("flying,bombing" not in card_ini,
                          "全项目不再有 flying,bombing 这种拼接写法"))
+
+    # ==================== ④b 飞机的**兵种默认**攻击动画 ====================
+    # 毛驴的 strafe 与伊尔2M 的 airstrike 原本是**这两张卡各自**的配置，
+    # 现在提升成兵种默认 —— 13 张飞机卡一个 attackEffect 都不用写，新加的飞机也自动有。
+    # 所以断言从「某张卡写了什么」改成「按兵种解析出什么」。
+    print("\n--- ④b 飞机默认：按兵种解析 ---")
+    defaults = method(battle, "private static string DefaultAttackEffect(cardBase_ from)", "\n    }")
+    results.append(check("CardTypes.Plane => PlaneStrikeEffect" in defaults,
+                         "战斗机默认 = PlaneStrikeEffect"))
+    results.append(check("CardTypes.Bomber => BomberStrikeEffect" in defaults,
+                         "轰炸机默认 = BomberStrikeEffect"))
+    results.append(check("CardTypes.Tank or CardTypes.Artillery => TankAttackEffectFor(from)" in defaults,
+                         "坦克与火炮走的还是原来那条（没被这次改动碰到）"))
+    results.append(check("_ => null" in defaults,
+                         "步兵/指令/总部没有默认（返回 null，不播特效）"))
+    results.append(check('PlaneStrikeEffect = "strafe";' in battle
+                         and 'BomberStrikeEffect = "airstrike";' in battle,
+                         "两条默认都是常量（不在 switch 里裸写特效名）"))
+    results.append(check("return DefaultAttackEffect(from);" in battle,
+                         "ResolveAttackEffect 的兜底改调它"))
+
+    # 在 Python 里按源码那张表**重放一遍**——测的是规则，不是文本
+    plane_default = re.search(r'PlaneStrikeEffect = "(.+?)";', battle).group(1)
+    bomber_default = re.search(r'BomberStrikeEffect = "(.+?)";', battle).group(1)
+
+    def resolve(card_type, own_effect=""):
+        if own_effect.strip():
+            return own_effect
+        if card_type == "Plane":
+            return plane_default
+        if card_type == "Bomber":
+            return bomber_default
+        return None   # 坦克/火炮要算槽位，步兵等没有默认 —— 这条重放只管飞机
+
+    for card_type, own, want, note in [
+        ("Plane", "", "strafe", "战斗机没写 → 扫射"),
+        ("Bomber", "", "airstrike", "轰炸机没写 → 投弹"),
+        ("Plane", "bullet", "bullet", "卡上写了就以卡为准（哪怕写的是别的）"),
+    ]:
+        results.append(check(resolve(card_type, own) == want,
+                             f"{card_type}（卡上 {'空' if not own else own}）→ {want}（{note}）"))
+
+    # 13 张飞机卡现在**一个 attackEffect 都不用写**
+    plane_cards = [p for p in re.split(r"(?m)(?=^\[)", card_ini)
+                   if re.search(r"^cardType[ \t]*=[ \t]*(Plane|Bomber)[ \t]*\r?$", p, re.MULTILINE)]
+    leftover = [p.split("\n")[0] for p in plane_cards
+                if re.search(r"^attackEffect[ \t]*=[ \t]*\S", p, re.MULTILINE)]
+    results.append(check(len(plane_cards) >= 13,
+                         f"飞机卡共 {len(plane_cards)} 张"))
+    results.append(check(not leftover,
+                         f"飞机卡都清空了 attackEffect、吃兵种默认（残留 {leftover}）"))
+
+    # 开火声的联动：默认动画换了，静音名单**不能跟着一起换** ——
+    # strafe 打的就是子弹（要那声机枪），airstrike 扔的是炸弹（配机枪是串味）。
+    # 这两条上一轮实机调过，改默认时最容易被顺手弄坏。
+    # （⑤ 里另有一份同样的重放，这里自己读一遍是为了不依赖那一段的执行顺序。）
+    muted_names = set(re.findall(r'"(\w+)"', method(effect, "HashSet<string> NoFiringSoundNames",
+                                                    "public static bool ReplacesFiringSound")))
+    results.append(check(not (plane_default in muted_names),
+                         f"战斗机默认 {plane_default} **不在**静音名单里（保留机枪声）"))
+    results.append(check(bomber_default in muted_names,
+                         f"轰炸机默认 {bomber_default} **在**静音名单里（只有飞掠声）"))
+
 
     # ==================== ⑤ 谁不放通用开火声 ====================
     # 实机反馈两轮，方向是反的，所以这张表**按结果命名**而不是按原因：
@@ -638,8 +699,11 @@ def main():
                          f"两个场景只差子特效名与节点名（airstrike 独有: {only_airstrike}；strafe 独有: {only_strafe}）"))
     card_ini = CARD_INI.read_text(encoding="utf-8-sig")
     # 取固定长度窗口：按 `[` 切会切到段标题自己那一个（它就以 `[` 开头）
+    # 毛驴这里**不再断言它写了 strafe** —— strafe 现在是战斗机的兵种默认
+    # （见 ④b），卡上留着那一行反而是同一数据配两处。
     donkey = card_ini[card_ini.index("[毛驴]"):][:400]
-    results.append(check("attackEffect = strafe" in donkey, "毛驴改用 strafe"))
+    results.append(check(re.search(r"^attackEffect[ \t]*=[ \t]*\r?$", donkey, re.MULTILINE) is not None,
+                         "毛驴清空了 attackEffect（吃战斗机的兵种默认 strafe）"))
 
     # ==================== 弹体池 ====================
     print("\n--- 弹体池按场景路径分池 ---")

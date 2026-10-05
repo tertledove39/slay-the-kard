@@ -169,24 +169,32 @@ def main():
     # 交叉核对：卡里写的槽位，[sfx] 段里必须真有 —— 写错一个字母就静默没声
     for card, slot in sorted(wired.items()):
         results.append(check(slot in slots, f"{card} 用的槽位「{slot}」在 [sfx] 段里存在"))
-    results.append(check(len(wired) == len(expected),
-                         f"接线的卡数与预期一致（实际 {len(wired)}，预期 {len(expected)}）"))
+    # 用**包含**而不是**相等**：卡牌语音是可以随时加的（主人自己就往 20 多张指令卡上
+    # 补了语音），钉死总数等于每加一张就弄红一次测试，那种红灯最后没人看。
+    # 这里保证的是「上面点名的那几张**必须**接对了」+「接的槽位都得存在」。
+    missing = sorted(set(expected) - set(wired))
+    results.append(check(not missing,
+                         f"上面点名的卡都接了线（缺 {missing}）"))
 
     # ---- 研发三档：**槽位要跟着卡面 cost 走** ----
     # 「初级 / 2级 / 3级」在卡名里看不出来（三家叫法还不一样：军事研发 / 扩展 / 高级），
     # 唯一统一的判据是 cost。所以按 cost 反查一遍，防止某张卡填错档。
+    #
+    # 名单写**卡 id 白名单**，不是「槽位以 research_ 开头」——后者会把任何一张
+    # 碰巧用了研发音的卡也算成研发卡（间谍组织就是这么被误判进来的）。
     print("\n--- 研发三档与卡面 cost 对齐 ---")
     tier_by_cost = {3: "research_1", 6: "research_2", 9: "research_3"}
-    research_cards = {c: s for c, s in wired.items() if s.startswith("research_")}
+    research_ids = ["美国军事研发", "苏联军事研发", "皇家研发",
+                    "扩展美国研发", "扩展军事研发", "扩展皇家研发",
+                    "高级美国研发", "高级苏联研发", "高级皇家研发"]
     sections = {sec.split("]")[0].strip(): sec
                 for sec in re.split(r"(?m)^\[", card_ini) if sec.strip()}
-    for card, slot in sorted(research_cards.items()):
+    for card in research_ids:
+        slot = wired.get(card)
         m = re.search(r"(?m)^price\s*=\s*(\d+)", sections.get(card, ""))
         cost = int(m.group(1)) if m else -1
-        results.append(check(tier_by_cost.get(cost) == slot,
+        results.append(check(slot == tier_by_cost.get(cost),
                              f"{card}（cost {cost}）→ {slot}，与档位表一致"))
-    results.append(check(len(research_cards) == 9,
-                         f"研发卡共 9 张（三家 × 三档），实际 {len(research_cards)} 张"))
     for slot in ("research_1", "research_2", "research_3", "stalins_organ", "manhattan"):
         results.append(check(slot in slots, f"[sfx] 配了槽位「{slot}」"))
         for f in slots.get(slot, []):
