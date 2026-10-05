@@ -34,17 +34,22 @@ public partial class EventScene : CanvasLayer
     /// <param name="areaName">触发此事件的区域名，用于完成后标记</param>
     public static async Task Show(Node parent, EventData eventData, string areaName)
     {
-        var scene = new EventScene { Layer = 2 };
-        parent.AddChild(scene);
-
-        // 事件期间收起任务选择面板，但**保留**本次抽到的那一批（走 CloseMissionPanel
-        // 而不是 Dismiss）：事件结束后玩家回到地图，看到的还是同样三个选项。
-        //
         // ⚠️ 这里必须**向上找** WorldMap，不能写 `parent is WorldMap`：
         // 事件的开场是 ChooseMission.StartEvent → EventScene.Show(this, ...)，
         // 传进来的 parent 是**任务选择面板**而不是世界地图，直接判类型会永远为 false，
         // 面板收不起来、区域按钮也锁不住（暗幕已改成不拦鼠标，点击就会穿透过去）。
         var map = FindWorldMap(parent);
+
+        // ⚠️ 叠层要挂**世界地图**，不能挂 parent —— 下面那句 EnterEventOverlay 会把
+        // 任务选择面板 QueueFree 掉，而叠层是它的子节点，会被一起带走。表现是
+        // 「点了事件什么都不发生」，而且 `_eventOverlayActive` 永远停在 true，
+        // 地图从此点不动（见 BUGS.md #58）。
+        var host = map ?? parent;
+        var scene = new EventScene { Layer = 2 };
+        host.AddChild(scene);
+
+        // 事件期间收起任务选择面板，但**保留**本次抽到的那一批（走 CloseMissionPanel
+        // 而不是 Dismiss）：事件结束后玩家回到地图，看到的还是同样三个选项。
         map?.EnterEventOverlay();
 
         bool campaignCompleted = await scene.Run(eventData, areaName);
@@ -53,8 +58,10 @@ public partial class EventScene : CanvasLayer
         // 事件结算完毕才丢弃这一批——烈度已经被这次事件消耗掉了
         map?.ExitEventOverlay();
 
+        // 这里也要传**存活的** host：parent（任务面板）在事件开场就被关掉了，
+        // 传它是空引用，`ShowAndReturnToMenu` 开头的存活判定会直接把通关界面整段跳过。
         if (campaignCompleted)
-            await CampaignVictory.ShowAndReturnToMenu(parent);
+            await CampaignVictory.ShowAndReturnToMenu(host);
     }
 
     /// <summary>

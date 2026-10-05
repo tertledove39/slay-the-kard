@@ -776,3 +776,51 @@ if (isFriendly)
 
 **下一步**：真机进一次战斗、进一次商店，看日志里有没有同样的两行。有的话再查
 `SceneLoader` 的线程化加载；没有就说明只是合成测试的产物。
+
+**同族的第二个现象（同样未确认）**：合成测试里 `add_child(store.tscn)` 会让进程
+**静默死亡**（`A: 开始` / `B: instantiate 完成` 之后没有下文，也没有任何报错）。
+但同一个 `store.tscn` 单独 `ResourceLoader.load()` + `instantiate()` 是**成功**的，
+只是不进树。**已确认与本轮改动无关**：把 `Store.cs` 的改动整段撤掉再跑，一样死。
+真机上商店是能用的（主人一直在用），所以更像是「把它当普通子节点加进树」这个
+合成场景的问题，而不是商店本身坏了。
+
+### 58. 事件界面打不开：叠层被挂在了「马上要被关掉的那个面板」上（已修）
+
+**症状**（主人报的）：「现在无法进入事件界面了」。在任务选择面板里点事件选项，
+什么都没发生；而且此后**地图上的区域按钮全部失灵**，点哪儿都没反应。
+
+**复现**（headless 起真 `worldMap.tscn`，走 `area1` → `OnChoose(事件那一个)`）：
+
+    修复前：第 0 帧 任务面板还在=False  EventScene=<没有>
+            事件界面**从头到尾没出现在树里**
+    修复后：第 0 帧 任务面板还在=False  EventScene 在树里=True
+            事件界面父节点 = Control2（世界地图根节点）  0.6 秒后仍在 = True
+
+**根因**：`EventScene.Show(parent, ...)` 里
+
+    parent.AddChild(scene);          // parent = ChooseMission 任务面板
+    var map = FindWorldMap(parent);
+    map?.EnterEventOverlay();        // → CloseMissionPanel() → 面板 QueueFree()
+
+叠层是**任务面板的子节点**，面板被 `QueueFree` 时把它一起带走了。同一次调用里，
+先把东西挂到 A 上、再让 A 消失——所以事件界面一个画面都没活到。
+
+**连带症状**：`Show` 里 `ExitEventOverlay()` 写在 `await scene.Run(...)` **之后**。
+叠层既然活不到 `Run` 返回（或者根本没跑），那一句就永远执行不到，
+`_eventOverlayActive` 一直停在 `true` → `OnAreaPressed` 开头直接 return，地图从此点不动。
+**两个症状是同一个原因**，不是两件事。
+
+**第二个连带项**：末尾的 `CampaignVictory.ShowAndReturnToMenu(parent)` 传的也是那个
+已关掉的面板；`ShowAndReturnToMenu` 开头有 `IsInstanceValid(parent)` 存活判定，
+于是**最后一个区域归零时的通关界面会被整段静默跳过**。
+
+**修复**：解析出 `map` 之后，叠层挂 `host = map ?? parent`（拿不到世界地图才退回原样）；
+通关界面也传 `host`。顺序不变——先挂好叠层，再收起面板。
+
+**怎么进来的**：`7c5d076`（「修实机反馈十项……事件叠层」）。那一轮的注释还写着
+「传进来的 parent 是**任务选择面板**而不是世界地图」——作者知道 parent 是面板，
+却没注意到紧接着那句 `EnterEventOverlay` 正是把面板关掉的那一下。
+
+**谁守着**：`tests/verify_button_animations.py` 断言 `var host = map ?? parent;`、
+`host.AddChild(scene)`、并且 `parent.AddChild(scene)` **已消失**、挂载点写在
+`EnterEventOverlay` 之前；`tests/verify_area_intensity.py` 断言通关那句传的是 `host`。

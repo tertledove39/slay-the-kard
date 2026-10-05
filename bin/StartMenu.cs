@@ -50,8 +50,8 @@ public partial class StartMenu : Control
         ConnectHover("Menu/Settings");
         ConnectHover("Menu/Credits");
 
-        
-
+        // 主菜单四个按钮都响按键音
+        UiClickSound.AttachAll(this);
 
     }
 

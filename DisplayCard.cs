@@ -38,6 +38,10 @@ public partial class DisplayCard : Control
         button.MouseExited += () => AnimateButton(button, 1f);
         MoveChild(button, GetChildCount() - 1);
 
+        // 卡组查看器的「返回」按钮响按键音。世界地图里点开卡组、战斗里点开卡组，
+        // 用的是**同一个** DisplayCard，所以挂在这一处就同时覆盖了两边。
+        UiClickSound.AttachAll(this);
+
         // 异步加载卡牌，Display内部首帧让出使背景先渲染
         Display(BattleStateManager.Deck);
     }

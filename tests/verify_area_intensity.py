@@ -155,10 +155,17 @@ def main():
               and "CampaignVictory.ShowAndReturnToMenu(this)" in battle,
               "战斗路径在最后一个区域归零时进入通关流程")
     )
+    # 传的是 `host` 而不是 `parent`：事件开场时任务选择面板就被 EnterEventOverlay
+    # 关掉了，`parent` 正是那个面板 —— 传它进去会撞上 ShowAndReturnToMenu 开头的
+    # 存活判定，通关界面整段静默跳过（BUGS.md #58 的连带项）。
     results.append(
         check("BattleStateManager.IsFinalArea(_areaName)" in event
-              and "CampaignVictory.ShowAndReturnToMenu(parent)" in event,
-              "事件路径在最后一个区域归零时进入通关流程")
+              and "CampaignVictory.ShowAndReturnToMenu(host)" in event,
+              "事件路径在最后一个区域归零时进入通关流程（传存活的 host，不是已关掉的面板）")
+    )
+    results.append(
+        check("ShowAndReturnToMenu(parent)" not in event,
+              "旧的「传 parent」写法已消失")
     )
     results.append(
         check('"res://dialogues/campaign_victory.dialogue"' in victory

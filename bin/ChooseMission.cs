@@ -68,6 +68,9 @@ public partial class ChooseMission : Control
 
         ApplyNames();
         RefreshIntensityLabel();
+
+        // 任务选择面板的四个按钮（三个选项 + 返回）都响按键音
+        UiClickSound.AttachAll(this);
     }
 
     /// <summary>设置任务条目列表和区域名，并刷新显示</summary>

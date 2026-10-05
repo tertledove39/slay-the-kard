@@ -350,8 +350,12 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 - `plane_deploy` / `plane_flyby`：飞机（战斗机与轰炸机）的**部署**音与**移动**音，不分档。
   两组素材是按时机给的（`AU_depl_Fighter_small_*` / `AU_Flyby_Fighter_small_v2_*`），**不通用**；
   每条两个文件、随机抽一条。挂载点见 `battlefield_.PlaneFallbackEffect`
-- `button`：**按键音**（`assest/General_button2.wav`）。世界地图界面所有按钮 +
-  战斗界面的「下一回合」按钮，挂载点见 `bin/UiClickSound.cs`
+- `button`：**按键音**（`assest/General_button2.wav`）。挂载点见 `bin/UiClickSound.cs`，
+  目前覆盖：**主菜单**、**任务选择面板**（三个选项 + 返回）、**世界地图**（9 个）、
+  **商店**（刷新 / 返回 / 买血，以及点卡片购买）、**卡组查看器**的返回、
+  战斗里的**「下一回合」与「卡组」**。
+  加了新界面要记得也挂上——`tests/verify_button_animations.py` 里有一张
+  「场景 与 挂载点」的对照表，漏挂会直接红
 - `katyusha_fire` / `katyusha_into_pos`：喀秋莎的**攻击**音与**进入阵地**音，分别挂在 `attackEffect` 与 `playEffect` 上
 - `draw`：抽卡音，5 条变体（`Draw_One_A`~`E`），随机抽一条
 - `tank_cannon_medium` / `tank_cannon_large` / `tank_cannon_impact`：坦克的**开火音**（两档，小的并入 medium）与**命中音**（不分档）

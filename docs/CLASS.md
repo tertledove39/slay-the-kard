@@ -292,7 +292,7 @@
 | `WorldMap` : Control | bin/WorldMap.cs | 世界地图主界面。7个区域按钮随进度解锁，按钮按墨卡托投影落在对应历史城市。含调试控制台；卡牌、事件与区域池配置首次解析后跨场景复用。内置`Area`类（区域池、`areaTimes`烈度、`boss`预设名）。任务抽取委托给`MissionDrawer`。事件期间由 `EnterEventOverlay()` / `ExitEventOverlay()` 接管：只收起任务面板（保留本次抽到的一批）、锁住区域按钮，好让商店与卡组仍可点开。 |
 | `MissionDrawer` : static | bin/MissionDrawer.cs | 任务抽取规则的唯一实现，纯计算不依赖场景节点。按当前烈度处理`boss`（不为1则不参与抽取，为1则只提供它），其余组成`2战斗+1事件`，不足时只用剩余战斗补位。见`docs/CONFIG.md`的`AreaPool.ini`一节。 |
 | `ChooseMission` : Control | bin/ChooseMission.cs | 任务选择面板。3个任务按钮（战斗或事件）。 |
-| `EventScene` : CanvasLayer | bin/EventScene.cs | 剧情事件界面。配图+描述+选项，支持获得战役资源点和卡牌替换效果。 |
+| `EventScene` : CanvasLayer | bin/EventScene.cs | 剧情事件界面。配图+描述+选项，支持获得战役资源和卡牌替换效果。**叠层挂在世界地图上**（`Show` 里 `host = map ?? parent`），不是挂到传进来的调用者身上 —— 事件开场会收起任务选择面板，挂上去就会被一起 `QueueFree`（BUGS.md #58）。 |
 | `EventMaterialPoints` : static | bin/EventMaterialPoints.cs | 解析事件 `materialPoints(n)` 效果，并以 `int.MaxValue` 为上限执行安全加法。 |
 | `PostBattleReward` : CanvasLayer | bin/PostBattleReward.cs | 战后奖励系统。3组卡牌选择→卡组替换。稀有度限制。 |
 | `DisplayCard` : Control | bin/DisplayCard.cs | 卡组查看器。滚轮翻页。 |

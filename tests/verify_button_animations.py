@@ -2,12 +2,19 @@
 """按钮在**悬停**与**按下**时各自该做什么。
 
 悬停：各场景自己的一份 `AnimateButton`（1.08x / 0.12s 放大）。
-按下：**按键音**——世界地图界面所有按钮 + 战斗界面的「下一回合」按钮，
-      统一走 `bin/UiClickSound.cs`（槽位 `[sfx] button` = `General_button2.wav`）。
+按下：**按键音**，统一走 `bin/UiClickSound.cs`（槽位 `[sfx] button` = `General_button2.wav`）。
+      目前覆盖：主菜单、任务选择面板、世界地图、商店、卡组查看器、战斗的「下一回合」与「卡组」。
+
+命名提醒：`bin/UiClickSound.cs` 的 `AttachAll` 是**递归**挂的，所以「这个界面有按钮却
+没挂上」是能静态查出来的——见下面那张 场景 与 挂载点 的对照表，加了新界面忘了挂会直接红。
 """
 from pathlib import Path
 import re
 import sys
+
+if hasattr(sys.stdout, "reconfigure"):
+    # 控制台是 GBK，中文/箭头字符直接 print 会 UnicodeEncodeError
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -90,6 +97,54 @@ def main():
         check(len(music.split("\n")) < 300,
               f'MusicManager.cs 仍在 300 行红线内（当前 {len(music.splitlines())} 行）'),
     ]
+
+    # ---- 每个「有按钮的界面」都要挂上，一个都不能漏 ----
+    # 这张表就是「哪些界面该响」的唯一清单：加了新界面忘了挂会红，
+    # 而不是靠人去数。`Attach` 那一列是**运行时才建的按钮**（`_Ready` 之后才存在，
+    # 递归扫不到），必须在创建处单独挂。
+    print("\n--- 各界面 与 挂载点 的对照表 ---")
+    hookups = [
+        ("bin/start_menu.tscn", "bin/StartMenu.cs", "AttachAll(this)", "主菜单"),
+        ("bin/chooseMission.tscn", "bin/ChooseMission.cs", "AttachAll(this)", "任务选择面板"),
+        ("bin/worldMap.tscn", "bin/WorldMap.cs", "AttachAll(this)", "世界地图"),
+        ("store.tscn", "Store.cs", "AttachAll(this)", "商店"),
+        ("bin/display_card.tscn", "DisplayCard.cs", "AttachAll(this)", "卡组查看器"),
+    ]
+    for scene_rel, cs_rel, call, label in hookups:
+        scene_text = (ROOT / scene_rel).read_text(encoding="utf-8")
+        cs_text = (ROOT / cs_rel).read_text(encoding="utf-8")
+        buttons = len(re.findall(r'type="(?:Button|TextureButton)"', scene_text))
+        results.append(check(f"UiClickSound.{call};" in cs_text,
+                             f"{label}（{scene_rel}）挂上了按键音"))
+        results.append(check(buttons > 0,
+                             f"{label} 场景里确实有按钮（{buttons} 个）—— 否则这条断言是空跑"))
+
+    # 战斗里两个按钮是 `_Ready` 之后才建的（下一回合在场景里、卡组是代码 new 的），
+    # 所以用 Attach 而不是 AttachAll。
+    results.append(check("UiClickSound.Attach(buttonNextTurn);" in battle,
+                         "战斗的「下一回合」按钮（场景里的节点）"))
+    results.append(check("UiClickSound.Attach(viewDeckBtn);" in battle,
+                         "战斗的「卡组」按钮（代码里 new 的，递归扫不到，必须在创建处挂）"))
+    # 商店的「点卡片购买」不是 Button 而是 _Input + 矩形命中，单独补一声。
+    results.append(check("UiClickSound.Play();" in store
+                         and store.index("UiClickSound.Play();") < store.index("TryBuyCard(i);"),
+                         "商店点卡片买卡时也响一声（放在命中判定之后、买卡之前）"))
+
+    # ---- 事件叠层必须挂在**世界地图**上 ----
+    # 曾经的 bug（BUGS.md #58）：叠层挂在任务选择面板上，而下一句 EnterEventOverlay
+    # 就把那个面板 QueueFree 了 —— 叠层跟着陪葬，事件界面从不出现，而且
+    # `_eventOverlayActive` 永远停在 true，地图从此点不动。
+    print("\n--- 事件叠层挂在哪 ---")
+    results.append(check("var host = map ?? parent;" in event_scene and "host.AddChild(scene);" in event_scene,
+                         "叠层挂到世界地图（拿不到才退回 parent），不挂在会被关掉的任务面板上"))
+    results.append(check("parent.AddChild(scene);" not in event_scene,
+                         "旧的「直接挂 parent」写法已消失"))
+    results.append(check("await CampaignVictory.ShowAndReturnToMenu(host);" in event_scene,
+                         "通关界面也传存活的 host（传 parent 会被存活判定挡掉、整段跳过）"))
+    show = event_scene[event_scene.index("public static async Task Show("):]
+    show = show[:show.index("\n    }")]
+    results.append(check(show.index("var host = map ?? parent;") < show.index("map?.EnterEventOverlay();"),
+                         "顺序：先挂好叠层，再收起任务面板"))
 
     # 交叉核对：UiClickSound 里写的槽位名必须在 [sfx] 段里存在，且文件真在、真被 Godot 导入。
     # 少了任何一环都是**静默没声**——测试不查就只能靠耳朵发现。

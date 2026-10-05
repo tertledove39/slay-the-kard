@@ -731,6 +731,11 @@ private const int OpeningHandSize = 5;
             BattleStateManager.ShowDeckViewer(this, displayDeck);
         };
         AddChild(viewDeckBtn);
+
+        // 这个按钮是 `_Ready` 之后才建的，所以 `AttachAll` 那一轮扫不到它，
+        // 得在**创建处**单独挂。（战斗里点开卡组之后那个「返回」按钮在 DisplayCard 里，
+        // 由它自己的 `_Ready` 覆盖。）
+        UiClickSound.Attach(viewDeckBtn);
     }
 
     /// <summary>

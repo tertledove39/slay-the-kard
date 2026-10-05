@@ -59,6 +59,10 @@ public partial class Store : Control
         }
         if (BattleStateManager.StoreCurrentSlots == null) BattleStateManager.InitializeStoreSlots();
         DisplayCards();
+
+        // 商店界面内部的按钮（刷新 / 返回 / 买血）都响按键音。
+        // 三个都在 store.tscn 里，所以一次递归挂完。
+        UiClickSound.AttachAll(this);
     }
 
     private void DisplayCards()
@@ -173,7 +177,14 @@ public partial class Store : Control
         for (int i = 0; i < StoreCardCount && i < slots.Count; i++)
         {
             if (slots[i].IsSold || _cards[i] == null) continue;
-            if (_cards[i].GetGlobalRect().HasPoint(mb.GlobalPosition)) { TryBuyCard(i); break; }
+            if (_cards[i].GetGlobalRect().HasPoint(mb.GlobalPosition))
+            {
+                // 买卡不是 Button 而是「点卡片命中矩形」，所以按键音要自己补一声。
+                // 放在命中判定之后、TryBuyCard 之前：点中是「按下按钮」，买不起另有一声提示。
+                UiClickSound.Play();
+                TryBuyCard(i);
+                break;
+            }
         }
     }
 
