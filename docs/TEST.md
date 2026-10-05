@@ -1117,3 +1117,65 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 > 这两个场景**单独加载完全正常**（实测四个场景逐个 `load()` 全部 OK），
 > 报错行都是 `script = ExtResource(...)`。与本轮改动无关，也没有定位到根因，
 > 先记现象、不动代码。详见 `BUGS.md` #57（未定位）。
+
+### 第十九轮（坦克炮弹：炮口/落点烟 + 发光 + 大幅提速）
+
+需求（主人原话）：
+
+> 坦克的动画有问题 请拿烟雾修改一下 在坦克炮发射和落点的位置都新增一个小型烟雾
+> 并让坦克炮像子弹一样发光 再让坦克炮弹飞行速度大幅加快
+
+**发光不是「调亮一点」，是 HDR**：战场里 `bin/battleField.tscn` 开着
+`glow_enabled = true` / `glow_hdr_threshold = 0.9`。`bin/bullet.tscn` 的根节点写着
+`modulate = Color(18.59, 18.89, 0, 1)` —— 把贴图色推到远大于 1 越过阈值，才有 bloom。
+坦克炮弹缺的就是这两行，于是**逐字照抄**（不是「调成差不多的黄色」：
+抄的是机制，值也一模一样，以后一眼能看出两者是同一套）。
+
+> 顺带查清了一件事：`bullet.tscn` 同时写了 `modulate` 与 `self_modulate`，
+> 但 `self_modulate` 只管**节点自身**的绘制，而根节点是个不画东西的 `Control`，
+> 所以真正起作用的是 `modulate`。照抄时两条都留着，是为了两个场景能对得上。
+
+**两根烟挂在哪，是这次唯一的设计点**。「炮弹抵达那一刻」只有 `BulletEffect` 知道
+（`await bullet.Play(...)` 正是在那一刻返回的）——与上一轮的命中音同一个道理：
+
+    炮口烟：Play 开头、**生成弹体之前**  → 不 await，与第一发同时跑
+    落点烟：await Task.WhenAll(tasks) 之后 → **await 它**
+
+落点烟必须 `await`：不 await 的话 `RunEffect` 的 finally 会立刻回收整个特效，
+而烟是这个特效的子节点，会被一起掐掉半截。
+
+两个烟都是 `BulletEffect` 的 Export、**默认留空 = 不冒**，只有 `tank_attack_effect.tscn`
+填了值 —— 与命中音同一套「默认关闭、按需开」，所以 `bullet` / `bombing` 两端依旧干净。
+
+**规范 A 的一次实际应用**：`AirStrikeEffect` 里**已经有**一段「取子特效 → 播 → 回收」
+（Create → AddChild → PrepareForUse → Play → Release）。所以没有新写第二份，把它提到
+`Effect` 基类当 `PlayChildEffectAsync(name, positions, count)`，攻击机与炮弹共用。
+`AirStrikeEffect` 那边从 28 行缩成一行转发。四条原本钉在 `AirStrikeEffect` 内部的断言
+改成钉**基类**（更强的说法：全项目只有一份实现），另加一条「AirStrikeEffect 里已经没有
+第二份 `EffectRegistry.Create` / `Release`」。
+
+**「小型」是 Export，不是第二个类**：`SmokeEffect` 加 `[Export] float SizeScale = 1f`
+（默认 1 = 阵亡烟大小不变），新场景 `effects/smoke_small_effect.tscn` 填 0.3。
+乘在 `(1 + frame * 0.2)` **之上**，所以放大过程本身的速度不受影响。
+
+**速度**：`ProjectileFlightSeconds` 0.6 → **0.25**（子弹是 0.3 —— 现在炮弹比子弹还快）。
+
+验证（临时 C# 场景，跑完即删；`Play` 的入参是 `IReadOnlyList<Vector2>`，
+GDScript 传给 `call()` 会编组失败，所以这次用 C# 写临时测试）：
+
+    smoke_small 注册表命中 = True
+    smoke_small.SizeScale = 0.3 / smoke.SizeScale = 1          <- 既有烟没被改到
+    tank_shell modulate = (18.592834, 18.892157, 0, 1)         <- 与子弹逐字相同
+    tank_shell 的 Sprite2D modulate = (1, 1, 1, 1)             <- 炮弹保持不透明
+    MuzzleEffect = 'smoke_small' / ImpactEffect = 'smoke_small' / FlightSeconds = 0.25
+    跑完全程，见到烟的落点: (100,200) (500,300)                <- 正好两个，位置全对
+    await 返回那一刻的子节点: 4 个 AudioStreamPlayer（命中音声部，上一轮的）
+
+> 最后那行一开始看着像泄漏（期望 0 个子节点）。查下来是**命中音的 4 个声部**——
+> 它们是 `Configure` 建的、随特效一起销毁，本来就该在。炮弹与两个烟都已回收。
+
+`tests/verify_attack_effects.py` 179 项：新增第 ⑦ 节钉住上面每一条，并把两个烟雾场景
+也纳入「每个 Export 都要有中文 `///` 说明 + 场景里的属性名必须真实存在」那条守卫 ——
+为此给 `ENGINE_PROPS` 补了 `texture` / `hframes` / `vframes` / `scale` / `position` /
+`rotation` / `modulate`：那张白名单是**全文件**扫的，而场景里除了挂脚本的根节点
+还有子节点（`SmokeSprite` 就写了这几个），它们是子节点自己的引擎属性。

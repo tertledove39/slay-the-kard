@@ -85,12 +85,17 @@ def uncommented_exports(scene_text, names):
 
 
 # .tscn 里「引擎自带」的属性，不算手写的导出项。
+# 注意这些名字是**全文件**扫描的：场景里除了挂脚本的根节点，往往还有子节点
+# （`smoke_effect.tscn` 的 Sprite2D 就写了 texture / hframes / vframes），
+# 那些是子节点自己的引擎属性，与「脚本的 Export 拼错了」是两回事。
 ENGINE_PROPS = {
     "script", "layout_mode", "anchors_preset", "anchor_left", "anchor_top",
     "anchor_right", "anchor_bottom", "offset_left", "offset_top", "offset_right",
     "offset_bottom", "grow_horizontal", "grow_vertical", "mouse_filter", "visible",
     "z_index", "bus", "stream", "autoplay", "volume_db", "pitch_scale",
     "size_flags_horizontal", "size_flags_vertical", "focus_mode", "name",
+    # Sprite2D / Node2D 的：
+    "texture", "hframes", "vframes", "scale", "position", "rotation", "modulate",
 }
 
 
@@ -387,6 +392,79 @@ def main():
                          (ROOT / bullet_scene_path.replace("res://", "")).read_text(encoding="utf-8"),
                          "bullet 场景写明固定 10 发（正数 = 固定发数，不随攻击力变）"))
 
+    # ==================== ⑦ 坦克炮弹：炮口烟 / 落点烟 / 发光 / 更快 ====================
+    # 主人：「坦克的动画有问题…在坦克炮发射和落点的位置都新增一个小型烟雾，
+    #        并让坦克炮像子弹一样发光，再让坦克炮弹飞行速度大幅加快」。
+    #
+    # 两根烟挂在 BulletEffect 上、**默认关闭**（留空 = 不冒），只有 tank_attack_effect.tscn
+    # 填了值——与命中音同一套「默认值而非逐卡配置」的思路，bullet / bombing 两端依旧是干净的。
+    print("\n--- ⑦ 坦克炮弹的炮口烟 / 落点烟 / 发光 ---")
+    results.append(check('["smoke_small"] = "res://effects/smoke_small_effect.tscn"' in effect,
+                         "注册了 smoke_small"))
+    results.append(check("[Export] public float SizeScale" in smoke,
+                         "SmokeEffect 加的是 **Export**（不是写死的尺寸）"))
+    results.append(check("float scale = (1f + frame * 0.2f) * SizeScale;" in smoke,
+                         "SizeScale 乘在逐帧放大之上——放大过程本身的速度不受影响"))
+    results.append(check("[Export] public float SizeScale = 1f;" in smoke,
+                         "默认 1 = 阵亡烟那个大小，既有场景行为不变"))
+    small_scene = (ROOT / "effects" / "smoke_small_effect.tscn").read_text(encoding="utf-8")
+    results.append(check('path="res://core_logic/SmokeEffect.cs"' in small_scene,
+                         "smoke_small 复用 SmokeEffect 脚本（不写第二个类）"))
+    size = re.search(r"SizeScale = ([\d.]+)", small_scene)
+    results.append(check(size is not None and 0.0 < float(size.group(1)) < 1.0,
+                         f"smoke_small 的 SizeScale 确实比 1 小（{size.group(1) if size else '?'}）"))
+    results.append(check('path="res://assest/Smoke_006.png"' in small_scene
+                         and "hframes = 4" in small_scene and "vframes = 4" in small_scene,
+                         "用的是同一张贴图与同一套 4x4 切帧（只改大小不改素材）"))
+
+    # 两根烟各挂在哪一刻：发射是**开跑前**（与第一发同时出），落点是**全部弹体抵达之后**。
+    results.append(check("[Export] public string MuzzleEffect" in bullet_effect
+                         and "[Export] public string ImpactEffect" in bullet_effect,
+                         "两个烟都是 Export（特效名，可带参数）"))
+    results.append(check('[Export] public string MuzzleEffect = "";' in bullet_effect
+                         and '[Export] public string ImpactEffect = "";' in bullet_effect,
+                         "默认留空 = 不冒 —— bullet / bombing 两端依旧干净"))
+    muzzle = bullet_effect.index("_ = PlayChildEffectAsync(MuzzleEffect")
+    shots = bullet_effect.index("var tasks = new List<Task>(shots);")
+    results.append(check(muzzle < shots and "positions[0]" in bullet_effect[muzzle:shots],
+                         "炮口烟在**生成弹体之前**就放出去（不 await，与第一发同时跑）"))
+    tail = method(bullet_effect, "await Task.WhenAll(tasks);", "\n    }")
+    results.append(check("await PlayChildEffectAsync(ImpactEffect" in tail,
+                         "落点烟在**全部弹体抵达之后**放，而且 await 它"))
+    results.append(check("positions[positions.Count - 1]" in tail,
+                         "落点取的是最后一个位置（目标），不是发射点"))
+    results.append(check("PlayChildEffectAsync(ImpactEffect" in tail
+                         and tail.index("await Task.WhenAll(tasks);") < tail.index("PlayChildEffectAsync(ImpactEffect"),
+                         "顺序：先等所有弹体飞完，再冒烟 —— 不然烟会先炸在还没到的地方"))
+
+    tank_scene = (ROOT / "effects" / "tank_attack_effect.tscn").read_text(encoding="utf-8")
+    results.append(check('MuzzleEffect = "smoke_small"' in tank_scene
+                         and 'ImpactEffect = "smoke_small"' in tank_scene,
+                         "tank_attack 场景两个烟都填了 smoke_small"))
+    flight = float(re.search(r"ProjectileFlightSeconds = ([\d.]+)", tank_scene).group(1))
+    bullet_flight = float(re.search(r"ProjectileFlightSeconds = ([\d.]+)", bullets_scene).group(1))
+    results.append(check(flight < bullet_flight,
+                         f"炮弹 {flight}s 比子弹 {bullet_flight}s 还快（需求「大幅加快」）"))
+    for name in (re.search(r'MuzzleEffect = "(.*?)"', tank_scene).group(1),
+                 re.search(r'ImpactEffect = "(.*?)"', tank_scene).group(1)):
+        results.append(check(name in scene_paths(effect), f"场景里填的特效名「{name}」真实注册过"))
+
+    # 发光：bullet.tscn 靠 modulate 把贴图抬进 HDR 越过 glow 阈值，坦克炮弹照抄。
+    shell_scene = (ROOT / "bin" / "tank_shell.tscn").read_text(encoding="utf-8")
+    bullet_tscn = (ROOT / "bin" / "bullet.tscn").read_text(encoding="utf-8")
+    # 战场里确实开着 glow，否则 18 倍的 modulate 也只会是「很亮的图」而不是发光的图。
+    results.append(check("glow_enabled = true" in
+                         (ROOT / "bin" / "battleField.tscn").read_text(encoding="utf-8"),
+                         "战场开着 glow（发光才有意义）"))
+    bullet_mod = re.search(r"modulate = (Color\([^)]*\))", bullet_tscn)
+    shell_mod = re.search(r"modulate = (Color\([^)]*\))", shell_scene)
+    results.append(check(bullet_mod is not None and shell_mod is not None
+                         and bullet_mod.group(1) == shell_mod.group(1),
+                         f"坦克炮弹的 modulate 与子弹**逐字相同**（{shell_mod.group(1) if shell_mod else '?'}）"))
+    bright = re.match(r"Color\(([\d.]+)", shell_mod.group(1)) if shell_mod else None
+    results.append(check(bright is not None and float(bright.group(1)) > 1.0,
+                         "HDR 值远大于 1 —— 配合战场里开着的 glow 就能起 bloom"))
+
     # ==================== 场景里每个 Export 都要有中文注释 ====================
     print("\n--- 场景里 export 的内容必须带中文注释 ---")
     # 一个场景能写哪些 Export，看的是整条继承链，不是单个文件：
@@ -395,7 +473,9 @@ def main():
                                 ("effects/air_strike_effect.tscn", [AIRSTRIKE, FLYING]),
                                 ("effects/bullet_effect.tscn", [BULLET_EFFECT]),
                                 ("effects/bombing_effect.tscn", [BULLET_EFFECT]),
-                                ("effects/tank_attack_effect.tscn", [BULLET_EFFECT])]:
+                                ("effects/tank_attack_effect.tscn", [BULLET_EFFECT]),
+                                ("effects/smoke_effect.tscn", [SMOKE]),
+                                ("effects/smoke_small_effect.tscn", [SMOKE])]:
         cs_text = "\n".join(p.read_text(encoding="utf-8") for p in cs_paths)
         scene_text = (ROOT / scene_rel).read_text(encoding="utf-8")
         names = exports_of(cs_text)
@@ -459,15 +539,28 @@ def main():
     results.append(check("await StayAsync(source, positions, baseRotation," in after,
                          "三段顺序：升起（含并行的事）→ 悬停 → 落回"))
 
-    # 投弹是「子特效」，弹数/时长仍在 bombing 场景里配，这里只决定何时开投
-    results.append(check('EffectRegistry.Create(StrikeEffectName)' in airstrike,
-                         "投弹复用已注册的 bombing 特效，不重写弹道"))
-    results.append(check("await strike.Play(positions, null, null, count);" in airstrike,
-                         "count（= 攻击力）原样传给投弹"))
+    # 投弹是「子特效」，弹数/时长仍在 bombing 场景里配，这里只决定何时开投。
+    # 「取 → 进树 → 传参 → 播 → 还」那一套**已提到基类**：BulletEffect 的发射/落点烟
+    # 也要同一套，所以现在只有一份实现（规范 A 的「先找已有功能、适合改造就改造」）。
+    child_fn = method(effect, "protected async Task PlayChildEffectAsync(", "\n    }")
+    results.append(check('EffectRegistry.Create(effectName)' in child_fn,
+                         "子特效复用已注册的特效，不重写弹道"))
+    results.append(check("await child.Play(positions, null, null, count);" in child_fn,
+                         "count（= 攻击力）原样传给子特效"))
+    results.append(check("EffectRegistry.Release(child)" in child_fn, "子特效用完回收"))
+    results.append(check("AddChild(child);" in child_fn and "child.PrepareForUse();" in child_fn,
+                         "顺序与 StartEffect 一致：先进树、再 PrepareForUse、最后才开演"))
+    results.append(check("catch (Exception exception)" in child_fn,
+                         "子特效出问题只报警不抛出（调用方通常还有降落等活要干）"))
+
+    results.append(check("=> PlayChildEffectAsync(StrikeEffectName, positions, count);" in airstrike,
+                         "AirStrikeEffect 只把子特效名交给基类，自己不再抄一份"))
+    results.append(check("EffectRegistry.Create" not in airstrike_code
+                         and "EffectRegistry.Release" not in airstrike_code,
+                         "AirStrikeEffect 里已经没有第二份「取/还子特效」了"))
     results.append(check("[Export] public string StrikeEffectName" in airstrike,
                          "子特效名是 Export"))
     results.append(check('StrikeEffectName = "bombing"' in airstrike, "默认投的是 bombing"))
-    results.append(check("EffectRegistry.Release(strike)" in airstrike, "子特效用完回收"))
 
     results.append(check('path="res://core_logic/AirStrikeEffect.cs"' in airstrike_scene,
                          "场景挂了 AirStrikeEffect"))

@@ -2,10 +2,26 @@ using Godot;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
+/// <summary>
+/// 在指定位置冒一下烟。
+///
+/// **一个脚本、两个场景**，差别只在 Export 出去的 `SizeScale`：
+/// `effects/smoke_effect.tscn`（阵亡烟，默认 1）与 `effects/smoke_small_effect.tscn`
+/// （坦克炮口/落点的小烟）——所以不是两套实现，是两个 Export 值
+/// （与 `bullet` / `bombing` / `TankAttack` 同一套路）。
+/// </summary>
 public partial class SmokeEffect : Effect
 {
     private const int FrameCount = 16;
     private const float DefaultDuration = 0.4f;
+
+    /// <summary>
+    /// 整体尺寸倍数。**1 = 原大小**（阵亡那一声烟就是它）；
+    /// `smoke_small` 那个场景填得比 1 小，炮口烟才不会遮住半张桌子。
+    /// 它乘在「逐帧放大」之上，所以放大过程本身的速度不受影响。
+    /// </summary>
+    [Export] public float SizeScale = 1f;
+
     private Sprite2D sprite;
     private Tween currentTween;
 
@@ -50,7 +66,7 @@ public partial class SmokeEffect : Effect
     {
         int frame = Mathf.Min(FrameCount - 1, Mathf.FloorToInt(progress * FrameCount));
         sprite.Frame = frame;
-        float scale = 1f + frame * 0.2f;
+        float scale = (1f + frame * 0.2f) * SizeScale;
         sprite.Scale = Vector2.One * scale;
         float alpha = progress < 0.1f
             ? progress / 0.1f

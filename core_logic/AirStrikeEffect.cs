@@ -48,32 +48,10 @@ public partial class AirStrikeEffect : FlyingEffect
     /// <summary>
     /// 播一遍子特效。`count` 原样传下去——`bombing` 场景里弹数配的是 0，
     /// 意思是「用调用方给的数量」，也就是**攻击力**；`bullet` 配的是固定 10 发。
+    ///
+    /// 「取 → 播 → 还」那一套在基类 `Effect.PlayChildEffectAsync` 里，
+    /// 与 `BulletEffect` 的发射/落点烟共用同一份实现。
     /// </summary>
-    private async Task StrikeAsync(IReadOnlyList<Vector2> positions, int count)
-    {
-        if (string.IsNullOrWhiteSpace(StrikeEffectName)) return;
-
-        Effect strike = EffectRegistry.Create(StrikeEffectName);
-        if (strike == null)
-        {
-            GD.PushWarning($"AirStrikeEffect: 子特效取不到，本次只飞不打: '{StrikeEffectName}'");
-            return;
-        }
-
-        AddChild(strike);
-        strike.PrepareForUse();
-        try
-        {
-            await strike.Play(positions, null, null, count);
-        }
-        catch (Exception exception)
-        {
-            // 子特效出问题不该连累降落——父类那边还等着这一支返回。
-            GD.PushWarning($"AirStrikeEffect: 子特效播放异常: {exception.Message}");
-        }
-        finally
-        {
-            if (IsInstanceValid(strike)) EffectRegistry.Release(strike);
-        }
-    }
+    private Task StrikeAsync(IReadOnlyList<Vector2> positions, int count)
+        => PlayChildEffectAsync(StrikeEffectName, positions, count);
 }

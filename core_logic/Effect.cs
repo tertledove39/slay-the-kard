@@ -30,6 +30,47 @@ public abstract partial class Effect : Control
 
     public virtual void PrepareForUse() => Visible = true;
     public virtual void ResetForPool() => Visible = false;
+
+    /// <summary>
+    /// 播一个**子特效**（按 `EffectRegistry` 里的名字取），播完自动回收。
+    ///
+    /// 「取 → 进树 → 传参 → 播 → 还」这一套只在写一处：谁是子特效、什么时候播由调用方决定，
+    /// 但怎么播不该各写一份。目前两个调用方：`AirStrikeEffect`（起飞时打出去的子特效）、
+    /// `BulletEffect`（发射与落点的烟）。
+    ///
+    /// 子特效**自己的**弹数/时长/尺寸仍然配在它自己的场景里，本方法不碰——
+    /// 它只负责把 `count` 原样传下去。
+    ///
+    /// 出问题只报警不抛出：调用方通常还有别的活在等（比如降落），
+    /// 一个烟放不出来不该把整段动画带塌。
+    /// </summary>
+    protected async Task PlayChildEffectAsync(string effectName, IReadOnlyList<Vector2> positions, int count = 0)
+    {
+        if (string.IsNullOrWhiteSpace(effectName)) return;
+
+        Effect child = EffectRegistry.Create(effectName);
+        if (child == null)
+        {
+            GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} Effect.cs: 子特效取不到，本次跳过: '{effectName}'");
+            return;
+        }
+
+        AddChild(child);
+        child.PrepareForUse();
+        try
+        {
+            await child.Play(positions, null, null, count);
+        }
+        catch (Exception exception)
+        {
+            GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} Effect.cs: 子特效播放异常 "
+                         + $"'{effectName}': {exception.Message}");
+        }
+        finally
+        {
+            if (GodotObject.IsInstanceValid(child)) EffectRegistry.Release(child);
+        }
+    }
 }
 
 public static class EffectRegistry
@@ -38,6 +79,9 @@ public static class EffectRegistry
     {
         ["bullet"] = "res://effects/bullet_effect.tscn",
         ["smoke"] = "res://effects/smoke_effect.tscn",
+        // smoke_small 与 smoke 共用 SmokeEffect 脚本，差别只在场景里 Export 出去的 SizeScale
+        // ——所以这里不是两套实现，是两个 Export 值（与 bullet / bombing / TankAttack 同一套路）。
+        ["smoke_small"] = "res://effects/smoke_small_effect.tscn",
         // bombing 与 bullet 共用 BulletEffect 脚本，差别只在场景里 Export 出去的
         // 「弹体场景」与「弹数」——所以这里是两个场景、不是两个类。
         ["bombing"] = "res://effects/bombing_effect.tscn",

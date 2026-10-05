@@ -39,6 +39,23 @@ public partial class BulletEffect : Effect
     /// </summary>
     [Export] public float ProjectileFlightSeconds = 0.3f;
 
+    /// <summary>
+    /// **发射位置**（`positions[0]`）冒的烟，写 `EffectRegistry` 里的特效名（可以带参数）。
+    /// **留空 = 不冒**——`bullet` / `bombing` 都没填，所以它们两端一直是干净的。
+    ///
+    /// `tank_attack_effect.tscn` 填的是 `smoke_small`（炮口那一小股白烟）。
+    /// </summary>
+    [Export] public string MuzzleEffect = "";
+
+    /// <summary>
+    /// **落点**（`positions[^1]`，即最后一个目标）冒的烟，格式同 `MuzzleEffect`。
+    ///
+    /// 它等**全部弹体都飞抵之后**才冒一次——那一刻只有这里知道（`await bullet.Play(...)`
+    /// 正是在弹体抵达时返回的），所以挂在 `PlayAndReleaseBullet` 之后的收尾处，
+    /// 而不是每发各冒一个（`bombing` 有攻击力那么多发，逐个冒会糊成一片）。
+    /// </summary>
+    [Export] public string ImpactEffect = "";
+
     /// <summary>命中音的音量（线性，1 = 原音量）。没有命中音槽位时不起作用。</summary>
     [Export] public float ImpactSfxVolume = 1f;
 
@@ -121,6 +138,9 @@ public partial class BulletEffect : Effect
         // 飞行时长：调用方传了就用它，否则用场景里配的（航弹比子弹慢得多）。
         float? flightSeconds = time ?? (ProjectileFlightSeconds > 0f ? ProjectileFlightSeconds : null);
 
+        // 炮口烟与第一发同时出：不 await，让它和弹体一起跑。
+        _ = PlayChildEffectAsync(MuzzleEffect, new List<Vector2> { positions[0] });
+
         var tasks = new List<Task>(shots);
         for (int index = 0; index < shots; index++)
         {
@@ -135,6 +155,10 @@ public partial class BulletEffect : Effect
                 await ToSignal(GetTree().CreateTimer(delay / 1000.0), SceneTreeTimer.SignalName.Timeout);
         }
         await Task.WhenAll(tasks);
+
+        // 落点烟在**全部弹体都抵达之后**才冒，一次。（`await` 它，否则调用方
+        // 会在烟还没演完时把整个特效回收掉——烟会跟着被掐掉半截。）
+        await PlayChildEffectAsync(ImpactEffect, new List<Vector2> { positions[positions.Count - 1] });
     }
 
     /// <summary>

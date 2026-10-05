@@ -70,6 +70,7 @@
 | `Play(positions, time, source, count)` | 抽象方法。`source` 是触发它的卡（`flying` 要动这张卡本身），`count` 是要生成几个（`bombing` 的弹数 = 攻击力） |
 | `Configure(argument)` | 特效名括号里的参数——`playEffect = sfx(严冬)` 传进来的是「严冬」。**在 `AddChild` 之后、`Play` 之前调用**，所以需要时可安全 `GetNode`。不需要参数的特效忽略即可 |
 | `PrepareForUse()` / `ResetForPool()` | 取用与回收时的收尾 |
+| `PlayChildEffectAsync(name, positions, count)`（`protected`） | 播一个**子特效**：取（`EffectRegistry.Create`）→ 进树 → `PrepareForUse` → `Play` → 还。两个调用方共用：`AirStrikeEffect` 起飞时打出去的子特效、`BulletEffect` 的发射/落点烟。**子特效自己的弹数/时长/尺寸仍配在它自己的场景里**，本方法只把 `count` 原样传下去。出问题只 `PushWarning` 不抛出——调用方通常还有别的活在等（比如降落） |
 
 ### `Bullet` : Effect (bin/Bullet.cs)
 
@@ -99,6 +100,7 @@
 | 成员 | 说明 |
 |------|------|
 | `Configure(argument)` | 收下命中音槽位并按 `ImpactVoiceCount` 懒建声部（声部要 `AddChild`，而 `Configure` 正是在 `AddChild` 之后调的）。传空则**整段命中音不存在** |
+| `MuzzleEffect` / `ImpactEffect` | **发射位置**与**落点**各冒的烟，写 `EffectRegistry` 里的特效名。**留空 = 不冒**，所以 `bullet` / `bombing` 两端依旧干净。炮口烟在生成弹体**之前**放（不 await，与第一发同时跑）；落点烟在 `await Task.WhenAll(tasks)` **之后**放一次、位置取 `positions[^1]`，并且 **await 它**（不 await 的话调用方会在烟演完前回收整个特效，烟被掐掉半截） |
 | `ImpactSfxVolume` / `ImpactVoiceCount` | 音量（线性）与声部数。多个声部**轮换**用，连发时后一声不掐前一声 |
 | `PlayAndReleaseBullet(...)` | `await bullet.Play(...)` **是在弹体飞抵目标那一刻返回的**，命中音就挂在那之后——不必再往 `Bullet` 里塞回调 |
 
@@ -151,6 +153,19 @@
 ### `SmokeEffect` : Effect (core_logic/SmokeEffect.cs)
 
 单位被消灭时在其中心播放的烟雾动画。使用`assest/Smoke_006.png`的4×4图集，每帧256×256，按行依次播放16帧，默认总时长0.4秒；前10%时间淡入，从30%进度开始淡出。
+
+**一个脚本、两个场景**，差别只在 Export 出去的 `SizeScale`：
+
+| 场景 | `SizeScale` | 用在哪 |
+|------|-------------|--------|
+| `effects/smoke_effect.tscn`（`smoke`） | `1`（默认） | 单位阵亡 |
+| `effects/smoke_small_effect.tscn`（`smoke_small`） | 比 1 小 | 坦克炮的炮口烟与落点烟 |
+
+`SizeScale` 乘在**逐帧放大之上**（`(1 + frame * 0.2) * SizeScale`），所以放大过程本身的速度不受影响。
+
+> `smoke_small` **不参与对象池**：`BattleEffectPool.AcquireEffect` 只按名字认 `bullet` / `smoke`，
+> 所以它每次都是新实例 + `QueueFree`（`TankAttack` 同理）。一次攻击两个烟，开销可以接受；
+> 要池化的话得先解决「池按类型分、而两种烟是同一个类型、只有尺寸不同」这个冲突。
 
 ### `BattleEffectPool` : Node (core_logic/BattleEffectPool.cs)
 

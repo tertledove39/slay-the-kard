@@ -1,0 +1,22 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core_logic/SmokeEffect.cs" id="1"]
+[ext_resource type="Texture2D" uid="uid://s2cj1qsr6wmi" path="res://assest/Smoke_006.png" id="2"]
+
+; 小型烟雾：与 effects/smoke_effect.tscn **同一个脚本、同一张贴图**，
+; 只把 SizeScale 调小 —— 所以这里不是第二套实现，是一个 Export 值。
+; 用在坦克炮的炮口与落点（见 effects/tank_attack_effect.tscn 的 MuzzleEffect / ImpactEffect）。
+[node name="SmokeSmallEffect" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+mouse_filter = 2
+script = ExtResource("1")
+; 整体尺寸倍数。1 = 阵亡烟那个大小；炮口/落点的烟要小得多才不遮住半张桌子
+SizeScale = 0.3
+
+[node name="SmokeSprite" type="Sprite2D" parent="."]
+z_index = 100
+scale = Vector2(2, 2)
+texture = ExtResource("2")
+hframes = 4
+vframes = 4

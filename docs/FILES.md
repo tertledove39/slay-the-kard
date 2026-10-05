@@ -32,7 +32,9 @@
 | bin/bomb.tscn | 航弹弹体（复用 `bin/Bullet.cs`，贴图 `assest/航弹.png`），供 `bombing` 特效用 |
 | bin/tank_shell.tscn | 坦克炮弹弹体（复用 `bin/Bullet.cs`，贴图 `assest/tank_projetile.png`，原图只有 3×9 所以 `Sprite2D.scale` 给得比航弹大得多），供 `TankAttack` 特效用 |
 | effects/bombing_effect.tscn | `bombing` 特效：复用 `BulletEffect` 脚本，`ProjectileScenePath=bin/bomb.tscn`、`ProjectileCount=0`（0 = 用攻击力）、`ProjectileFlightSeconds=1.5` |
-| effects/tank_attack_effect.tscn | `TankAttack` 特效：复用 `BulletEffect` 脚本，`ProjectileScenePath=bin/tank_shell.tscn`、`ProjectileCount=1`、`ProjectileFlightSeconds=0.6`（比航弹快）。**只有它带命中音**，槽位由特效名的参数给出 |
+| effects/tank_attack_effect.tscn | `TankAttack` 特效：复用 `BulletEffect` 脚本，`ProjectileScenePath=bin/tank_shell.tscn`、`ProjectileCount=1`、`ProjectileFlightSeconds=0.25`（比子弹还快）。**只有它带命中音与两端烟雾**：命中音槽位由特效名的参数给出，`MuzzleEffect`/`ImpactEffect` 填 `smoke_small` |
+| effects/smoke_small_effect.tscn | **小型烟雾**：与 `smoke_effect.tscn` 同脚本同贴图，只把 `SizeScale` 调小。用在坦克炮的炮口与落点 —— 不是第二套实现，是一个 Export 值 |
+| — | `bin/tank_shell.tscn` 的根节点写了与 `bin/bullet.tscn` **逐字相同**的 `modulate`：战场开着 glow，把它抬到远大于 1 就能让贴图进入 HDR 起 bloom（即「像子弹一样发光」） |
 | effects/flying_effect.tscn | 上述飞掠特效的场景（一个 Control + SFX 总线上的 AudioStreamPlayer） |
 | effects/air_strike_effect.tscn | `airstrike` 特效的场景（同上结构，脚本换 `AirStrikeEffect.cs`，`StrikeEffectName = "bombing"`） |
 | effects/strafe_effect.tscn | `strafe` 特效的场景：**与 `air_strike_effect.tscn` 只差 `StrikeEffectName = "bullet"`**（同一个脚本，不是第二套实现） |

@@ -7,6 +7,12 @@
 ; 弹道由 Bullet.cs 决定——从攻击者直线飞向目标，并让贴图的「上边」对准飞行方向。
 ; 若实机看到炮弹是倒着飞的，把下面 Sprite2D 的 rotation 改成 3.14159（转 180°）即可。
 [node name="TankShell" type="Control"]
+; 发光：与 bin/bullet.tscn **逐字相同**的两个值。
+; 战场里开着 glow（glow_enabled / glow_hdr_threshold = 0.9），
+; 把 modulate 抬到远大于 1 就能让贴图进入 HDR、越过阈值起 bloom。
+; 数值越大越亮，改回 1 就是不发光。
+modulate = Color(18.592834, 18.892157, 0, 1)
+self_modulate = Color(18.892157, 18.892157, 0, 1)
 layout_mode = 3
 anchor_left = -0.001
 anchor_top = -0.004

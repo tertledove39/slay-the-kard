@@ -36,9 +36,10 @@
 | `bullet` | `effects/bullet_effect.tscn` | 从攻击者向目标打出一串子弹，固定 10 发（`ProjectileFlightSeconds = 0.3`） |
 | `bombing` | `effects/bombing_effect.tscn` | 航弹，**弹数 = 攻击力**（场景里 `ProjectileCount = 0` 表示用调用方给的数量）；`ProjectileFlightSeconds = 1.5`，比子弹慢得多才有投弹感；**不发声**（名字不带参数 → 命中音那条路根本不会建，不是靠配置关掉的） |
 | — | `bin/bomb.tscn` | 航弹弹体。`Sprite2D` 的 `scale` 定大小（净尺寸 = 根 `scale` × 它，当前 `3 × 1.2 = 3.6`）；`FlightEase = 0` 定飞行曲线 |
-| `TankAttack` | `effects/tank_attack_effect.tscn` | **坦克与火炮**打的那一发炮弹：固定 1 发、`ProjectileFlightSeconds = 0.6`（比航弹快），**飞抵目标时响一声命中音**。命中音的槽位写在**参数**里：`TankAttack(artillery_large_impact)` |
-| — | `bin/tank_shell.tscn` | 坦克炮弹弹体，用 `assest/tank_projetile.png`。`Sprite2D` 的 `scale` 定大小（原图只有 3×9，所以倍数比航弹大得多） |
-| `smoke` | `effects/smoke_effect.tscn` | 在指定位置冒一下烟 |
+| `TankAttack` | `effects/tank_attack_effect.tscn` | **坦克与火炮**打的那一发炮弹：固定 1 发、`ProjectileFlightSeconds = 0.25`（**比子弹的 0.3 还快**），**炮口与落点各冒一个小烟**（`MuzzleEffect` / `ImpactEffect` = `smoke_small`），**飞抵目标时响一声命中音**。命中音的槽位写在**参数**里：`TankAttack(artillery_large_impact)` |
+| — | `bin/tank_shell.tscn` | 坦克炮弹弹体，用 `assest/tank_projetile.png`。`Sprite2D` 的 `scale` 定大小（原图只有 3×9，所以倍数比航弹大得多）；根节点的 `modulate` **与 `bin/bullet.tscn` 逐字相同**——战场开着 glow，把它抬到远大于 1 就能让贴图进入 HDR 起 bloom，也就是「像子弹一样发光」 |
+| `smoke` | `effects/smoke_effect.tscn` | 在指定位置冒一下烟（阵亡用） |
+| `smoke_small` | `effects/smoke_small_effect.tscn` | **同一个 `SmokeEffect` 脚本、同一张贴图**，只把 `SizeScale` 调小 —— 坦克炮的炮口烟与落点烟用它。所以这**不是第二套实现，是一个 Export 值**（与 `bullet`/`bombing`/`TankAttack` 同一套路） |
 | `flying` | `effects/flying_effect.tscn` | 让**触发它的那张卡**升起（`RiseDuration`，只移动位置 + 轻微放大）-> 原地悬停 `SwaySecondsPerCycle × SwayCycles` 秒 -> 落回（`LandDuration`，连角度一起还原），期间抬高层级压住其他卡；音效取 `[sfx] flyby`。**全程不转角度**（`SwayDegrees` 默认 0 = 完全静止悬停；调大才在卡自己的原始角度上左右摆） |
 | `airstrike` | `effects/air_strike_effect.tscn` | **空袭 = 飞掠 + 投弹**：**刚开始起飞就把航弹扔出去** -> 悬停（`SwaySecondsPerCycle = 0.5`，比 `flying` 那个短一半）-> 降落。投的是 `bombing` 子特效，所以弹数仍是攻击力；`StrikeEffectName` 留空则退化成纯飞掠 |
 | `strafe` | `effects/strafe_effect.tscn` | **扫射 = 飞掠 + 打枪**：与 `airstrike` **是同一个脚本、同一套节奏**，只把 `StrikeEffectName` 换成 `bullet`（起飞即打出 10 发子弹）。毛驴用这个 |
@@ -211,6 +212,19 @@
 |------|------|------|
 | 炮弹**出膛**那一刻（`Attack()` 里） | `battlefield_.TankCannonSoundEffect()` | 见下表 |
 | 炮弹**飞抵目标**之后（`BulletEffect.PlayAndReleaseBullet` 里） | 特效自己，槽位来自**特效名的参数** | 见下表 |
+
+**视觉上两端也各有一小股烟**，同样分两个时刻、同样默认关闭：
+
+| 时机 | 谁放 | 怎么配 |
+|------|------|--------|
+| 生成弹体**之前**（与第一发同时出） | `BulletEffect.Play` 开头的 `PlayChildEffectAsync(MuzzleEffect, { positions[0] })` | `tank_attack_effect.tscn` 里 `MuzzleEffect = "smoke_small"` |
+| **全部弹体飞抵之后**（`await Task.WhenAll(tasks);` 的下一行） | 同上的 `ImpactEffect`，位置取 `positions[^1]` | 同上 `ImpactEffect = "smoke_small"` |
+
+- 两个都是**特效名**（可以带参数），**留空 = 不冒**——`bullet` / `bombing` 都没填，
+  所以它们两端一直是干净的。这与命中音是同一套「**默认关闭、按需开**」的思路。
+- `PlayChildEffectAsync` 是 `Effect` 基类上的**共用实现**（取 → 进树 → 传参 → 播 → 还），
+  `AirStrikeEffect` 的子特效也走它——所以「播一个子特效」全项目只有一份代码。
+- 落点烟只冒**一次**（不是每发各冒一个）：`bombing` 有攻击力那么多发，逐个冒会糊成一片。
 
 | 兵种 | 开火音（`_fire`） | 命中音（`_impact`） |
 |------|------------------|---------------------|
