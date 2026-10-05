@@ -1,0 +1,137 @@
+[gd_scene load_steps=8 format=3 uid="uid://d35dy87rvq1mc"]
+
+[ext_resource type="Script" uid="uid://dbkfpoeflekpg" path="res://bin/WorldMap.cs" id="1_kanex"]
+[ext_resource type="Texture2D" uid="uid://1wq05532vpn4" path="res://assest/worldMap.png" id="1_wpv1p"]
+[ext_resource type="Texture2D" uid="uid://cn2kgl0dgbhey" path="res://assest/chooseThisArea.png" id="2_cs12g"]
+[ext_resource type="Texture2D" uid="uid://tijuuut6gmwa" path="res://assest/chooseThisAreaPresssed.png" id="3_kanex"]
+[ext_resource type="Texture2D" uid="uid://cl2c37lfu3l2y" path="res://assest/chooseThisAreaHover.png" id="4_ord10"]
+[ext_resource type="Texture2D" uid="uid://357opc6t10uq" path="res://assest/资源点.png" id="6_kanex"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_cs12g"]
+font_size = 43
+
+[node name="Control" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_kanex")
+
+[node name="WorldMap" type="Sprite2D" parent="."]
+position = Vector2(797, 453)
+scale = Vector2(0.83391005, 0.83391005)
+texture = ExtResource("1_wpv1p")
+
+[node name="area1" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 1179.5
+offset_top = 177.0
+offset_right = 1368.5
+offset_bottom = 352.0
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0
+
+[node name="area2" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 1460.5
+offset_top = 646.5
+offset_right = 1649.5
+offset_bottom = 821.5
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0
+
+[node name="area3" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 952.7
+offset_top = 246.3
+offset_right = 1141.7
+offset_bottom = 421.3
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0
+
+[node name="area4" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 1123.6
+offset_top = 566.5
+offset_right = 1312.6
+offset_bottom = 741.5
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0
+
+[node name="area5" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 1122.0
+offset_top = 454.7
+offset_right = 1311.0
+offset_bottom = 629.7
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0
+
+[node name="area6" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 770.1
+offset_top = 308.0
+offset_right = 959.1
+offset_bottom = 483.0
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0
+
+[node name="area7" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 193.8
+offset_top = 402.2
+offset_right = 382.8
+offset_bottom = 577.2
+texture_normal = ExtResource("2_cs12g")
+texture_pressed = ExtResource("3_kanex")
+texture_hover = ExtResource("4_ord10")
+stretch_mode = 0
+
+[node name="pointNum" type="Label" parent="."]
+layout_mode = 0
+offset_left = 86.0
+offset_top = 25.0
+offset_right = 212.0
+offset_bottom = 86.0
+text = "1"
+label_settings = SubResource("LabelSettings_cs12g")
+
+[node name="store" type="Button" parent="."]
+layout_mode = 0
+offset_left = 1401.0
+offset_top = 91.0
+offset_right = 1553.0
+offset_bottom = 159.0
+theme_override_font_sizes/font_size = 40
+text = "store"
+
+[node name="deck" type="Button" parent="."]
+layout_mode = 0
+offset_left = 1401.0
+offset_top = 182.0
+offset_right = 1550.0
+offset_bottom = 240.0
+theme_override_font_sizes/font_size = 30
+text = "卡组"
+
+[node name="pointPic" type="Sprite2D" parent="."]
+modulate = Color(1.6845763e-06, 0.706827, 9.62615e-07, 1)
+position = Vector2(49, 55)
+texture = ExtResource("6_kanex")
+
+[connection signal="pressed" from="store" to="." method="_on_store_pressed"]
+[connection signal="pressed" from="deck" to="." method="_on_deck_pressed"]

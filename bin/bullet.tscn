@@ -1,0 +1,26 @@
+[gd_scene load_steps=3 format=3 uid="uid://bjwmdcdnkulf"]
+
+[ext_resource type="Script" uid="uid://cpgljq7sgkkho" path="res://bin/Bullet.cs" id="1_v8qja"]
+[ext_resource type="Texture2D" uid="uid://bgbn48ca865xm" path="res://cards/bullet.png" id="2_t4vbm"]
+
+[node name="Bullet" type="Control"]
+modulate = Color(18.592834, 18.892157, 0, 1)
+self_modulate = Color(18.892157, 18.892157, 0, 1)
+layout_mode = 3
+anchor_left = -0.001
+anchor_top = -0.004
+anchor_right = 0.001
+anchor_bottom = 0.004
+offset_left = -0.39999998
+offset_top = -0.39999986
+offset_right = 0.39999998
+offset_bottom = 0.39999986
+grow_horizontal = 2
+grow_vertical = 2
+scale = Vector2(3, 3)
+script = ExtResource("1_v8qja")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+modulate = Color(1.353648, 1.3301728, 0.37242857, 1)
+position = Vector2(2, 4)
+texture = ExtResource("2_t4vbm")
