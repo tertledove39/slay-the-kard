@@ -63,15 +63,20 @@
 
 单位当前攻击力为0时，主动攻击、普通反击和伏击均不会播放`attackEffect`。攻击力大于0但伤害被重甲或免疫修正为0时仍会播放。
 
-#### 通用开火声与`SelfVoicedNames`
+#### 通用开火声与`NoFiringSoundNames`
 
-每次攻击都会放一声通用的开火声（`battleField.tscn` 的`battleSound`，机枪「哒哒」）。但**攻击特效自带音效时不再叠这一声**——飞机掠过时再来一层机枪声会串味。
+每次攻击都会放一声通用的开火声（`battleField.tscn` 的`battleSound`，资源就是`机枪_低.wav`）。**有一部分特效不放这一声**，名单在`EffectRegistry.NoFiringSoundNames`，通过`EffectRegistry.ReplacesFiringSound(attackEffect)`查询，调用点在`battlefield_.cs`的`Attack()`里、`PlayBattleSound(1)`那一行。
 
-判定表在`EffectRegistry.SelfVoicedNames`（当前是`flying`、`airstrike`），通过`EffectRegistry.ReplacesFiringSound(attackEffect)`查询，调用点在`battlefield_.cs`的`Attack()`里、`PlayBattleSound(1)`那一行。
+| 特效 | 放不放开火声 | 为什么 |
+|------|--------------|--------|
+| `flying` / `airstrike` | **不放** | 飞机掠过然后**扔炸弹**。炸弹配机枪「哒哒」是串味 |
+| `strafe` | **放** | 飞机掠过然后**打枪**。打的就是子弹，那声机枪正是它要的 |
+
+**判断依据是「打出来的东西和机枪声搭不搭」，不是「有没有自己的音效」**——所以这张表按**结果**命名（`NoFiringSoundNames`），而不是按原因命名。`strafe` 自带飞掠声，照样要那声机枪；曾经叫过`SelfVoicedNames`（自带音效的特效名），那个说法在`strafe`出现后就不成立了。
 
 - 判定按**攻击者**的`attackEffect`走，不看防守方。
 - 判定放在注册表而不是卡上或`CardTypes.Bomber`上：写到卡上、或按兵种判，都会让同一个特效配在不同卡上行为不一致。
-- 新增自带音效的特效要加进`SelfVoicedNames`。`tests/verify_attack_effects.py`会交叉核对表里每个名字对应的场景**确实挂了`AudioStreamPlayer`**，防止这张表变成假话。
+- 改这张表之前先想清楚上面那条依据。`tests/verify_attack_effects.py`守着两件事：表里每个名字对应的场景**确实挂了`AudioStreamPlayer`**（防止表变成假话），以及**`strafe`必须不在表里**（"顺手统一一下"加进去会立刻红）。
 
 ### cards/enemyTurn.ini
 定义敌方关卡预设的回合行动脚本。

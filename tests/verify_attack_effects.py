@@ -463,29 +463,39 @@ def main():
     results.append(check("flying,bombing" not in card_ini,
                          "全项目不再有 flying,bombing 这种拼接写法"))
 
-    # ==================== ⑤ 自带音效的特效不叠通用开火声 ====================
-    # 实机反馈：轰炸机投弹时听到「哒哒」的开火声。那是 `battleSound` 的机枪声，
-    # 每次攻击都放；飞机掠过时再叠一层就串味了。
-    print("\n--- ⑤ 飞机攻击不放机枪「哒哒」声 ---")
+    # ==================== ⑤ 谁不放通用开火声 ====================
+    # 实机反馈两轮，方向是反的，所以这张表**按结果命名**而不是按原因：
+    #   · 第一轮「投弹时听到哒哒声」→ airstrike 不放（炸弹配机枪是串味）；
+    #   · 第二轮「strafe 开火时也要机枪声」→ strafe **放**（它打的就是子弹）。
+    # 也就是说「自带音效」并不等于「不要开火声」——strafe 自带飞掠声，照样要那声机枪。
+    print("\n--- ⑤ 谁不放通用开火声 ---")
     results.append(check("public static bool ReplacesFiringSound(string effectNames)" in effect,
-                         "注册表提供「这串特效名里有没有自带音效的」查询"))
-    results.append(check("HashSet<string> SelfVoicedNames" in effect, "自带音效的特效名是一张单独的表"))
+                         "注册表提供「这串特效名放不放开火声」查询"))
+    results.append(check("HashSet<string> NoFiringSoundNames" in effect,
+                         "表名按结果命名（不放通用开火声的特效名）——不叫「自带音效」，那个说法已经不成立"))
+    results.append(check("SelfVoicedNames" not in code_only(effect),
+                         "旧名 SelfVoicedNames 已彻底移除（留着就是两个说法打架）"))
     results.append(check("if (!EffectRegistry.ReplacesFiringSound(from.attackEffect)) PlayBattleSound(1);" in battle,
                          "攻击时按**攻击者**的攻击特效决定放不放开火声"))
     results.append(check("PlayBattleSound(1);" not in
                          battle.replace("if (!EffectRegistry.ReplacesFiringSound(from.attackEffect)) PlayBattleSound(1);", ""),
                          "没有漏掉其它无条件放战斗音效的地方"))
 
-    # 交叉核对：表里的名字必须真的指向一个挂了 AudioStreamPlayer 的场景。
+    # 交叉核对：静音名单里的名字必须真的指向一个挂了 AudioStreamPlayer 的场景。
     # 否则这张表会变成一句假话——写了名字却根本不发声，等于白静音一场。
-    self_voiced = re.findall(r'"(\w+)"', method(effect, "HashSet<string> SelfVoicedNames",
-                                                "public static bool ReplacesFiringSound"))
-    results.append(check(bool(self_voiced), f"自带音效表非空（{self_voiced}）"))
-    for name in self_voiced:
+    muted = re.findall(r'"(\w+)"', method(effect, "HashSet<string> NoFiringSoundNames",
+                                          "public static bool ReplacesFiringSound"))
+    results.append(check(bool(muted), f"静音名单非空（{muted}）"))
+    for name in muted:
         rel = scene_paths(effect).get(name)
         results.append(check(rel is not None
                              and "AudioStreamPlayer" in (ROOT / rel.replace("res://", "")).read_text(encoding="utf-8"),
                              f"{name} 确实自带播放器（不是写了个空名字）"))
+
+    # 反向：扫射**必须**保留通用开火声 —— 它打的就是子弹，那声机枪正是主人要的。
+    # 这条是本次需求的核心，单独钉死；以后有人「顺手统一一下」把它加进名单会立刻红。
+    results.append(check("strafe" not in muted,
+                         "strafe 不在静音名单里（开火时要听得见机枪声）"))
 
     # ==================== ⑥ strafe 扫射（飞掠 + 打枪） ====================
     # 「起飞后发射子弹」不是新动画，只是 airstrike 换了个子特效——
@@ -507,9 +517,6 @@ def main():
     only_strafe = strafe_lines - airstrike_lines
     results.append(check(all("StrikeEffectName" in l or "node name=" in l for l in only_airstrike | only_strafe),
                          f"两个场景只差子特效名与节点名（airstrike 独有: {only_airstrike}；strafe 独有: {only_strafe}）"))
-    results.append(check('"strafe"' in method(effect, "HashSet<string> SelfVoicedNames",
-                                              "public static bool ReplacesFiringSound"),
-                         "strafe 也算自带音效（与 airstrike 同规格，不叠通用开火声）"))
     card_ini = CARD_INI.read_text(encoding="utf-8-sig")
     # 取固定长度窗口：按 `[` 切会切到段标题自己那一个（它就以 `[` 开头）
     donkey = card_ini[card_ini.index("[毛驴]"):][:400]

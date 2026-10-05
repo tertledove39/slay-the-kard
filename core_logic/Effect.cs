@@ -42,26 +42,33 @@ public static class EffectRegistry
     };
 
     /// <summary>
-    /// **自带音效**的特效名。这些特效响的时候，`Attack()` 不再叠那声通用的开火声
-    /// （`battleSound` 的机枪「哒哒」）——飞机掠过时再叠一层机枪声会串味。
+    /// **不放通用开火声**的特效名。`Attack()` 每次都放一声通用的开火声
+    /// （`battleSound`，资源就是 `机枪_低.wav`）；名单里的特效不放。
+    ///
+    /// 名单怎么定——看这个特效**打出来的东西和机枪声搭不搭**，而不是看它有没有自己的音效：
+    /// - `flying` / `airstrike`：**飞机掠过然后扔炸弹**。炸弹配机枪「哒哒」是串味，所以不放；
+    /// - `strafe`：**飞机掠过然后打枪**。打的就是子弹，**机枪声正是它要的**，所以不在名单里。
+    ///
+    /// 换句话说「自带音效」并不自动等于「不要开火声」——`strafe` 自带飞掠声，
+    /// 但它照样要那声机枪。所以这张表叫 `NoFiringSoundNames`（按结果命名），
+    /// 而不是按原因命名。
     ///
     /// 判定放在注册表里，是因为「这个特效是什么」本来就是这张表在管：
     /// 写到卡上、或按 `CardTypes.Bomber` 判，都会让同一个特效配在不同卡上行为不一致。
     ///
-    /// 新增自带音效的特效时记得加进来。`tests/verify_attack_effects.py` 会交叉核对
-    /// 表里每个名字对应的场景**确实挂了 `AudioStreamPlayer`**，防止这张表变成假话。
+    /// `tests/verify_attack_effects.py` 会交叉核对表里每个名字对应的场景**确实挂了
+    /// `AudioStreamPlayer`**（防止这张表变成假话），并单独钉住 `strafe` **不在**表里。
     /// </summary>
-    private static readonly HashSet<string> SelfVoicedNames = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> NoFiringSoundNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "flying",
-        "airstrike",
-        "strafe"
+        "airstrike"
     };
 
     /// <summary>
-    /// 这串特效名（`attackEffect` 的原文，可以是逗号分隔的多个）里有没有自带音效的。
-    /// 有一个就算——`attackEffect = flying,bullet` 那种写法下，飞机声和机枪声已经串了，
-    /// 再补一声开火声只会更糊。
+    /// 这串特效名（`attackEffect` 的原文，可以是逗号分隔的多个）里有没有
+    /// 「不放通用开火声」的。有一个就算——`attackEffect = flying,bullet` 那种写法下，
+    /// 飞机声和机枪声已经串了，再补一声开火声只会更糊。
     /// </summary>
     public static bool ReplacesFiringSound(string effectNames)
     {
@@ -69,7 +76,7 @@ public static class EffectRegistry
 
         foreach (string raw in effectNames.Split(','))
         {
-            if (SelfVoicedNames.Contains(raw.Trim())) return true;
+            if (NoFiringSoundNames.Contains(raw.Trim())) return true;
         }
         return false;
     }

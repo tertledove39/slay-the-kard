@@ -594,9 +594,10 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 那不是投弹音效，是**每次攻击都放**的通用开火声（`battleSound`）。飞机掠过时再叠一层
 机枪声就串味了。
 
-修法是按**攻击者的 `attackEffect` 是否自带音效**决定放不放：
-`EffectRegistry.SelfVoicedNames`（`flying` / `airstrike`）+ `ReplacesFiringSound()`，
+修法是按**攻击者的 `attackEffect`**决定放不放：
+`EffectRegistry.NoFiringSoundNames`（`flying` / `airstrike`）+ `ReplacesFiringSound()`，
 调用点在 `battlefield_.cs` 的 `Attack()` 里、`PlayBattleSound(1)` 那一行。
+（表名后来从 `SelfVoicedNames` 改成 `NoFiringSoundNames`，原因见「第九轮调整」。）
 
 判定**不写到卡上、也不按 `CardTypes.Bomber` 判**——那两条都会让同一个特效配在不同卡上
 行为不一致。测试除了断言这条判断存在，还会**交叉核对**表里每个名字对应的场景确实挂了
@@ -769,8 +770,11 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 （当初把它做成 `[Export]` 就是为了这一天），所以新动画 = **新场景 + 改 `card.ini` 一个值**：
 
 - 新建 `effects/strafe_effect.tscn`，挂 `AirStrikeEffect` 脚本，`StrikeEffectName = "bullet"`；
-- `EffectRegistry.ScenePaths` 加 `["strafe"]`；`SelfVoicedNames` 加 `"strafe"`（与 `airstrike` 同规格）；
+- `EffectRegistry.ScenePaths` 加 `["strafe"]`；
 - 毛驴（`cards/card.ini`，战斗机，攻击 2）`attackEffect = bullet` → `strafe`。
+
+> 音效那一项当时按「与 `airstrike` 同规格」处理（静音），下一轮就按主人的要求改回来了，
+> 见「第九轮调整」。
 
 测试里那两条是重点：
 
@@ -780,6 +784,21 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 
 > `StrikeEffectName` 与 `FlightEase` 一样，在 `.tscn` 里写错是**静默生效**的，
 > 所以两轮的 Export 值都用临时 GDScript 读出来实测过（`bombing` / `bullet` 各自正确）。
+
+### 第九轮调整（`strafe` 开火要听得到机枪声）
+
+要求：`strafe` 开火时也播放机枪音效。
+
+看起来只是「从表里删一行」，但那行删掉之后**表的旧名字就变成假话了**：
+`SelfVoicedNames` = 「自带音效的特效名」，而 `strafe` **自带飞掠声**、却不在表里。
+所以改名成 **`NoFiringSoundNames`**（按**结果**命名，不按原因），并重写注释把判据写清楚：
+
+> 判断依据是「**打出来的东西和机枪声搭不搭**」，不是「有没有自己的音效」。
+> `flying`/`airstrike` 扔炸弹 → 机枪声串味 → 不放；`strafe` 打枪 → 那声机枪正是它要的 → 放。
+
+测试那边加了一条**反向断言**：`strafe` **必须不在**静音名单里。这条是本次需求的核心，
+以后有人「顺手统一一下」把它加进去会立刻红。同时加了一条「旧名 `SelfVoicedNames`
+已彻底移除」——留着就是两个说法打架。
 
 ### 场景里 export 的值要带中文注释
 
