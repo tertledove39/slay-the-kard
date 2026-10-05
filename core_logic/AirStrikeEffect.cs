@@ -28,18 +28,18 @@ public partial class AirStrikeEffect : FlyingEffect
     [Export] public string StrikeEffectName = "bombing";
 
     /// <summary>
-    /// 停留 = **一边盘旋一边投弹**。两件事同时开跑，谁后结束就等谁：
-    /// 父类给的摆动一秒都不会少，投弹也不会把降落提前。
+    /// 悬停 = **一边悬停一边投弹**。两件事同时开跑，谁后结束就等谁：
+    /// 父类给的悬停时间一秒都不会少，投弹也不会把降落提前。
     ///
-    /// 盘旋比投弹短时，飞机会投完弹后继续悬停到摆动结束——这是刻意的，
+    /// 悬停比投弹短时，飞机会投完弹后继续悬停到时间结束——这是刻意的，
     /// 宁可多停一会儿，也不要让卡在航弹还在飞的时候就落回桌面。
     /// </summary>
     protected override async Task StayAsync(cardBase_ card, IReadOnlyList<Vector2> positions,
-                                            float aimRotation, float stayDuration, int count)
+                                            float baseRotation, float stayDuration, int count)
     {
-        Task sway = base.StayAsync(card, positions, aimRotation, stayDuration, count);
+        Task hover = base.StayAsync(card, positions, baseRotation, stayDuration, count);
         Task strike = StrikeAsync(positions, count);
-        await Task.WhenAll(sway, strike);
+        await Task.WhenAll(hover, strike);
     }
 
     /// <summary>

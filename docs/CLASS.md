@@ -79,18 +79,22 @@
 
 ### `FlyingEffect` : Effect (core_logic/FlyingEffect.cs)
 
-飞掠效果：让**触发它的那张卡**升起（含转向）-> 停留 -> 落回，把卡的 Position / Scale / Rotation / ZIndex 全接管，播完在 `finally` 里逐项还原。三段顺序在 `Play` 里显式可见，其中**停留**是钩子：
+飞掠效果：让**触发它的那张卡**升起 -> 原地悬停 -> 落回，把卡的 Position / Scale / Rotation / ZIndex 全接管，播完在 `finally` 里逐项还原。
+
+**本特效不负责转向**：卡在整段动画里保持进入前的角度。早先版本会让卡边升边「指向被攻击的目标」（`AimRotationOffset`），已整段删除。
+
+三段顺序在 `Play` 里显式可见，其中**悬停**是钩子：
 
 | 成员 | 说明 |
 |------|------|
-| `Play(...)` | 起飞 `RiseAndAimAsync` -> 停留 `StayAsync` -> 降落 `LandAsync` |
-| `protected virtual Task StayAsync(card, positions, aimRotation, stayDuration, count)` | 停留阶段，默认就是原地左右摆动。子类覆写它即可在这段时间里捎带做别的事 |
+| `Play(...)` | 升起 `RiseAsync` -> 悬停 `StayAsync` -> 落回 `LandAsync` |
+| `protected virtual async Task StayAsync(card, positions, baseRotation, stayDuration, count)` | 悬停阶段。`SwayDegrees` 为 0（默认）时是**原地静止悬停**（只等够时间，不建 tween）；调大了才在卡自己的原始角度上左右摆。子类覆写它即可在这段时间里捎带做别的事 |
 
 ### `AirStrikeEffect` : FlyingEffect (core_logic/AirStrikeEffect.cs)
 
-空袭特效：轰炸机攻击时**先飞起来，在盘旋的过程中把航弹扔下去，投完再落回桌面**。投弹夹在飞掠中间，所以拼接写法（`attackEffect = flying,bombing`）做不到，必须由一个特效自己掌握节奏。
+空袭特效：轰炸机攻击时**先飞起来，在悬停的过程中把航弹扔下去，投完再落回桌面**。投弹夹在飞掠中间，所以拼接写法（`attackEffect = flying,bombing`）做不到，必须由一个特效自己掌握节奏。
 
-只覆写 `StayAsync`：`Task.WhenAll(盘旋, 投弹)`，两件事同时开跑、谁后结束等谁。投弹本身不在这里实现，而是把 `StrikeEffectName`（默认 `bombing`）当**子特效**播一遍，弹数、飞行时长、错开间隔仍然配在 `effects/bombing_effect.tscn` 里。起飞/降落/转向/还原/飞掠音效全部沿用父类——「卡飘起来」这套运动只有一份实现。
+只覆写 `StayAsync`：`Task.WhenAll(悬停, 投弹)`，两件事同时开跑、谁后结束等谁。投弹本身不在这里实现，而是把 `StrikeEffectName`（默认 `bombing`）当**子特效**播一遍，弹数、飞行时长、错开间隔仍然配在 `effects/bombing_effect.tscn` 里。升起/降落/还原/飞掠音效全部沿用父类——「卡飘起来」这套运动只有一份实现。
 
 ### `SmokeEffect` : Effect (core_logic/SmokeEffect.cs)
 

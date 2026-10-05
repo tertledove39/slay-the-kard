@@ -577,11 +577,11 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 - **刷 ZIndex 的那套会打架**：`RefreshAllCardDisplayOrder` 对场上卡一律 `ZIndex = 10`，
   所以漂浮期间要么被跳过、要么抬起来的层级下一帧就被打回去。断言那条 `continue`
   同时看 `isDiscarding || isUnderCardEffect`。
-- **「夹在中间」拼不出来，只能继承**。要的是「起飞 → 投弹 → 降落」，而
+- **「夹在中间」拼不出来，只能继承**。要的是「升起 → 投弹 → 落回」，而
   `attackEffect = flying,bombing` 只能做到两段各自开跑（总时长取较长者）。
-  所以 `AirStrikeEffect : FlyingEffect`，**只覆写「停留」那一段**（`StayAsync`）=
-  `Task.WhenAll(盘旋, 投弹)`。测试同时钉住反面：`AirStrikeEffect` 里
-  **不得出现** `RiseAndAimAsync` / `LandAsync` / `SwayAroundAimAsync`——
+  所以 `AirStrikeEffect : FlyingEffect`，**只覆写「悬停」那一段**（`StayAsync`）=
+  `Task.WhenAll(悬停, 投弹)`。测试同时钉住反面：`AirStrikeEffect` 里
+  **不得出现** `RiseAsync` / `LandAsync` / `SwayAsync`——
   出现任何一个就说明运动代码被抄了第二份。
 - **投弹是子特效，不是第二套弹道**。`airstrike` 通过
   `EffectRegistry.Create(StrikeEffectName)` 播一遍已注册的 `bombing`，弹数
@@ -620,15 +620,15 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 参数（升起高度、放大倍率、摆幅、时速、音效槽位）全部 Export 在 `effects/flying_effect.tscn` 上，
 调手感不必改代码——测试断言这些字段都是 `[Export]`。
 
-### 第二轮调整（flying 的旋转 / bombing 的命中音效，后者已撤销）
+### 第二轮调整（flying 的旋转 / bombing 的命中音效，两者都已撤销）
 
-- **flying 的「摆动」原本做错了**：第一版是在 X 轴上左右**平移**，而要求是**旋转**——
-  「先指向被攻击的目标，再在那个角度上左右摆约 10°」。现在四段是
-  升起 30% → 转向目标 25% → 在瞄准角上摆动 25% → 落回 20%，全程 Sine/InOut 缓动。
-  测试断言：转的是 `rotation` 而非 `position:x`；方向取自 `positions[1] - positions[0]`；
-  摆动是在 `aimRotation` 基础上 ±`SwayDegrees` 而不是绕 0 度摆；最后停在瞄准角上。
+- ~~**flying 的「摆动」改成「先指向目标再摆」**~~（**已撤销**）：第一版是在 X 轴上左右
+  **平移**，第二版改成「先指向被攻击的目标，再在那个角度上左右摆」。后来主人要求
+  **不转向**，这一整套（`AimRotationOffset`、升起的转向 tween、绕瞄准角摆动）已删除。
+  见下面的「第四轮调整」。
 - **落回要连角度一起还原**，否则打完之后卡会斜着停在场上。`finally` 的还原清单
-  已包含 `Rotation`（与位置/缩放/层级/标记并列）。
+  已包含 `Rotation`（与位置/缩放/层级/标记并列）。这条即使在「全程不转角度」之后也留着——
+  它是摆动被中途打断时的兜底。
 - ~~**bombing 的爆炸音效按「每发命中各响一声」做**~~（**已全部撤销**）：
   曾给 `BulletEffect` 加过 `ImpactSfxSlot` / `ImpactSfxVolume` / `ImpactVoiceCount`
   三个 Export 与一套多声部播放器。主人实测后要求**投弹不出声**，第一版只是把槽位留空
@@ -644,14 +644,32 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 ③ 摆幅缩到 **±5°**。
 
 - **① 的根因是时序，不是速度**：原先「升起 → 转向 → 摆动 → 落回」是四段串行，所以升完才开始转，
-  自然会出现「悬在空中还在慢慢转」的中间状态。现在升起/放大/转向**同一个 tween 并行**、
-  共用同一个 `duration`，升完即已对准。测试断言这三条 tween 都在 `RiseAndAimAsync` 里、
-  且共用同一个 duration，并反向断言旧的 `RiseAsync` / `AimAsync` 已不存在。
+  自然会出现「悬在空中还在慢慢转」的中间状态。当时改成升起/放大/转向同一个 tween 并行。
+  （**转向本身后来被整段移除**，见「第四轮调整」；「同一个 tween 共用 duration」这个做法保留。）
 - **② 的根因是「按总时长的百分比切段」**：总时长只有 0.9 秒，升起占 30% 就是 0.27 秒，
   快得看不清。而「摆动 4 秒一个周期」这种要求用百分比根本表达不出来，所以改成
   **每段各自填秒数**（`RiseDuration` / `SwaySecondsPerCycle` / `LandDuration`）。
   测试反向断言百分比常量（`RiseFraction` 等）已移除——它们再回来就意味着又切回去了。
 - **③** 是场景里的值（`SwayDegrees = 5.0`），代码里只是读它，测试断言场景里确实是 5.0。
+  （这条断言后来删了：主人的手感值一直在调，钉具体数字只会「调一次红一次」。）
+
+### 第四轮调整（flying 不转向，改成「升起 → 悬停 → 落回」）
+
+要求：**起飞后悬停，但不转向**；再确认「完全不转，静止悬停」。
+
+- **`AimRotationOffset()` 整段删除**，连「指向被攻击的目标」这个能力一起去掉。
+  升起那段的转向 tween 也没了（`RiseAndAimAsync` → `RiseAsync`），**升起只做位置 + 缩放**。
+- 中间那段从「摆动」正名为**悬停**（`SwayAroundAimAsync` → `SwayAsync`），
+  摆的基准从 `aimRotation` 换成 **`baseRotation`（卡自己的原始角度）**。
+- **`SwayDegrees` 默认改成 0** = 完全不转。这种情况下 `StayAsync` 走「等够时间」的分支，
+  **不建一串「原地不动」的 tween**；悬停时长 = `SwaySecondsPerCycle × SwayCycles`
+  （所以那两个键的名字在「不摆」时读起来会是「悬停时长」，已在 C# 注释里写明，
+  但**不改名**——主人现有的配置键不动）。
+- 两个场景里的 `SwayDegrees = 2.0` 也去掉了（等于默认值，编辑器保存时本来也会被省略）。
+
+测试的相应改法：反向断言 `AimRotationOffset` / `RiseAndAimAsync` / `SwayAroundAimAsync`
+**都不存在**；`RiseAsync` 里**不含 `rotation`**（这就是「不转向」）；摆动绕的是 `baseRotation`；
+`SwayDegrees` 默认值必须是 `0f`。
 
 ### 场景里 export 的值要带中文注释
 

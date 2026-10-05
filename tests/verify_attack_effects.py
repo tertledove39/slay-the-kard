@@ -216,40 +216,44 @@ def main():
                          and "SwayFraction" not in flying,
                          "百分比分段已移除"))
 
-    results.append(check("private async Task RiseAndAimAsync(" in flying
-                         and "private async Task SwayAroundAimAsync(" in flying
-                         and "private async Task LandAsync(" in flying,
-                         "三段：升起含转向 / 瞄准角上摆动 / 落回"))
+    results.append(check("private async Task RiseAsync(" in flying
+                         and "private async Task LandAsync(" in flying
+                         and "private async Task SwayAsync(" in flying,
+                         "三段：升起 / 悬停（内置摆动）/ 落回"))
     results.append(check("private async Task AimAsync(" not in flying
-                         and "private async Task RiseAsync(" not in flying,
-                         "旧的「先升完再单独转」两段已合并"))
+                         and "RiseAndAimAsync" not in flying
+                         and "SwayAroundAimAsync" not in flying,
+                         "旧的「升起含转向」「绕瞄准角摆动」两个方法已消失"))
 
-    # 要求：升到最高点时方向已经调整完毕 —— 升起与转向必须在同一个 tween 里并行完成
-    rise = method(flying, "private async Task RiseAndAimAsync(", "private async Task SwayAroundAimAsync(")
-    results.append(check("tween.SetParallel(true);" in rise, "升起/放大/转向并行"))
+    # 主人明确要求：**不转向**。卡在整段动画里保持进入前的角度。
+    results.append(check("AimRotationOffset" not in flying, "指向目标的角度计算已整段删除"))
+    results.append(check("public float SwayDegrees = 0f;" in flying,
+                         "SwayDegrees 默认为 0（默认就是静止悬停，不是小幅摆动）"))
+
+    rise = method(flying, "private async Task RiseAsync(", "protected virtual async Task StayAsync(")
+    results.append(check("tween.SetParallel(true);" in rise, "升起与放大并行"))
     results.append(check('TweenProperty(card, "position", basePosition + new Vector2(0f, -RiseHeight), duration)' in rise,
                          "往上升"))
     results.append(check("baseScale * RiseScale" in rise, "漂浮时轻微放大"))
-    results.append(check('TweenProperty(card, "rotation", aimRotation, duration)' in rise,
-                         "转向与升起同一个 duration（升完即已对准）"))
-    results.append(check(rise.count("duration)") >= 3, "三件事共用同一个 duration"))
+    results.append(check("rotation" not in rise, "升起过程中**不碰角度**（这就是「不转向」）"))
 
-    # 转向：幅度由「攻击者→目标」的方向决定，而不是固定角度
-    aim = method(flying, "private static float AimRotationOffset(", "private async Task RiseAndAimAsync(")
-    results.append(check("positions[1] - positions[0]" in aim, "方向取自 攻击者→目标"))
-    results.append(check("direction.Angle() + Mathf.Pi / 2f" in aim,
-                         "让卡的「上边」对准目标（与 Bullet 的朝向约定一致）"))
-    results.append(check("direction.LengthSquared() < 0.0001f" in aim,
-                         "攻击者与目标重合时不乱转"))
-
-    sway = method(flying, "private async Task SwayAroundAimAsync(", "private async Task LandAsync(")
+    sway = method(flying, "private async Task SwayAsync(", "private async Task LandAsync(")
     results.append(check("SwayCycles * 2f" in sway or "cycles * 2" in sway,
                          "摆动来回数由 SwayCycles 决定"))
     results.append(check("Mathf.DegToRad(SwayDegrees)" in sway, "摆幅是角度（DegToRad），不是像素"))
-    results.append(check("aimRotation + (index % 2 == 0 ? offset : -offset)" in sway,
-                         "摆动是「在瞄准角的基础上」左右偏，不是绕 0 度摆"))
-    results.append(check('tween.TweenProperty(card, "rotation", aimRotation, step)' in sway,
-                         "最后停在瞄准角上（落回才不会斜着停住）"))
+    results.append(check("baseRotation + (index % 2 == 0 ? offset : -offset)" in sway,
+                         "摆动绕的是**卡牌自己的原始角度**，不是瞄准角"))
+    results.append(check('tween.TweenProperty(card, "rotation", baseRotation, step)' in sway,
+                         "最后停回原角度（落回才不会斜着停住）"))
+
+    # 静止悬停（SwayDegrees = 0）时不该建一串「原地不动」的 tween
+    stay = method(flying, "protected virtual async Task StayAsync(", "private async Task SwayAsync(")
+    results.append(check("Mathf.IsZeroApprox(SwayDegrees)" in stay
+                         and "stateTimer" not in stay,
+                         "不摆时走「等够时间」的分支"))
+    results.append(check("SceneTreeTimer.SignalName.Timeout" in stay, "静止悬停靠计时器等够时长"))
+    results.append(check("await SwayAsync(card, baseRotation, stayDuration);" in stay,
+                         "摆幅非 0 时才真的摆"))
 
     # 手感数值（摆幅、周期、升降时长）由主人在编辑器里调，测试**不钉具体数字**：
     # 钉了就会「调一次手感红一次」，那种红灯最后没人看。这里只钉两件不会变的事。
@@ -259,7 +263,7 @@ def main():
 
     results.append(check("source.isUnderCardEffect = true;" in flying, "漂浮期间标记「特效在管这张卡」"))
     results.append(check("source.ZIndex = TopZIndex;" in flying, "抬高层级压住其他卡"))
-    fin = method(flying, "finally", "private static float AimRotationOffset(")
+    fin = method(flying, "finally", "private async Task RiseAsync(")
     results.append(check("source.Position = basePosition;" in fin
                          and "source.Scale = baseScale;" in fin
                          and "source.Rotation = baseRotation;" in fin
@@ -372,22 +376,22 @@ def main():
                          "继承 FlyingEffect（运动代码只有一份，不复制）"))
     results.append(check("protected override async Task StayAsync(" in airstrike,
                          "只覆写「停留」那一段"))
-    results.append(check("Task sway = base.StayAsync(" in airstrike
+    results.append(check("Task hover = base.StayAsync(" in airstrike
                          and "Task strike = StrikeAsync(" in airstrike
-                         and "await Task.WhenAll(sway, strike);" in airstrike,
-                         "边盘旋边投弹（两件事同时开跑，谁后结束等谁）"))
-    results.append(check("RiseAndAimAsync" not in airstrike and "LandAsync" not in airstrike
-                         and "SwayAroundAimAsync" not in airstrike,
+                         and "await Task.WhenAll(hover, strike);" in airstrike,
+                         "边悬停边投弹（两件事同时开跑，谁后结束等谁）"))
+    results.append(check("RiseAsync" not in airstrike and "LandAsync" not in airstrike
+                         and "SwayAsync" not in airstrike,
                          "起飞/降落/摆动的实现没有搬过来（搬了就是第二份实现）"))
 
     # 父类必须留出这个钩子，而且三段顺序要显式可见
-    stay_hook = method(flying, "protected virtual Task StayAsync(", "private async Task SwayAroundAimAsync(")
-    results.append(check("=> SwayAroundAimAsync(card, aimRotation, stayDuration);" in stay_hook,
-                         "父类默认实现仍是左右摆动"))
-    results.append(check("protected virtual Task StayAsync(" in flying, "父类的停留阶段是 virtual"))
-    play_body = method(flying, "await RiseAndAimAsync(source", "await LandAsync(source")
-    results.append(check("await StayAsync(source, positions, aimRotation," in play_body,
-                         "三段顺序：起飞 → 停留 → 降落"))
+    stay_hook = method(flying, "protected virtual async Task StayAsync(", "private async Task SwayAsync(")
+    results.append(check("await SwayAsync(card, baseRotation, stayDuration);" in stay_hook,
+                         "父类默认实现仍是「摆幅非 0 才摆」"))
+    results.append(check("protected virtual async Task StayAsync(" in flying, "父类的悬停阶段是 virtual"))
+    play_body = method(flying, "await RiseAsync(source", "await LandAsync(source")
+    results.append(check("await StayAsync(source, positions, baseRotation," in play_body,
+                         "三段顺序：升起 → 悬停 → 落回"))
 
     # 投弹是「子特效」，弹数/时长仍在 bombing 场景里配，这里只决定何时开投
     results.append(check('EffectRegistry.Create(StrikeEffectName)' in airstrike,
