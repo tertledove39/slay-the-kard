@@ -145,9 +145,10 @@ def main():
         if m:
             wired[card] = m.group(1).strip()
 
+    # 喀秋莎也在列：它的 playEffect 是「进入阵地」，进场与移动共用（见 ⑧ 与 ⑦）
     expected = {"冬季攻势": "严冬", "战略重心": "战略重心", "五年计划": "红色旗帜",
                 "塔曼斯卡亚": "嘿", "方面军": "阿嘿", "朱可夫": "朱可夫",
-                "拖拉机厂": "拉伸", "预备役": "预备役"}
+                "拖拉机厂": "拉伸", "预备役": "预备役", "喀秋莎": "katyusha_into_pos"}
     for card, slot in sorted(expected.items()):
         results.append(check(wired.get(card) == slot, f"{card} → sfx({slot})"))
 
@@ -241,23 +242,49 @@ def main():
             results.append(check(Path(str(src) + ".import").exists(),
                                  f"{name} 的 {src.name} 已被 Godot 导入"))
 
-    # ==================== ⑦ 飞机移动也响 ====================
+    # ==================== ⑦ 移动也响 ====================
     # 入场那一声走 PlayCardEffect（与部署分支互斥），**移动**那一声在 Move() 的 else 分支里。
-    print("\n--- ⑦ 飞机移动也响一声飞过 ---")
-    plane_fn = method(battle, "private void PlayPlaneMoveEffect(cardBase_ card)", "\n    }")
-    results.append(check("card.cardType is not (CardTypes.Plane or CardTypes.Bomber)" in plane_fn,
-                         "只对飞机/轰炸机生效"))
-    results.append(check("StartEffect(PlaneFlybyEffect," in plane_fn, "放的是同一条飞过声"))
-    results.append(check("card.playEffect" not in plane_fn,
-                         "移动不看卡上的 playEffect（那个语义是「打出时」）"))
+    # 一次移动只响一声：卡上写了 playEffect 就用它（喀秋莎的「进入阵地」进场与移动共用一行），
+    # 没写的飞机才放「飞过」。
+    print("\n--- ⑦ 移动也响一声 ---")
+    move_fn = method(battle, "private void PlayMoveEffect(cardBase_ card)", "\n    }")
+    results.append(check("string effect = card.playEffect;" in move_fn,
+                         "卡上有 playEffect 就用它（喀秋莎靠这一行同时覆盖进场与移动）"))
+    results.append(check("card.cardType is not (CardTypes.Plane or CardTypes.Bomber)) return;" in move_fn
+                         and "effect = PlaneFlybyEffect;" in move_fn,
+                         "没写的话，飞机/轰炸机放「飞过」"))
+    results.append(check(move_fn.index("card.playEffect") < move_fn.index("PlaneFlybyEffect"),
+                         "两份音的优先级：卡上的 playEffect 先于飞机默认"))
+    results.append(check("PlayPlaneMoveEffect" not in battle, "旧名 PlayPlaneMoveEffect 已不存在"))
     # 移动分支：确认它接在 Move() 的 else（非部署）里，且入场分支没有它
     move_body = battle[battle.index("async Task Move(cardBase_ card, place_ position)"):][:6000]
     deploy_branch = move_body[move_body.index("if (isDeployedFromHand)"):]
-    else_branch = return_stmt = deploy_branch[deploy_branch.index("else"):]
-    results.append(check("PlayPlaneMoveEffect(card);" in else_branch,
-                         "移动分支（else）里调了 PlayPlaneMoveEffect"))
-    results.append(check("PlayPlaneMoveEffect(card);" not in deploy_branch[:deploy_branch.index("else")],
+    else_branch = deploy_branch[deploy_branch.index("else"):]
+    results.append(check("PlayMoveEffect(card);" in else_branch, "移动分支（else）里调了 PlayMoveEffect"))
+    results.append(check("PlayMoveEffect(card);" not in deploy_branch[:deploy_branch.index("else")],
                          "部署分支里**没有**它 —— 两条互斥，不会连响两声"))
+
+    # ==================== ⑧ 喀秋莎 ====================
+    # 专属音效一个挂 attackEffect（攻击）、一个挂 playEffect（进场 + 移动）。
+    print("\n--- ⑧ 喀秋莎专属音 ---")
+    katyusha = card_ini[card_ini.index("[喀秋莎]"):][:600]
+    # 攻击音挂在 attackEffect 上。**主人后来把 `bullet` 去掉了**（只响炮声、不出子弹视觉），
+    # 所以这里只断言「带了这一条音效」，不锁死整串值——以后想加回视觉也不必改测试。
+    results.append(check(re.search(r"(?m)^attackEffect\s*=.*sfx\(katyusha_fire\)", katyusha) is not None,
+                         "攻击音挂在 attackEffect 上"))
+    results.append(check("playEffect" in katyusha and "sfx(katyusha_into_pos)" in katyusha,
+                         "进入阵地挂在 playEffect 上（进场与移动共用这一行）"))
+    for name in ("katyusha_fire", "katyusha_into_pos"):
+        results.append(check(name in slots, f"[sfx] 配了槽位「{name}」"))
+        for f in slots.get(name, []):
+            src = ROOT / f.replace("res://", "")
+            results.append(check(src.exists(), f"{name} → {src.name} 存在"))
+            results.append(check(Path(str(src) + ".import").exists(),
+                                 f"{name} 的 {src.name} 已被 Godot 导入"))
+    # 攻击特效里带了自定义音效，就不该再叠通用机枪声
+    results.append(check('"sfx"' in method(effect, "HashSet<string> NoFiringSoundNames",
+                                           "public static bool ReplacesFiringSound"),
+                         "「sfx」进了静音名单：攻击特效自带音效时不再叠通用开火声"))
 
     # 挂载点：没写 playEffect 的走兜底；写了的一律以卡为准
     results.append(check("effect = card.cardType == CardTypes.Command ? DefaultCommandPlayEffect : DeployMoveEffect(card);"

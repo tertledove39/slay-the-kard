@@ -80,6 +80,7 @@
 
 | 卡 | 槽位 | 音频 |
 |----|------|------|
+| 喀秋莎 | `katyusha_into_pos`（`playEffect`，进场+移动） / `katyusha_fire`（`attackEffect`，攻击） | `assest/AU_Rocket_Art_Katyusha_IntoPos_01.wav` / `..._fire_02.wav` |
 | 冬季攻势 | `严冬` | `assest/严冬.wav` |
 | 战略重心 | `战略重心` | `assest/战略重心.wav` |
 | 五年计划 | `红色旗帜` | `assest/红色旗帜.wav` |
@@ -114,9 +115,18 @@
 槽位名是 `{前缀}_{档位}` **拼出来的**，所以加一个兵种只要加一个前缀常量 + `[sfx]` 三条，
 判定逻辑一行都不用改。（坦克素材自己叫 Light/Medium/Heavy，槽位统一叫 small/medium/large。）
 
-**飞机的「移动」**：入场走上面的兜底，**在场上挪位置**另在 `Move()` 的移动分支里调
-`PlayPlaneMoveEffect(card)`，放的是同一条 `plane_flyby`。两条互斥，不会连响两声。
-移动那一声**不看卡上的 `playEffect`**——那个语义是「打出时」，挪位置不算打出。
+#### 单位「移动」时的音
+
+入场走上面的兜底，**在场上挪位置**（支援阵线 → 前线）另在 `Move()` 的移动分支里调
+`PlayMoveEffect(card)`。一次移动**只响一声**：
+
+1. **卡上写了 `playEffect` 就用它**——喀秋莎的「进入阵地」就是这么配的
+   （`playEffect = sfx(katyusha_into_pos)`），**进场与移动共用同一行配置**；
+2. 没写的话，飞机与轰炸机放那一声 `plane_flyby`；
+3. 其余不播。
+
+两条路互斥：入场走 `Move()` 的部署分支 / `AddCardToPlace()`，移动走同函数的 else 分支，
+不会连响两声。（指令卡的 `playEffect` 不会走到这里——指令卡不上场。）
 
 - 取的是**进场那一刻的当前值**（= 卡面值）：`PlayCardEffect` 排在 `Deployed` / `BeingAddedToField` **之前**，「部署时 +1/+1」那类还没结算。
 - **两条进场路径都覆盖，且不会重复播**：从手牌拖上场走 `Move()`（`isDeployedFromHand`，同时触发 `Deployed`）；效果刷进场走 `AddCardToPlace()`（同时触发 `BeingAddedToField`）。在场上挪位置的单位两条都不满足。

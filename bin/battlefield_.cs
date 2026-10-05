@@ -920,7 +920,7 @@ private const int OpeningHandSize = 5;
     /// 卡进场（部署 / 加入战场）时的默认音：
     /// - **步兵** → `infantry_{档}`；
     /// - **坦克与火炮** → `tank_{档}`（素材自己叫 Light/Medium/Heavy，槽位统一叫 small/medium/large）；
-    /// - **飞机与轰炸机** → 不分档，一条 `plane_flyby`（它的「移动」另有一处，见 `PlayPlaneMoveEffect`）；
+    /// - **飞机与轰炸机** → 不分档，一条 `plane_flyby`（它在场上挪位置另有一处，见 `PlayMoveEffect`）；
     /// - 其余（总部、指令卡）→ `null`。
     ///
     /// 三档按 `attack + defence`：≤`DeploySoundSmallMax` 小、到 `DeploySoundMediumMax` 为止是中、
@@ -952,18 +952,31 @@ private const int OpeningHandSize = 5;
     }
 
     /// <summary>
-    /// 飞机**移动**时的那一声「飞过」。入场那一声走 `PlayCardEffect`，两边互斥（一次进场只走一条路、
-    /// 一次移动只走这一条），不会连响两声。
+    /// 单位在场上**挪位置**（支援阵线 → 前线）时的音。一次移动只响一声：
     ///
-    /// 与入场不同，这里**不看卡上的 `playEffect`**：`playEffect` 的语义是「打出时」，
-    /// 在场上挪位置不算打出。
+    /// 1. 卡上写了 `playEffect` 就用它——喀秋莎的「进入阵地」
+    ///    （`playEffect = sfx(katyusha_into_pos)`）就是这么配的，**进场与移动共用一行**；
+    /// 2. 没写的话，飞机与轰炸机放那一声「飞过」；
+    /// 3. 其余不播。
+    ///
+    /// 与入场那一声互斥：入场走 `Move()` 的部署分支 / `AddCardToPlace()`，移动走这里的 else 分支，
+    /// 两条路不会同时走，所以不会连响两声。
+    ///
+    /// 单位素材（`playEffect`）在这里也生效，是为了让「部署音」与「移动音」能用同一处配置表达；
+    /// 指令卡的 `playEffect` 不会走到这里（指令卡不上场）。
     /// </summary>
-    private void PlayPlaneMoveEffect(cardBase_ card)
+    private void PlayMoveEffect(cardBase_ card)
     {
         if (card == null || !IsInstanceValid(card)) return;
-        if (card.cardType is not (CardTypes.Plane or CardTypes.Bomber)) return;
 
-        StartEffect(PlaneFlybyEffect, new List<Vector2> { GetCardCenter(card) }, null, card);
+        string effect = card.playEffect;
+        if (string.IsNullOrWhiteSpace(effect))
+        {
+            if (card.cardType is not (CardTypes.Plane or CardTypes.Bomber)) return;
+            effect = PlaneFlybyEffect;
+        }
+
+        StartEffect(effect, new List<Vector2> { GetCardCenter(card) }, null, card);
     }
 
     private bool PlayAttackEffect(cardBase_ from, cardBase_ to)
@@ -2443,8 +2456,9 @@ InputState currentInputState = InputState.nil;
             {
                 card.HaveMoved();
             }
-            // 飞机在场上挪位置也响一声「飞过」（入场那一声走 PlayCardEffect，两条互斥）
-            PlayPlaneMoveEffect(card);
+            // 在场上挪位置也响一声（卡上有 playEffect 就用它，飞机放「飞过」；
+            // 入场那一声走 PlayCardEffect，两条互斥）
+            PlayMoveEffect(card);
             // 否则触发移动单位的 Moving 效果
             await TriggerUnitEffects("Moving", card, new List<cardBase_> { card }, checkOnlySourceCard: true);
         }

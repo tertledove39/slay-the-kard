@@ -79,6 +79,8 @@ public static class EffectRegistry
     ///
     /// 名单怎么定——看这个特效**打出来的东西和机枪声搭不搭**，而不是看它有没有自己的音效：
     /// - `flying` / `airstrike`：**飞机掠过然后扔炸弹**。炸弹配机枪「哒哒」是串味，所以不放；
+    /// - `sfx`：**攻击特效里自己带了音效**（如喀秋莎 `bullet,sfx(katyusha_fire)`）。
+    ///   既然已经指定了要放什么，就不该再叠一层通用开火声；
     /// - `strafe`：**飞机掠过然后打枪**。打的就是子弹，**机枪声正是它要的**，所以不在名单里。
     ///
     /// 换句话说「自带音效」并不自动等于「不要开火声」——`strafe` 自带飞掠声，
@@ -94,7 +96,8 @@ public static class EffectRegistry
     private static readonly HashSet<string> NoFiringSoundNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "flying",
-        "airstrike"
+        "airstrike",
+        "sfx"
     };
 
     /// <summary>

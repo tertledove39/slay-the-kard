@@ -917,6 +917,37 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 `ResourceLoader` 会直接返回 null、配置全对也没声——和上一轮 `战略重心.wav` 同一个坑。
 跑一次 `--headless --editor --quit` 补上即可（测试里每个槽位都断言 `.import` 存在）。
 
+### 第十四轮调整（喀秋莎专属音；单位「移动」时也响）
+
+需求：喀秋莎两个专属音——`AU_Rocket_Art_Katyusha_fire_02` 是**攻击**音、
+`AU_Rocket_Art_Katyusha_IntoPos_01`（主人写字误作 `_02`）是**移动**音。
+
+**先纠正一个前提**：主人说「似乎步兵入场音效在步兵移动时也会播放，所以不需要改 ini 写法」。
+**核实结果是并不会**——`PlayCardEffect` 只有四个调用点（`AddCardToPlace` 刷进场、
+`Move()` 的 `isDeployedFromHand` 部署分支、两条指令卡路径），移动走的是 `Move()` 的 else 分支，
+那一支此前**什么都不放**。所以「移动也出声」需要真的去接。
+
+**但主人的意图（不改 ini 写法）被采纳了**：把移动那一声做成「**卡上写了 `playEffect` 就用它**」。
+于是喀秋莎只要写一行
+
+    playEffect = sfx(katyusha_into_pos)
+
+**进场和移动就都响它**——一行覆盖两个时机，确实不用新增任何 ini 语法。
+`PlayPlaneMoveEffect` 随之改名为 `PlayMoveEffect`（它现在不只服务飞机），规则变成三条：
+
+1. 卡上有 `playEffect` → 用它；
+2. 没写 + 飞机/轰炸机 → `plane_flyby`；
+3. 其余不播。
+
+攻击音则是零代码：`attackEffect` 挂上去即可（多特效本来就支持）。
+**主人随后自己把 `attackEffect` 从 `bullet,sfx(...)` 改成了 `sfx(...)`** ——
+即喀秋莎开火只响炮声、不出子弹视觉。测试相应改成只断言「带了这条音效」，不锁死整串值。
+
+**机枪声**：主人选「不要」——火箭炮配机枪「哒哒」是串味。做法是把 **`sfx` 也加进
+`NoFiringSoundNames`**：**攻击特效里带了自定义音效（`sfx(...)`）就不再叠通用开火声**。
+影响面只有喀秋莎自己（此前没有别的卡在 `attackEffect` 里用 `sfx`）。
+注意 `strafe` 仍然**不在**名单里——它打的就是子弹，那声机枪正是它要的。
+
 ### 场景里 export 的值要带中文注释
 
 `.tscn` 的导出值在 Inspector 里只显示英文字段名，看不出含义，所以约定在**上一行**写一行
