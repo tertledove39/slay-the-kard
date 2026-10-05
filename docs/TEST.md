@@ -610,3 +610,20 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
   **每段各自填秒数**（`RiseDuration` / `SwaySecondsPerCycle` / `LandDuration`）。
   测试反向断言百分比常量（`RiseFraction` 等）已移除——它们再回来就意味着又切回去了。
 - **③** 是场景里的值（`SwayDegrees = 5.0`），代码里只是读它，测试断言场景里确实是 5.0。
+
+### 场景里 export 的值要带中文注释
+
+`.tscn` 的导出值在 Inspector 里只显示英文字段名，看不出含义，所以约定在**上一行**写一行
+`;` 中文注释。分号注释必须单独成行（写在属性行尾会被当成值的一部分）。
+
+测试把这条约定钉死了，而且**不写死字段名单**——它先解析脚本里 `[Export]` 的声明，
+再逐项核对场景：
+
+1. 每一项都得在场景里**显式赋值**（缺了就在 Inspector 里看不见，也谈不上注释）；
+2. 每个赋值行的**正上方**必须是一行带中文的 `;` 注释。
+
+覆盖 `effects/flying_effect.tscn`、`effects/bullet_effect.tscn`、`effects/bombing_effect.tscn`
+（后两者共用 `BulletEffect` 脚本）。这样以后新增 Export 忘了写注释或忘了写值，测试会直接点名。
+
+> 反向验证过一次：故意删掉 `; 摆动几个来回` 后测试立刻报 `没有中文注释: SwayCycles` 并失败；
+> 补回来后恢复全绿——确认这条守卫不是空跑。

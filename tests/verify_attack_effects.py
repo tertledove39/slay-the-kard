@@ -43,6 +43,35 @@ def method(text, start, end):
     return text[i:text.index(end, i)]
 
 
+def exports_of(cs_text):
+    """C# 里声明的 [Export] 字段名，按声明顺序。"""
+    return re.findall(r"\[Export\]\s+public\s+[\w<>\[\],\s]+?\s(\w+)\s*=", cs_text)
+
+
+def uncommented_exports(scene_text, names):
+    """返回「场景里的赋值行上方没有中文 ; 注释」的导出项名。
+
+    .tscn 用分号作注释，且**必须单独一行**写在属性上方（行尾注释会被当成值的一部分）。
+    """
+    lines = scene_text.split("\n")
+    missing = []
+    for name in names:
+        for index, line in enumerate(lines):
+            if not re.match(rf"{re.escape(name)}\s*=", line):
+                continue
+
+            previous = ""
+            for back in range(index - 1, -1, -1):
+                if lines[back].strip():
+                    previous = lines[back].strip()
+                    break
+
+            if not (previous.startswith(";") and re.search(r"[一-鿿]", previous)):
+                missing.append(name)
+            break
+    return missing
+
+
 def scene_paths(text):
     """取出 EffectRegistry.ScenePaths 里的 名字 -> 路径。"""
     block = method(text, "private static readonly Dictionary<string, string> ScenePaths",
@@ -219,17 +248,39 @@ def main():
     results.append(check('ImpactSfxSlot = "dead"' in bombing_scene, "bombing 每发命中配爆炸音效"))
     results.append(check("ImpactSfxVolume = 0.7" in bombing_scene, "爆炸音效音量 70%"))
     bullets_scene = (ROOT / "effects" / "bullet_effect.tscn").read_text(encoding="utf-8")
-    results.append(check("ImpactSfxSlot" not in bullets_scene,
-                         "bullet 不写命中音效，行为与从前一致"))
+    results.append(check('ImpactSfxSlot = ""' in bullets_scene,
+                         "bullet 的命中音效槽位显式留空（不播，行为与从前一致）"))
 
     bomb_scene = (ROOT / "bin" / "bomb.tscn").read_text(encoding="utf-8")
     results.append(check('path="res://bin/Bullet.cs"' in bomb_scene, "航弹复用 Bullet 脚本（运动方式照 bullet）"))
     results.append(check("航弹.png" in bomb_scene, "航弹弹体用 航弹.png"))
 
     bullet_scene_path = next(p for n, p in scene_paths(effect).items() if n == "bullet")
-    results.append(check("ProjectileCount" not in
+    results.append(check("ProjectileCount = 10" in
                          (ROOT / bullet_scene_path.replace("res://", "")).read_text(encoding="utf-8"),
-                         "bullet 场景不写弹数，保持脚本默认的 10 发（行为不变）"))
+                         "bullet 场景写明固定 10 发（正数 = 固定发数，不随攻击力变）"))
+
+    # ==================== 场景里每个 Export 都要有中文注释 ====================
+    print("\n--- 场景里 export 的内容必须带中文注释 ---")
+    for scene_rel, cs_path in [("effects/flying_effect.tscn", FLYING),
+                               ("effects/bullet_effect.tscn", BULLET_EFFECT),
+                               ("effects/bombing_effect.tscn", BULLET_EFFECT)]:
+        names = exports_of(cs_path.read_text(encoding="utf-8"))
+        scene_text = (ROOT / scene_rel).read_text(encoding="utf-8")
+
+        # ① 每一项都得在场景里显式写出来，否则 Inspector 里根本看不到、也谈不上注释
+        absent = [n for n in names if not re.search(rf"(?m)^{re.escape(n)}\s*=", scene_text)]
+        results.append(check(not absent,
+                             f"{scene_rel}：{len(names)} 个 Export 全部在场景里显式赋值（缺 {len(absent)} 项）"))
+        for n in absent:
+            print(f"       场景里没写: {n}")
+
+        # ② 每个赋值行的正上方都得有一行中文 `;` 注释
+        missing = uncommented_exports(scene_text, names)
+        results.append(check(not missing,
+                             f"{scene_rel}：每个 Export 上方都有中文注释（缺 {len(missing)} 项）"))
+        for n in missing:
+            print(f"       没有中文注释: {n}")
 
     # ==================== 弹体池 ====================
     print("\n--- 弹体池按场景路径分池 ---")
