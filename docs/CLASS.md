@@ -65,6 +65,12 @@
 
 所有视觉效果的抽象基类。`Play`接收可选的全局`Vector2`位置列表和以秒为单位的可选播放时间；省略参数时由具体效果采用默认值。`EffectRegistry`将卡牌配置短名称映射到效果场景。
 
+| 成员 | 说明 |
+|------|------|
+| `Play(positions, time, source, count)` | 抽象方法。`source` 是触发它的卡（`flying` 要动这张卡本身），`count` 是要生成几个（`bombing` 的弹数 = 攻击力） |
+| `Configure(argument)` | 特效名括号里的参数——`playEffect = sfx(严冬)` 传进来的是「严冬」。**在 `AddChild` 之后、`Play` 之前调用**，所以需要时可安全 `GetNode`。不需要参数的特效忽略即可 |
+| `PrepareForUse()` / `ResetForPool()` | 取用与回收时的收尾 |
+
 ### `Bullet` : Effect (bin/Bullet.cs)
 
 单发飞弹动画，从一个全局位置飞向另一个全局位置。`bullet.tscn`（机枪子弹）与 `bomb.tscn`（航弹）共用本脚本。
@@ -106,6 +112,20 @@
 只覆写 `DuringRiseAsync`。子特效本身不在这里实现，而是从 `EffectRegistry` 取出来播一遍，弹数/飞行时长/错开间隔仍然配在各自那个场景里。升起/悬停/降落/还原/飞掠音效全部沿用父类——「卡飘起来」这套运动只有一份实现。
 
 > 子特效最初挂在 `StayAsync`（等起飞演完才打），实机反馈「炮弹发射得太晚」——起飞那一段有整整一秒。现在挂到 `DuringRiseAsync`，卡刚一离地弹就已经在飞了。
+
+### `SoundEffect` : Effect (core_logic/SoundEffect.cs)
+
+**只放一段音效**、不画任何东西。卡牌语音（打出这张卡时喊一声）走它。
+
+槽位不从场景里读，而是从**特效名的参数**来：卡写 `playEffect = sfx(严冬)`，
+`EffectRegistry.ParseName` 拆出「严冬」交给 `Configure`，`Play` 再拿它去
+`configs/music.ini` 的 `[sfx]` 段取文件。所以**全项目共用这一个场景**。
+
+| 成员 | 说明 |
+|------|------|
+| `Configure(argument)` | 收下槽位名 |
+| `[Export] float VolumeDb` | 音量（0 = 原音量）。一个场景服务所有语音，所以这是**全局**微调 |
+| `Play(...)` | 取音频、播放，然后 **`await ToSignal(player, Finished)`**——调用方 `RunEffect` 的 `finally` 会立刻回收本节点，不等放完的话播放器会连着声音一起被删掉 |
 
 ### `SmokeEffect` : Effect (core_logic/SmokeEffect.cs)
 

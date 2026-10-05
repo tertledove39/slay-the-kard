@@ -800,6 +800,45 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
 以后有人「顺手统一一下」把它加进去会立刻红。同时加了一条「旧名 `SelfVoicedNames`
 已彻底移除」——留着就是两个说法打架。
 
+### 第十轮调整（卡牌语音：打出卡时喊一声）
+
+需求：新增了 8 个音效（严冬 / 战略重心 / 红色旗帜 / 嘿 / 阿嘿 / 朱可夫 / 拉伸 / 预备役），
+让对应的卡打出时播放。其中 5 个的名字与卡名对不上，由主人给出了映射。
+
+**做法：给特效名加了一层「参数」语法。** 卡写 `playEffect = sfx(严冬)`，链条是
+
+    StartEffect（用括号感知的 SplitEffectString 拆名）
+      → EffectRegistry.ParseName 拆出名字 `sfx` 与参数「严冬」
+      → Create 取 effects/sound_effect.tscn
+      → AddChild → Configure("严冬") → PrepareForUse
+      → SoundEffect.Play → MusicManager.PickSfx("严冬") → configs/music.ini 的 [sfx] 段
+
+三个刻意的取舍：
+
+1. **没有做成一音效一场景**。语音会越加越多，一音效一场景的话每加一句都要新建 `.tscn`
+   再改注册表；现在加一句只要 `[sfx]` 写一行、卡上写一行。
+2. **拆分交给已有的 `SplitEffectString`**（括号与引号感知），没有新写一个拆分器——
+   朴素的 `Split(',')` 会把参数里的逗号也当分隔符。
+3. **`Configure` 排在 `AddChild` 之后**。先让节点进树（`_Ready` 跑完、子节点就绪），
+   参数里才可能安全地 `GetNode`；反过来会拿到 `null`。测试钉住了这个顺序。
+
+`SoundEffect.Play` 必须 **等音效放完再返回**：调用方 `RunEffect` 的 `finally` 会立刻回收
+特效节点，不等的话播放器连着声音一起被删掉，只听得见开头一小截。测试钉住这句
+（依赖素材是**非循环**的——8 个新 wav 的 `edit/loop_mode` 都是 0，已核对）。
+
+新增 `tests/verify_card_voice.py`（94 条），做两条**交叉核对**：
+
+- 卡里写的槽位必须在 `[sfx]` 段里存在（拼错一个名字就静默没声）；
+- 槽位指向的音频必须**已被 Godot 导入**（有 `.import`）。
+
+第二条是实机跑出来的：`战略重心.wav` 少了 `.import`，另外 7 个都有，于是
+`ResourceLoader` 报 `No loader found for resource`、返回 null——配置全对却没声。
+用一次 `--headless --editor --quit` 扫描就补上了。
+
+本轮还踩到一个自己造成的坑：**用 `utf-8-sig` 写回 `cards/card.ini` 给它加了 BOM**，
+而该文件本来没有 BOM，用 `encoding="utf-8"` 读它的两个测试（`configparser`）
+当场 `MissingSectionHeaderError`。已去 BOM；这条写进了 `NOTICE.md`。
+
 ### 场景里 export 的值要带中文注释
 
 `.tscn` 的导出值在 Inspector 里只显示英文字段名，看不出含义，所以约定在**上一行**写一行

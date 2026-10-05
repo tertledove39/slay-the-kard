@@ -19,6 +19,15 @@ public abstract partial class Effect : Control
     public abstract Task Play(IReadOnlyList<Vector2> positions = null, float? time = null,
                               cardBase_ source = null, int count = 0);
 
+    /// <summary>
+    /// 特效名括号里带的那一段参数。`playEffect = sfx(严冬)` 传进来的就是「严冬」；
+    /// 名字不带括号时是 `null`。
+    ///
+    /// **在 `AddChild` 之后、`Play` 之前调用**，所以需要时可安全地 `GetNode`。
+    /// 不需要参数的特效（`bullet`、`smoke`……）忽略它即可。
+    /// </summary>
+    public virtual void Configure(string argument) { }
+
     public virtual void PrepareForUse() => Visible = true;
     public virtual void ResetForPool() => Visible = false;
 }
@@ -38,8 +47,31 @@ public static class EffectRegistry
         // `StrikeEffectName`（bombing / bullet）——所以这里不是两套实现，是两套 Export。
         // 再加「飞起来干别的」（火箭弹、机枪扫射……）同样只是再加一个场景。
         ["airstrike"] = "res://effects/air_strike_effect.tscn",
-        ["strafe"] = "res://effects/strafe_effect.tscn"
+        ["strafe"] = "res://effects/strafe_effect.tscn",
+        // 只放音效、不画任何东西。槽位由**特效名的参数**指定：`playEffect = sfx(严冬)`
+        // ——所以卡牌语音不需要一场景一音效，全项目共用这一个。
+        ["sfx"] = "res://effects/sound_effect.tscn"
     };
+
+    /// <summary>
+    /// 把 `名字(参数)` 拆成名字与参数——`sfx(严冬)` 拆成 `sfx` 与 `严冬`。
+    /// 名字不带括号时 `argument` 为 `null`。
+    ///
+    /// 解析放在注册表里，是因为**特效名的格式本来就是它定的**（`Create` 只认名字那一段）。
+    /// 调用方另有括号感知的拆分器（`battlefield_.SplitEffectString`）负责切多个特效，
+    /// 两者配合下参数里出现逗号也不会被拆坏。
+    /// </summary>
+    public static void ParseName(string raw, out string name, out string argument)
+    {
+        name = (raw ?? string.Empty).Trim();
+        argument = null;
+
+        int open = name.IndexOf('(');
+        if (open <= 0 || !name.EndsWith(")")) return;
+
+        argument = name.Substring(open + 1, name.Length - open - 2).Trim();
+        name = name.Substring(0, open).Trim();
+    }
 
     /// <summary>
     /// **不放通用开火声**的特效名。`Attack()` 每次都放一声通用的开火声

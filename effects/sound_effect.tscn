@@ -1,0 +1,12 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core_logic/SoundEffect.cs" id="1"]
+
+[node name="SoundEffect" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Sfx" type="AudioStreamPlayer" parent="."]
+bus = &"SFX"

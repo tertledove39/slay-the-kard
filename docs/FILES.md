@@ -25,6 +25,8 @@
 | core_logic/Effect.cs | 特效基类 `Effect` 与注册表 `EffectRegistry`（名字 -> 场景路径）。`Play` 的入参除坐标外还有 `source`（触发它的单位）与 `count`（生成几个） |
 | core_logic/FlyingEffect.cs | **飞掠特效**：让触发它的那张卡升起（位置 + 轻微放大）-> 原地悬停 -> 落回，期间抬高层级压住其他卡（`TopZIndex`，**必须低于手牌的 20**）。**全程不转角度**（`SwayDegrees` 默认 0 = 静止悬停）。参数全部 Export 在 `effects/flying_effect.tscn`。两个钩子：`DuringRiseAsync`（与起飞并行的事）与 `StayAsync`（悬停阶段） |
 | core_logic/AirStrikeEffect.cs | **「飞起来打一下」特效** `AirStrikeEffect : FlyingEffect`，只覆写 `DuringRiseAsync` = **起飞的同时把子特效打出去**。一个脚本、两个场景，靠 `StrikeEffectName` 区分：`bombing` = 投弹（`airstrike`）、`bullet` = 打枪（`strafe`）。升起/悬停/降落/还原/音效全部沿用父类 |
+| core_logic/SoundEffect.cs | **只放一段音效**的特效（卡牌语音）。槽位从**特效名的参数**来：`playEffect = sfx(严冬)` → `Configure("严冬")` → `MusicManager.PickSfx`。`Play` 会**等音效放完**才返回，否则调用方回收节点时会把声音一起掐掉 |
+| effects/sound_effect.tscn | 上述音效特效的场景。**全项目共用这一个**——语音不必一音效一场景 |
 | bin/bomb.tscn | 航弹弹体（复用 `bin/Bullet.cs`，贴图 `assest/航弹.png`），供 `bombing` 特效用 |
 | effects/bombing_effect.tscn | `bombing` 特效：复用 `BulletEffect` 脚本，`ProjectileScenePath=bin/bomb.tscn`、`ProjectileCount=0`（0 = 用攻击力）、`ProjectileFlightSeconds=1.5` |
 | effects/flying_effect.tscn | 上述飞掠特效的场景（一个 Control + SFX 总线上的 AudioStreamPlayer） |
@@ -109,4 +111,5 @@
 | `tests/verify_card_state_lifecycle.py` | 复用卡牌的生命周期状态归零（shouldBeRemoved / isDiscarding / LabelSettings 独占） |
 | `tests/verify_trigger_death_check.py` | 时点触发里的效果打死人后必须有死亡检查（女狙击手 + 机动防御那条） |
 | `tests/verify_explosion_sfx.py` | 阵亡爆炸音效随机池（爆炸3~21 且排除下划线开头）、`[sfx]` 槽位复用、场景引用的音频文件必须存在 |
+| `tests/verify_card_voice.py` | 卡牌语音整条链：`playEffect = sfx(槽位)` 的参数解析、`SoundEffect` 的「等放完再返回」、`[sfx]` 段的新槽位与配对音频、8 张卡的接线，以及**交叉核对「卡里写的槽位在 `[sfx]` 段里确实存在、音频确实被 Godot 导入过」** |
 | `tests/verify_attack_effects.py` | `attackEffect` 多效果、`Effect.Play` 的 source/count 上下文、flying 飞掠、bombing 航弹、airstrike 空袭（继承 + 盘旋投弹）、Export 中文说明的落点、弹体池按路径分池 |

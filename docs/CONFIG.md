@@ -40,6 +40,7 @@
 | `flying` | `effects/flying_effect.tscn` | 让**触发它的那张卡**升起（`RiseDuration`，只移动位置 + 轻微放大）-> 原地悬停 `SwaySecondsPerCycle × SwayCycles` 秒 -> 落回（`LandDuration`，连角度一起还原），期间抬高层级压住其他卡；音效取 `[sfx] flyby`。**全程不转角度**（`SwayDegrees` 默认 0 = 完全静止悬停；调大才在卡自己的原始角度上左右摆） |
 | `airstrike` | `effects/air_strike_effect.tscn` | **空袭 = 飞掠 + 投弹**：**刚开始起飞就把航弹扔出去** -> 悬停（`SwaySecondsPerCycle = 0.5`，比 `flying` 那个短一半）-> 降落。投的是 `bombing` 子特效，所以弹数仍是攻击力；`StrikeEffectName` 留空则退化成纯飞掠 |
 | `strafe` | `effects/strafe_effect.tscn` | **扫射 = 飞掠 + 打枪**：与 `airstrike` **是同一个脚本、同一套节奏**，只把 `StrikeEffectName` 换成 `bullet`（起飞即打出 10 发子弹）。毛驴用这个 |
+| `sfx` | `effects/sound_effect.tscn` | **只放一段音效**，不画任何东西。放什么由**特效名的参数**指定：`playEffect = sfx(严冬)`。所以全项目共用这一个场景，卡牌语音不必一音效一场景 |
 
 `bombing`与`bullet`共用`BulletEffect`脚本，差别只在场景 Export 出去的「弹体场景」与「弹数」——生成、随机错开、回池那套逻辑不写第二遍。
 
@@ -62,6 +63,38 @@
 | 起飞即打枪 -> 悬停 -> 降落 | `attackEffect = strafe` |
 
 单位当前攻击力为0时，主动攻击、普通反击和伏击均不会播放`attackEffect`。攻击力大于0但伤害被重甲或免疫修正为0时仍会播放。
+
+#### 特效名可以带参数：`名字(参数)`
+
+单个特效名后面可以跟一对括号写参数，例如`playEffect = sfx(严冬)`。参数经`Effect.Configure(argument)`交给特效；不需要参数的特效忽略即可。名字不带括号时参数是`null`。
+
+- 拆分用`SplitEffectString`（**括号与引号感知**），所以参数里出现逗号也不会被拆坏——朴素的`Split(',')`做不到。
+- 解析在`EffectRegistry.ParseName`，它和`Create`放在一起是因为**特效名的格式本来就是注册表定的**。
+- 调用顺序是`AddChild` → `Configure` → `PrepareForUse`：先让节点进树（`_Ready` 跑完、子节点就绪），参数里才可能安全地`GetNode`。
+
+目前只有`sfx`用得上它。
+
+#### 卡牌语音
+
+打出一张卡时喊一声，走的就是上面那套：`cards/card.ini`写`playEffect = sfx(槽位名)`，音频文件配在`configs/music.ini`的`[sfx]`段。
+
+| 卡 | 槽位 | 音频 |
+|----|------|------|
+| 冬季攻势 | `严冬` | `assest/严冬.wav` |
+| 战略重心 | `战略重心` | `assest/战略重心.wav` |
+| 五年计划 | `红色旗帜` | `assest/红色旗帜.wav` |
+| 塔曼斯卡亚 | `嘿` | `assest/嘿.wav` |
+| 方面军 | `阿嘿` | `assest/阿嘿.wav` |
+| 朱可夫 | `朱可夫` | `assest/朱可夫.wav` |
+| 拖拉机厂 | `拉伸` | `assest/拉伸.wav` |
+| 预备役 | `预备役` | `assest/预备役.wav` |
+
+**加一句新语音只要两步**：`[sfx]` 段写一行、卡上写 `playEffect = sfx(名字)`。不用新建场景、不用改注册表。
+
+两个静默失败的坑（都不报错、只是没声），`tests/verify_card_voice.py` 都守着：
+
+- **槽位名拼错**：交叉核对「卡里写的槽位」必须在 `[sfx]` 段里存在。
+- **素材没被 Godot 导入**：新增的 `.wav` 必须有配套的 `.wav.import`（在 Godot 里打开一次项目就会生成）。缺了的话 `ResourceLoader` 直接取不到，配置全对也没声。
 
 #### 通用开火声与`NoFiringSoundNames`
 

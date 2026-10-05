@@ -881,11 +881,16 @@ private const int OpeningHandSize = 5;
     }
 
     /// <summary>
-    /// 播放特效。名字里可以写**多个**特效，英文逗号分隔（如 `flying,bombing`），
+    /// 播放特效。名字里可以写**多个**特效，英文逗号分隔（如 `bullet,smoke`），
     /// 各自独立开跑、互不等待——总时长等于最长的那个，而不是相加。
     ///
-    /// 分隔符沿用卡牌多值字段的约定（`traits` 也是逗号）。写错名字时留一行日志：
-    /// 静默忽略会让「attackEffect 拼错了」表现成「打了没特效」，很难查。
+    /// 单个特效名还可以**带一个参数**：`名字(参数)`，例如 `playEffect = sfx(严冬)`。
+    /// 参数经 `Effect.Configure` 交给特效，不需要参数的特效忽略即可。
+    ///
+    /// 分隔符沿用卡牌多值字段的约定（`traits` 也是逗号），但拆分交给
+    /// `SplitEffectString`——它是**括号与引号感知**的，所以参数里出现逗号也不会被拆坏。
+    /// 写错名字时留一行日志：静默忽略会让「attackEffect 拼错了」表现成「打了没特效」，
+    /// 很难查。
     /// </summary>
     private bool StartEffect(string effectNames, IReadOnlyList<Vector2> positions,
                              float? time = null, cardBase_ source = null, int count = 0)
@@ -893,9 +898,9 @@ private const int OpeningHandSize = 5;
         if (string.IsNullOrWhiteSpace(effectNames)) return false;
 
         bool started = false;
-        foreach (string raw in effectNames.Split(EffectNameSeparator, StringSplitOptions.RemoveEmptyEntries))
+        foreach (string raw in SplitEffectString(effectNames, ','))
         {
-            string name = raw.Trim();
+            EffectRegistry.ParseName(raw, out string name, out string argument);
             if (name.Length == 0) continue;
 
             Effect effect = EffectRegistry.Create(name);
@@ -905,7 +910,10 @@ private const int OpeningHandSize = 5;
                 continue;
             }
 
+            // 顺序是刻意的：先进树（`_Ready` 跑完、子节点就绪），再传参数，最后才开演。
+            // 反过来的话 `Configure` 里 `GetNode` 会拿到 null。
             AddChild(effect);
+            effect.Configure(argument);
             effect.PrepareForUse();
             _ = RunEffect(effect, positions, time, source, count);
             started = true;

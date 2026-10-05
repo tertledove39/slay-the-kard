@@ -166,8 +166,10 @@ def main():
     # ==================== ① 多个效果 ====================
     print("--- ① attackEffect 支持多个效果 ---")
     start = method(battle, "private bool StartEffect(", "private async Task RunEffect(")
-    results.append(check("effectNames.Split(EffectNameSeparator" in start or
-                         "Split(EffectNameSeparator" in start, "按分隔符拆分名字"))
+    # 拆分现在交给 `SplitEffectString`——它**括号感知**，`sfx(严冬)` 这种带参数的名字
+    # 才不会被拆坏（朴素 Split 会把参数里的逗号也当分隔符）。
+    results.append(check("SplitEffectString(effectNames, ',')" in start,
+                         "用括号感知的 SplitEffectString 拆分名字"))
     results.append(check("EffectNameSeparator = { ',' }" in battle, "分隔符是与 traits 一致的英文逗号"))
     results.append(check(
         'GD.Print($"[Effect] 未知特效名' in start,
