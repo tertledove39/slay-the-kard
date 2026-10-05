@@ -126,6 +126,12 @@ public partial class battlefield_ : Control
     private const string DeadSfxSlot = "dead";
 
     /// <summary>
+    /// `attackEffect` / `playEffect` 里写多个特效名时的分隔符。
+    /// 与 `traits` 等卡牌多值字段一致用英文逗号。
+    /// </summary>
+    private static readonly char[] EffectNameSeparator = { ',' };
+
+    /// <summary>
     /// 多张单位卡被同时弃置时，卡与卡之间错开的起飞间隔（秒）。
     /// `cardBase_.DiscardCard()` 单张就要 3.5 秒（飞入1 + 停留1 + 飞出1.5），
     /// 若一张播完再播下一张，3 张就要 10 秒。错开起飞后动画互相重叠，单张观感不变。
@@ -266,8 +272,9 @@ public partial class battlefield_ : Control
                 if (card == cardNowChoose)
                     continue;
 
-                // 弃牌动画中的卡不参与Z-index/子节点顺序重置
-                if (card.isDiscarding)
+                // 弃牌动画中的卡不参与Z-index/子节点顺序重置；
+                // 正在播卡牌自身特效（flying）的卡同理——那会儿它的层级是特效在管。
+                if (card.isDiscarding || card.isUnderCardEffect)
                     continue;
 
                 // 跳过已临时Reparent到其他节点的卡（如ShowCardChoice期间）
@@ -846,31 +853,62 @@ private const int OpeningHandSize = 5;
     private void PlayCardEffect(cardBase_ card)
     {
         if (card == null || !IsInstanceValid(card)) return;
-        StartEffect(card.playEffect, new List<Vector2> { GetCardCenter(card) });
+        StartEffect(card.playEffect, new List<Vector2> { GetCardCenter(card) }, null, card);
     }
 
     private bool PlayAttackEffect(cardBase_ from, cardBase_ to)
     {
         if (from == null || to == null || !IsInstanceValid(from) || !IsInstanceValid(to)) return false;
-        if (from.ReadAttack() <= 0) return false;
-        return StartEffect(from.attackEffect, new List<Vector2> { GetCardCenter(from), GetCardCenter(to) });
+        int attack = from.ReadAttack();
+        if (attack <= 0) return false;
+
+        // 把攻击者与攻击力一起交给特效：
+        // - `source` 给 flying 用（要动的是这张卡本身，光有坐标拿不到节点）；
+        // - `count` 给 bombing 用（扔几发航弹 = 攻击力，特效自己不知道攻击力多少）。
+        return StartEffect(from.attackEffect,
+                           new List<Vector2> { GetCardCenter(from), GetCardCenter(to) },
+                           null, from, attack);
     }
 
-    private bool StartEffect(string effectName, IReadOnlyList<Vector2> positions, float? time = null)
+    /// <summary>
+    /// 播放特效。名字里可以写**多个**特效，英文逗号分隔（如 `flying,bombing`），
+    /// 各自独立开跑、互不等待——总时长等于最长的那个，而不是相加。
+    ///
+    /// 分隔符沿用卡牌多值字段的约定（`traits` 也是逗号）。写错名字时留一行日志：
+    /// 静默忽略会让「attackEffect 拼错了」表现成「打了没特效」，很难查。
+    /// </summary>
+    private bool StartEffect(string effectNames, IReadOnlyList<Vector2> positions,
+                             float? time = null, cardBase_ source = null, int count = 0)
     {
-        Effect effect = EffectRegistry.Create(effectName);
-        if (effect == null) return false;
-        AddChild(effect);
-        effect.PrepareForUse();
-        _ = RunEffect(effect, positions, time);
-        return true;
+        if (string.IsNullOrWhiteSpace(effectNames)) return false;
+
+        bool started = false;
+        foreach (string raw in effectNames.Split(EffectNameSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string name = raw.Trim();
+            if (name.Length == 0) continue;
+
+            Effect effect = EffectRegistry.Create(name);
+            if (effect == null)
+            {
+                GD.Print($"[Effect] 未知特效名，已跳过: '{name}'（完整字段: {effectNames}）");
+                continue;
+            }
+
+            AddChild(effect);
+            effect.PrepareForUse();
+            _ = RunEffect(effect, positions, time, source, count);
+            started = true;
+        }
+        return started;
     }
 
-    private async Task RunEffect(Effect effect, IReadOnlyList<Vector2> positions, float? time)
+    private async Task RunEffect(Effect effect, IReadOnlyList<Vector2> positions, float? time,
+                                 cardBase_ source = null, int count = 0)
     {
         try
         {
-            await effect.Play(positions, time);
+            await effect.Play(positions, time, source, count);
         }
         finally
         {

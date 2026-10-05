@@ -570,6 +570,12 @@ public partial class cardBase_ : Control
 
     public int shouldBeRemoved = 0;
     public bool isDiscarding = false; // 正在播放弃牌动画，不参与ZIndex重置
+
+    // 正在播「卡牌自身特效」（目前是 flying：升起→摆动→落回）期间置位。
+    // 这段时间卡的 Position / Scale / ZIndex 都归特效管，刷新显示顺序必须跳过它，
+    // 否则那套「场上卡一律 ZIndex = 10」会在下一帧就把抬起来的层级打回去，
+    // 漂浮就压不住别的卡了。
+    public bool isUnderCardEffect = false;
     List<Change> ChangeList = new List<Change>();
     public async Task ExecChangeList()
     {
@@ -1012,6 +1018,7 @@ public partial class cardBase_ : Control
         //     表现就是「弃牌之后卡不会回正」。
         shouldBeRemoved = 0;
         isDiscarding = false;
+        isUnderCardEffect = false;
         ChangeList.Clear();
 
         // ===== 属性文字的颜色必须由本实例独占 =====

@@ -13,7 +13,9 @@ public partial class Bullet : Effect
     /// </summary>
     /// <param name="from"></param>
     /// <param name="to"></param>
-    public override async Task Play(IReadOnlyList<Vector2> positions = null, float? time = null)
+    // source / count 这个弹体用不上：它只关心从哪飞到哪。
+    public override async Task Play(IReadOnlyList<Vector2> positions = null, float? time = null,
+                                    cardBase_ source = null, int count = 0)
     {
         if (positions == null || positions.Count < 2) return;
         Vector2 from = positions[0];

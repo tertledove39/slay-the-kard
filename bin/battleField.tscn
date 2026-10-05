@@ -1,8 +1,8 @@
-[gd_scene load_steps=18 format=3 uid="uid://evqf3f0uq3ao"]
+[gd_scene load_steps=17 format=3 uid="uid://evqf3f0uq3ao"]
 
 [ext_resource type="Script" uid="uid://bddqh2hovnp6b" path="res://bin/battlefield_.cs" id="1_8yftg"]
 [ext_resource type="Texture2D" uid="uid://chj5lq5e5hl7b" path="res://assest/table.jpeg" id="2_h5p18"]
-[ext_resource type="AudioStream" path="res://assest/机枪_低.wav" id="3_ght0g"]
+[ext_resource type="AudioStream" uid="uid://c7a8rkcupyjik" path="res://assest/机枪_低.wav" id="3_ght0g"]
 [ext_resource type="FontFile" uid="uid://cbd2hbmqcbhup" path="res://bin/FRADMCN.TTF" id="4_bmei2"]
 [ext_resource type="AudioStream" uid="uid://544883brg1l1" path="res://assest/爆炸20.wav" id="4_h5p18"]
 [ext_resource type="Texture2D" uid="uid://cdw8ii0fagl2k" path="res://assest/nextTurn.png" id="5_yx2c1"]
@@ -12,7 +12,6 @@
 [ext_resource type="Script" uid="uid://ceefw2hlywr3l" path="res://bin/Cardbase.cs" id="9_uwbmh"]
 [ext_resource type="Script" uid="uid://fcjignj7pq5c" path="res://End.cs" id="11_h5p18"]
 [ext_resource type="PackedScene" path="res://bin/settlement_panel.tscn" id="12_settle"]
-[ext_resource type="PackedScene" uid="uid://bjwmdcdnkulf" path="res://bin/bullet.tscn" id="13_xicgn"]
 
 [sub_resource type="Environment" id="Environment_3l6eg"]
 background_mode = 3
@@ -192,13 +191,6 @@ offset_top = 752.0
 offset_right = 1534.0
 offset_bottom = 804.0
 text = "打开牌堆"
-
-[node name="Bullet" parent="." instance=ExtResource("13_xicgn")]
-layout_mode = 1
-offset_left = 192.20001
-offset_top = 354.2
-offset_right = 193.0
-offset_bottom = 355.0
 
 [connection signal="pressed" from="NextTurnButton" to="." method="OnNextTurnButtonPressed"]
 [connection signal="pressed" from="Button" to="." method="TestButtonPressed"]

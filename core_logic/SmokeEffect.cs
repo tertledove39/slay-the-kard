@@ -14,7 +14,9 @@ public partial class SmokeEffect : Effect
         sprite = GetNode<Sprite2D>("SmokeSprite");
     }
 
-    public override async Task Play(IReadOnlyList<Vector2> positions = null, float? time = null)
+    // source / count 这个特效用不上：它只是在给定位置冒一下。
+    public override async Task Play(IReadOnlyList<Vector2> positions = null, float? time = null,
+                                    cardBase_ source = null, int count = 0)
     {
         if (positions == null || positions.Count == 0) return;
         sprite.GlobalPosition = positions[0];

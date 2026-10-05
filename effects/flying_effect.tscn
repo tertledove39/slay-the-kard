@@ -1,0 +1,19 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core_logic/FlyingEffect.cs" id="1"]
+
+[node name="FlyingEffect" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+mouse_filter = 2
+script = ExtResource("1")
+RiseHeight = 46.0
+RiseScale = 1.18
+SwayAmplitude = 14.0
+SwayCycles = 2.0
+Duration = 0.9
+TopZIndex = 200
+SfxSlot = "flyby"
+
+[node name="Sfx" type="AudioStreamPlayer" parent="."]
+bus = &"SFX"

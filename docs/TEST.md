@@ -553,3 +553,29 @@ GetCardBeingAddToHand  → battlefield_.lastCardAddedToHand
   `battleField.tscn` 曾引用不存在的 `res://assest/机枪.wav`（实际只有 `机枪_低.wav` /
   `机枪_高.wav`），Godot 只在控制台报一行 `Resource file not found`，游戏照跑，
   很容易被忽略。
+
+## attackEffect 多效果与 flying / bombing 特效
+
+测试脚本：`tests/verify_attack_effects.py`（62 条）。
+
+需求：① `attackEffect` 里能填多个效果；② 新增 `flying`（卡牌飘起来→左右摆→落回，配
+飞机飞过_单位 音效）；③ 新增 `bombing`（用 航弹.png 做类 bullet 的效果，攻击力多少扔多少发）。
+
+**设计上的关键取舍**（测试把这些取舍钉住了，改坏会红）：
+
+- **只给坐标不够用**。`flying` 要动的是**那张卡本身**（拿不到节点就没法做动画），
+  `bombing` 的弹数 = **攻击力**（特效自己不知道攻击力多少）。所以 `Effect.Play` 增加了
+  `source` 与 `count` 两个入参，三个已有实现跟着改签名——**而不是给这两个新效果各开一个特例**。
+- **`bombing` 不写第二个类**：与 `bullet` 共用 `BulletEffect` 脚本，差别只在场景里
+  Export 出去的「弹体场景」与「弹数」。断言「bombing 场景挂的是 BulletEffect 脚本」
+  就是这条约束。
+- **弹体池按场景路径分池**：子弹与航弹混在一个队列里会串味（取到航弹却按子弹的贴图/朝向播）。
+  断言旧的 `AcquireBullet` / `ReleaseBullet` 已不存在，且释放时按记录的路径还回原池。
+- **`flying` 必须还原干净**：`finally` 里把位置/缩放/层级/`isUnderCardEffect` 全部还原——
+  中途出错也不能让一张卡永远浮在空中压在别人身上。
+- **刷 ZIndex 的那套会打架**：`RefreshAllCardDisplayOrder` 对场上卡一律 `ZIndex = 10`，
+  所以漂浮期间要么被跳过、要么抬起来的层级下一帧就被打回去。断言那条 `continue`
+  同时看 `isDiscarding || isUnderCardEffect`。
+
+参数（升起高度、放大倍率、摆幅、时速、音效槽位）全部 Export 在 `effects/flying_effect.tscn` 上，
+调手感不必改代码——测试断言这些字段都是 `[Export]`。

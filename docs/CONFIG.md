@@ -23,7 +23,20 @@
 | playEffect | 打出时播放的视觉效果短名称，可省略 | deploy_flash |
 | attackEffect | 攻击时播放的视觉效果短名称，可省略 | bullet |
 
-`playEffect`和`attackEffect`由`EffectRegistry`解析。字段缺失、值为空或名称未注册时不播放视觉效果。当前已注册`bullet`；现有单位卡使用该攻击效果，首版尚未配置具体`playEffect`。
+`playEffect`和`attackEffect`由`EffectRegistry`解析。字段缺失、值为空或名称未注册时不播放视觉效果（未注册的名字会打一行日志，否则「拼错了」会表现成「打了没特效」，很难查）。
+
+**这两个字段都可以写多个特效**，用英文逗号分隔（与`traits`的多值写法一致），例如`attackEffect = flying,bombing`。多个特效**各自独立开跑、互不等待**，总时长等于最长的那个而不是相加。
+
+已注册的特效：
+
+| 名称 | 场景 | 说明 |
+|------|------|------|
+| `bullet` | `effects/bullet_effect.tscn` | 从攻击者向目标打出一串子弹，固定 10 发 |
+| `bombing` | `effects/bombing_effect.tscn` | 航弹，**弹数 = 攻击力**（场景里 `ProjectileCount = 0` 表示用调用方给的数量） |
+| `smoke` | `effects/smoke_effect.tscn` | 在指定位置冒一下烟 |
+| `flying` | `effects/flying_effect.tscn` | 让**触发它的那张卡**升起 -> 轻微放大 -> 左右摆 -> 落回，期间抬高层级压住其他卡；音效取 `[sfx] flyby` |
+
+`bombing`与`bullet`共用`BulletEffect`脚本，差别只在场景 Export 出去的「弹体场景」与「弹数」——生成、随机错开、回池那套逻辑不写第二遍。
 
 单位当前攻击力为0时，主动攻击、普通反击和伏击均不会播放`attackEffect`。攻击力大于0但伤害被重甲或免疫修正为0时仍会播放。
 
@@ -134,6 +147,7 @@ t1=addToEnemySupportLine(de_tiger)[icon=boss,description=部署虎式重坦]
 与`[music]`**同格式**（逗号分隔、随机抽一条），区别只在语义：音效没有「播完再切」的调度，**每次播放各抽一条**。代码走`MusicManager.PickSfx(slot)`，返回`AudioStream`（带缓存，不重复读盘），调用方自己赋值给`AudioStreamPlayer.Stream`再播。
 
 - `dead`：单位阵亡时的爆炸音效。素材范围是`assest/爆炸3.wav`～`爆炸21.wav`，**下划线开头的未采用版本不列入**（`_爆炸16`/`_爆炸17`/`_爆炸19`）
+- `flyby`：`flying` 特效的飞掠音效（`assest/飞机飞过_单位.wav`）。调用方是特效自己（`effects/flying_effect.tscn` 的 `SfxSlot`），不经过 `battlefield_`
 
 调用方：`battlefield_.PlayDeadSound()`，槽位名常量是`DeadSfxSlot`。抽不到（槽位没配/加载失败）时保留场景里原有的那条，不会变成没声音。
 
