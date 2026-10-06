@@ -1451,3 +1451,48 @@ shader 版能看到透视，代价是引 GLSL、还得赌它不会因为编译�
 `tests/verify_convert.py`（42 项）把上面这些连同「换的是同一张卡」「行动次数不刷新」
 「总部拒绝转换」「id 不存在只报警」一起钉住；`effects/convert_effect.tscn` 也纳入了
 `verify_attack_effects.py` 的 Export 中文说明守卫。
+
+### 第二十五轮（卡背拉伸填满 + 翻面时收起效果浮标）
+
+老板两条反馈：
+
+> 1) 请注意我给的卡背应该被拉伸到符合卡牌大小的尺寸
+> 2) 翻面的时候应该不显示效果浮标
+
+**① 拉伸**：上一轮用的是 `StretchMode = KeepAspectCovered`（保持比例、裁掉多余）。
+卡背是**方图**（苏联 1024²、德国 512²）、卡牌是 **3:4**，保持比例就只铺一部分、上下留白。
+改成 `StretchMode = Scale`（`stretch_mode = 0`）+ 原有的 `IgnoreSize`：拉伸填满 180×240。
+
+**② 效果浮标**：「浮标」= `cardBase_._attrPanel`（卡右侧 `(155,30)` 的属性图标面板）。
+它**不是被盖不住**，是**画在卡背上面**——`_attrPanel` 是**运行时 `AddChild`** 的，
+而 Godot 同 ZIndex 下按**子节点顺序**绘制、后加的排后面，所以它天生压在场景里的
+`convertBack` 之上。修法是两件事一起做：
+
+- `MoveChild(back, GetChildCount() - 1)`：把卡背挪到最后一个子节点，从根上解决
+  「以后再有运行时 AddChild 的东西盖上来」；
+- 显式隐藏 `_attrPanel` 与它的悬停提示（老板要的是「不显示」，不只是「被盖住」——
+  浮标还在卡右侧多探出一点点，光靠盖也不干净）。
+
+**刻意没做的事**：不给 `convertBack` 加大的 `ZIndex`。Godot 的 `z_index` 是**相对父节点**的，
+给子节点加 40 等于把卡背抬到「卡自己的层级 + 40」，会越过手牌的 20 ——
+正是 `NOTICE.md` 层级表明令避免的那类 bug。挪顺序能达到同样的遮挡效果，层级却留在卡自己那一层。
+
+实机验证（临时 C# 场景，跑完即删）：
+
+    StretchMode = Scale（期望 Scale）  一致=True        <- 枚举值又是读回来确认的
+    ExpandMode  = IgnoreSize
+    效果浮标建出来了 = True（卡有特性）
+    露卡背时：卡背 Visible=True；浮标 Visible=False
+      子节点顺序：卡背 index=16，浮标 index=14（卡背 > 浮标，即画在上面）
+      卡背在最后 = True
+      卡背 z_index=0（跟着卡走，不比手牌的 20 高）
+      卡背贴图 = res://assest/苏联卡背.png，尺寸 = 180x240
+    收起后：卡背 Visible=False；浮标 Visible=True
+
+`tests/verify_convert.py` 42 → 48 项，新增「必须 Scale 不是 KeepAspectCovered」
+「卡背要挪到最后一个子节点」「浮标跟着显隐」「卡背不许加 z_index」四条。
+
+> 顺带修了 `verify_card_effects.py` 的一条：它原来断言**指令卡里不许出现 `attackEffect` 这个键**，
+> 而老板新加的测试卡 `[convertTest]` 带了一行**空的** `attackEffect =`（从别的卡复制模板带来的）。
+> 空值是无操作（`ResolveAttackEffect` 拿到的还是空串），把它当失败属于假红灯。
+> 改成判「有没有**值**」。

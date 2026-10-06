@@ -64,7 +64,12 @@ def main():
                   if re.search(r"^cardType[ \t]*=[ \t]*(Tank|Artillery|Plane|Bomber)[ \t]*\r?$", part, re.MULTILINE)
                   for match in [re.search(r"^attackEffect[ \t]*=[ \t]*(.*)$", part, re.MULTILINE)] if match),
               "no Tank/Artillery/Plane/Bomber card still fires a bare machine-gun bullet effect"),
-        check(bool(commands) and all("attackEffect" not in part for part in commands), "cards without attack effects remain effect-free"),
+        # 判「有没有值」而不是「有没有这个键」：空的 `attackEffect =` 是无操作
+        # （`ResolveAttackEffect` 拿到的还是空串，走兵种默认；指令卡没有兵种默认，等于没有）。
+        # 写成「键都不许出现」的话，任何一次从别的卡复制模板都会把它弄红——那不是缺陷。
+        check(bool(commands) and all(
+            not re.search(r"^attackEffect[ \t]*=[ \t]*\S", part, re.MULTILINE) for part in commands
+        ), "command cards have no actual attack effect"),
     ]
     failed = results.count(False)
     print(f"\nResult: {len(results) - failed} passed, {failed} failed")

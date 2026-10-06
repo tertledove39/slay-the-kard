@@ -1005,8 +1005,33 @@ public partial class cardBase_ : Control
                 GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} cardBase_.cs: 卡背加载失败 {path}");
             else if (back.Texture != texture)
                 back.Texture = texture;
+
+            // 挪到**最后一个子节点**：同 ZIndex 下按子节点顺序画，而后加的排后面。
+            // `_attrPanel`（效果浮标）是运行时 AddChild 的，天生排在场景里的 convertBack 之后，
+            // 不挪就会被它压在卡背上。
+            //
+            // 为什么不干脆给 convertBack 一个大 ZIndex：Godot 的 z_index 是**相对父节点**的，
+            // 给子节点加 40 就等于把卡背抬到「卡自己的层级 + 40」——那会跑到手牌（20）上面去，
+            // 正是 NOTICE.md 层级表明令避免的。挪顺序同样盖得住浮标，层级却仍在卡自己那一层。
+            MoveChild(back, GetChildCount() - 1);
         }
+
+        // 效果浮标（`_attrPanel`）与它的悬停提示不跟着翻面一起露出来：
+        // 浮标在卡右侧、还往右多探出一点点，光靠卡背盖不干净。
+        SetAttributePanelVisible(!visible);
         back.Visible = visible;
+    }
+
+    /// <summary>
+    /// 显示/隐藏效果浮标（属性图标面板）与它的悬停提示。
+    /// 面板可能还没建（没有属性的卡不会建），所以两处都判空。
+    /// </summary>
+    private void SetAttributePanelVisible(bool visible)
+    {
+        if (_attrPanel != null && IsInstanceValid(_attrPanel)) _attrPanel.Visible = visible;
+        // 提示框本来就是碰上去才显示的，收起时不要去动它（一碰就会自己出来）
+        if (!visible && _attrTooltipPanel != null && IsInstanceValid(_attrTooltipPanel))
+            _attrTooltipPanel.Visible = false;
     }
 
 /// <summary>

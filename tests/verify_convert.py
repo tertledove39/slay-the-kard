@@ -109,9 +109,15 @@ def main():
                          "cardbase.tscn 里有卡背层（UI 写在场景里）"))
     results.append(check("visible = false" in card_scene.split('name="convertBack"')[1][:200],
                          "默认隐藏"))
-    results.append(check("stretch_mode = 6" in card_scene.split('name="convertBack"')[1][:200]
-                         and "expand_mode = 1" in card_scene.split('name="convertBack"')[1][:200],
-                         "KeepAspectCovered + IgnoreSize（铺满卡牌、不变形；枚举值已用 Godot 实测过）"))
+    # `stretch_mode = 0` 是 **Scale（拉伸填满）**：老板要的是「把卡背拉伸到符合卡牌大小」。
+    # 曾经用过 6（KeepAspectCovered，保持比例裁掉多余）——卡背是方图、卡牌是 3:4，
+    # 那样只铺一部分、上下留白。枚举值已用 Godot 读回来实测过（NOTICE 记过写错是静默生效的）。
+    convert_back_block = card_scene.split('name="convertBack"')[1][:260]
+    results.append(check("stretch_mode = 0" in convert_back_block
+                         and "expand_mode = 1" in convert_back_block,
+                         "Scale（拉伸填满）+ IgnoreSize（枚举值已用 Godot 实测）"))
+    results.append(check("stretch_mode = 6" not in convert_back_block,
+                         "没有退回 KeepAspectCovered（那会让卡背铺不满）"))
     results.append(check("offset_right = 180.0" in card_scene.split('name="convertBack"')[1][:260]
                          and "offset_bottom = 240.0" in card_scene.split('name="convertBack"')[1][:260],
                          "尺寸正好是卡牌的 180x240"))
@@ -126,6 +132,24 @@ def main():
                          "每次都重新选图 —— 卡是从对象池复用的，上一轮可能属于另一方"))
     results.append(check("GetNodeOrNull<TextureRect>(\"convertBack\")" in set_back,
                          "取节点用的是 GetNodeOrNull（老场景没有这层时不炸）"))
+
+    # ---- 翻面时不许露出效果浮标 ----
+    print("\n--- 翻面时收起效果浮标 ---")
+    results.append(check("MoveChild(back, GetChildCount() - 1);" in set_back,
+                         "卡背挪到最后一个子节点 —— 同 ZIndex 下后加的排后面，浮标是运行时 AddChild 的"))
+    results.append(check("SetAttributePanelVisible(!visible);" in set_back,
+                         "显隐浮标与卡背同步"))
+    panel_fn = method(card_base, "private void SetAttributePanelVisible(bool visible)", "\n    }")
+    results.append(check("_attrPanel.Visible = visible" in panel_fn,
+                         "浮标本体跟着翻面显隐"))
+    results.append(check("_attrTooltipPanel.Visible = false" in panel_fn
+                         and "if (!visible && _attrTooltipPanel != null" in panel_fn,
+                         "悬停提示只在收起时被关掉（显示时不去动它，免得一碰就弹出来）"))
+    # `_attrPanel` 是私有字段，静态测试只能查「有没有动它」；
+    # 「露卡背那一刻浮标真的不显示、且卡背的 index 排在浮标之后」是实机测出来的，见 TEST.md。
+    # 刻意**不**给卡背加 ZIndex：Godot 的 z_index 相对父节点，加 40 会越过手牌的 20
+    results.append(check("z_index" not in convert_back_block,
+                         "卡背不加 z_index —— 加了会跑到手牌 20 上面去（NOTICE 层级表的硬约束）"))
 
     # ==================== ⑤ 指令：convert(id) ====================
     print("\n--- ⑤ convert(id) 指令 ---")

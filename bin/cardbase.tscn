@@ -753,7 +753,7 @@ offset_right = 180.0
 offset_bottom = 240.0
 mouse_filter = 2
 expand_mode = 1
-stretch_mode = 6
+stretch_mode = 0
 
 [connection signal="focus_entered" from="checkMouce" to="." method="MouceEntered"]
 [connection signal="focus_exited" from="checkMouce" to="." method="MouceExited"]
