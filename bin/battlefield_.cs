@@ -3498,6 +3498,12 @@ InputState currentInputState = InputState.nil;
     {
         for (int round = 0; round < MaxEnemyActionRounds; round++)
         {
+            // 整场战斗可能已经没了：玩家在敌方回合里点「保存并退出」或「认输」，
+            // 都会 ChangeScene 把 battlefield_ 连同它下面的全部卡片、格子一起释放，
+            // 而这条协程还挂在 await 上。这一句必须放在两个阶段之前——阶段里的
+            // 第一件事就是摸 `frontLine` 那些 `place_` 节点，对已释放的包装同样会抛。
+            if (!GodotObject.IsInstanceValid(this) || !IsInsideTree()) return;
+
             bool anybodyMoved = await EnemyAdvancePhaseAsync();
             bool anybodyAttacked = await EnemyAttackPhaseAsync();
 
@@ -3531,6 +3537,11 @@ InputState currentInputState = InputState.nil;
     {
         for (double waited = 0; waited < DeathSettleTimeoutSeconds; waited += DeathSettlePollSeconds)
         {
+            // 战斗已经没了就别等了（见 EnemyPerformActionsAsync 里同一句的说明）：
+            // 这一轮里 `ReadCardInPlaces()` 本身是纯托管读取还活着，
+            // 但下面 `GetTree()` 要走原生指针，对已释放的 battlefield_ 会抛。
+            if (!GodotObject.IsInstanceValid(this) || !IsInsideTree()) return;
+
             bool corpseLeft = ReadCardInPlaces()
                 .Any(c => c != null && c.getState() == CardState.destroyed);
             if (!corpseLeft) return;
@@ -3561,6 +3572,9 @@ InputState currentInputState = InputState.nil;
 
         foreach (var eCard in enemyUnits)
         {
+            // 上一轮循环的 await Move(...) / await Task.Delay 期间它可能已经没了
+            // （阵亡回池、或整场战斗被释放）。见 CanBeSelected 的注释。
+            if (!CanBeSelected(eCard)) continue;
             if (eCard.isHq == HQ.hq) continue;              // 总部不能移动
             if (!eCard.CheckIfCanMove()) continue;          // CheckIfCanMove 是只读检查
 
@@ -3605,7 +3619,6 @@ InputState currentInputState = InputState.nil;
         for (int i = 0; i < attackers.Count; i++)
         {
             var attacker = attackers[i];
-            if (attacker == null) continue;
 
             // 出击的唯一入口：转发给 Attack 并记账。五处优先级分支都走它，
             // 免得漏记某一处导致循环提前收敛（那样前线清空了也不会补位）。
@@ -3616,6 +3629,14 @@ InputState currentInputState = InputState.nil;
             }
 
             await Task.Delay(500);
+
+            // **必须等完再确认它还在**。`attackers` 是进入本阶段时拍下的快照，
+            // 上面那 500ms 里这张卡可能已经阵亡回到对象池，甚至整个战斗已经被
+            // 释放（玩家中途「保存并退出」会 ChangeScene，卡片跟着一起没）。
+            // 下面那句 GD.Print 要把 attacker 插值成字符串，走的是原生指针，
+            // 对已释放的包装会抛 ObjectDisposedException——栈顶就是这一行。
+            if (!CanBeSelected(attacker)) continue;
+
             GD.Print($"Processing enemy unit: {attacker}, Type: {attacker.cardType}, Attack: {attacker.ReadAttack()}, Place: {attacker.GetMyPlace()}");
 
             // 如果是总部或攻击力为0则不主动攻击
@@ -4507,9 +4528,20 @@ async Task enemySummonAsync()
     ///
     /// 判据只写这一处：`IsValidTarget`、`CheckCardClick`、攻击落点校验、
     /// 目标高亮全都引用它，免得同一个规则在四个地方各写一遍（规范 E）。
+    ///
+    /// **`IsInstanceValid` 那一句是防「节点已经被释放」**，和上面那条「已阵亡」
+    /// 是两回事：任何跨 `await` 持有的卡牌引用，在 await 期间都可能被整个
+    /// 场景的销毁带走（玩家中途「保存并退出」/「认输」都会 `ChangeScene`，
+    /// 卡片是 `battlefield_` 的直接子节点，会跟着一起没）。此后凡是
+    /// `$"{card}"`、`IsInsideTree()` 这类要走原生指针的操作都会抛
+    /// `ObjectDisposedException`——实测 `getState()` 这种纯托管字段读取还活着，
+    /// 所以光靠状态判断拦不住，`IsInstanceValid` 是唯一安全的判据
+    /// （它自己不抛，见 `tests/verify_card_reference_lifetime.py`）。
     /// </summary>
     private static bool CanBeSelected(cardBase_ card)
-        => card != null && card.getState() != CardState.destroyed;
+        => card != null
+           && GodotObject.IsInstanceValid(card)
+           && card.getState() != CardState.destroyed;
 
     /// <summary>
     /// 检查卡牌是否匹配指定的TargetType。

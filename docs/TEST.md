@@ -1611,3 +1611,63 @@ shader 版能看到透视，代价是引 GLSL、还得赌它不会因为编译�
 `CancelCurrentDrag` 的函数体里。收尾抽到 `CloseTargetChoiceUi()` 之后行为没变、
 断言却红了——改成断言「`CloseTargetChoiceUi` 里有、且 `CancelCurrentDrag` 调了它」，
 和之前抽 `SettingRow` 时同一类更新。27 项全绿。
+
+---
+
+## 第二十八轮：卡牌引用的存活期（BUGS #60）
+
+老板贴了一份崩溃日志问「这是什么错误」。`ObjectDisposedException: cardBase_`，
+栈顶在 `EnemyAttackPhaseAsync` 那句 `GD.Print`（插值 `{attacker}`）。
+
+### 先量清楚判据，再动手
+
+临时 C# 场景，对一张**已被释放**的卡逐个操作，看谁会抛：
+
+| 操作 | 已归还对象池 | `QueueFree()` 之后（真释放） |
+|---|---|---|
+| `GodotObject.IsInstanceValid` | 正常 | **正常返回 false** |
+| `card == null` / `getState()` / `card.id` | 正常 | 正常（纯托管，拦不住） |
+| `$"{card}"` 插值 | 正常 | **抛 ObjectDisposedException(cardBase_)** |
+| `IsInsideTree()` | 正常 | **抛** |
+
+两条关键结论：
+1. **旧判据 `CanBeSelected` 对已释放的卡照样返回 true**（`getState()` 是纯托管读取），
+   所以「状态 != destroyed」拦不住这一类。
+2. `IsInstanceValid` 自己对已释放对象**不抛**——它才是唯一安全的判据。
+
+### 修复后实测
+
+    [PASS] 活着的卡：CanBeSelected = true
+    [PASS] 已被释放的卡：CanBeSelected = false（没抛异常）
+    [PASS] 对照：旧判据对已释放的卡仍然返回 true —— 所以光靠状态拦不住
+    [PASS] 最小复现：`GD.Print($"Processing enemy unit: {attacker}")`
+           抛 ObjectDisposedException('cardBase_')     <- 与老板日志逐字一致
+      中途: 协程已完成 = False（期望 False，说明还在跑）
+    [PASS] 释放战斗后协程在 115 帧内收束
+    [PASS] 释放战斗后协程**没有**抛未处理异常
+    ===> 全部通过
+
+### 一个差点被骗过去的坑
+
+第一次把「释放战斗」放在 40 帧（约 0.28s），协程**永远不收束**，900 帧也没完。
+差点当成修复失败。查日志发现**从头到尾没出现过 `Enemy attack phase`**——那时 AI 还在
+推进阶段的 `await Move(eCard, place)` 里，而 `MoveToPosition` 等的是动画信号，
+节点都没了信号永远不会来，协程就永久挂住。**那是另外一个形状**（已记 BUGS #61，
+不产生用户可见症状），跟本次要修的崩溃不是一回事。把释放点挪到攻击阶段（220 帧）
+之后立刻正常收束。
+
+**教训**：验证「A 之后不能再碰 B」时，必须确认 A 发生的那一刻 B 真的在跑——
+否则验的是另一个场景。加一句「中途: 协程已完成 = False」和事后 grep 日志里的阶段
+标记，就是为了钉住这一点。
+
+### 结构回归 `tests/verify_card_reference_lifetime.py`（12 项）
+
+- `CanBeSelected` 里有 `IsInstanceValid`，且排在 `getState()` 之前
+- **攻击阶段的确认语句必须排在 `await Task.Delay(500)` 之后**（这条最容易写反）
+- 那句会抛异常的 `GD.Print` 排在确认之后
+- 旧的 `if (attacker == null) continue;` 已消失
+- 推进阶段每轮先 `CanBeSelected(eCard)` 再摸它的成员
+- 两个方法里都有 `IsInstanceValid(this) || !IsInsideTree()` 的总闸，且写在阶段/`GetTree()` 之前
+
+> 定位 `GetTree()` 时先剥掉 `//` 注释再搜——方法里那段注释正好解释了「为什么
+> `GetTree()` 会抛」，直接搜会先命中注释。这类假阳性本项目已经踩到第三次了。

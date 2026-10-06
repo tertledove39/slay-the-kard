@@ -881,3 +881,93 @@ i42 此刻是 `placed`——兜底对它唯一的实际作用就是破坏。
 不用改——但排查时容易被它误导成「效果跑了但没生效」。
 
 **谁守着**：`tests/verify_unit_target_choice.py`（12 项）。真机验证记录见 `docs/TEST.md` 第二十七轮。
+
+---
+
+### 60. `ObjectDisposedException: cardBase_` —— 敌方 AI 跨 await 拿着已经被释放的卡（已修）
+
+**现象**（老板给的日志）：
+
+```
+System.ObjectDisposedException: Cannot access a disposed object.
+Object name: 'cardBase_'.
+    GodotObject.base.cs:93   Godot.GodotObject.GetPtr
+    GodotObject.base.cs:160  Godot.GodotObject.ToString
+    battlefield_.cs:3572     EnemyAttackPhaseAsync        <- 就是那句 GD.Print
+    battlefield_.cs:3455     EnemyPerformActionsAsync
+    battlefield_.cs:2781     EnemyTurnAsync
+    battlefield_.cs:3910     RunTurnTransitionAsync
+    battlefield_.cs:3868     OnNextTurnButtonPressed
+    Task+<>c.<ThrowAsync>b__128_0   <- async void 的未处理异常被抛回同步上下文
+```
+
+**为什么会这样**：`EnemyAttackPhaseAsync` 里的 `attackers` 是**进入阶段时拍下的快照**，
+之后每个单位之间要 `await Task.Delay(500)`。这 500ms 里那张卡可能已经没了。而崩溃
+那一行 `GD.Print($"Processing enemy unit: {attacker}, ...")` 要把节点**插值成字符串**，
+走的是原生指针（`ToString` → `GetPtr`），对已释放的包装直接抛。
+
+**什么会让卡“没”**：卡片是 `battlefield_` 的直接子节点（`AddToBattleField` 就是
+`AddChild(card)`），所以只有**整场战斗被释放**时才会销毁。最容易触发的是老板刚加的
+那两个暂停菜单项——玩家在**敌方回合进行中**点「保存并退出」或「认输」，两者都会
+`SceneLoader.ChangeSceneAsync` 把整棵战场释放掉，而敌方 AI 这条协程还挂在 await 上。
+**这一轮新增的行动循环把窗口拉长了很多**：原来敌方回合只跑一趟，现在要跑 2~3 轮
+外加每轮约 1 秒的等尸体，玩家有一整个更长的时间去点那个按钮。
+
+**为什么原来的防御拦不住**：项目里已有的判据是 `CanBeSelected`（`card != null &&
+card.getState() != CardState.destroyed`）。实测**已释放的卡上 `getState()` 仍然正常返回**
+（它读的是托管字段，不走原生指针），所以旧判据对已释放的卡**照样返回 true**。
+同理 `card == null` 也没用——引用非空，只是包装废了。
+
+| 对已释放的卡调用 | 结果 |
+|---|---|
+| `GodotObject.IsInstanceValid(card)` | **正常**返回 false（唯一安全的判据） |
+| `card == null` / `getState()` / `card.id` | 正常（纯托管，拦不住） |
+| `$"{card}"` / `IsInsideTree()` | **抛 ObjectDisposedException** |
+| `getState()`（对照，已释放） | 正常 → 所以旧判据会误判成“还能用” |
+
+**修复**（`bin/battlefield_.cs`）：
+1. `CanBeSelected` 加上 `GodotObject.IsInstanceValid(card)`，排在状态检查之前——
+   「这张卡还能不能用」只写这一处，`IsValidTarget` / `CheckCardClick` / 攻击落点校验 /
+   目标高亮四处引用自动受益。
+2. `EnemyAttackPhaseAsync`：`if (attacker == null)` → `if (!CanBeSelected(attacker))`，
+   并且**必须放在 `await Task.Delay(500)` 之后**——放在 await 之前等于没放，
+   快照里的卡正是死在那个 await 期间的。
+3. `EnemyAdvancePhaseAsync`：每轮先 `CanBeSelected(eCard)`，再摸它的任何成员。
+4. `EnemyPerformActionsAsync` / `WaitForCorpsesClearedAsync` 加「战斗还在吗」的总闸：
+   `if (!GodotObject.IsInstanceValid(this) || !IsInsideTree()) return;`。
+   必须在两个阶段之前——阶段里第一件事就是摸 `frontLine` 那些 `place_` 节点，
+   对已释放的包装一样会抛。
+
+**谁守着**：`tests/verify_card_reference_lifetime.py`（12 项），其中一条专门断言
+确认语句排在 `await Task.Delay(500)` **之后**。
+
+**实机/headless 验证**（临时 C# 场景，跑完即删）：
+
+    [PASS] 活着的卡：CanBeSelected = true
+    [PASS] 已被释放的卡：CanBeSelected = false（没抛异常）
+    [PASS] 对照：旧判据对已释放的卡仍然返回 true —— 所以光靠状态拦不住
+    [PASS] 最小复现：`GD.Print($"Processing enemy unit: {attacker}")`
+           抛 ObjectDisposedException('cardBase_')      <- 与崩溃日志逐字一致
+    [PASS] 释放战斗后协程在 115 帧内收束
+    [PASS] 释放战斗后协程**没有**抛未处理异常
+
+---
+
+### 61.（已知，未修）战斗释放时，挂在 `await Move(...)` 上的协程会永远挂着
+
+**怎么发现的**：验 #60 的时候，第一次把释放点放在 40 帧（约 0.28s）——那时敌方 AI
+还在**推进阶段**的 `await Move(eCard, place)` 里。结果是协程**永远不会收束**：
+`Move` → `card.MoveToPosition(...)` 在等一个动画信号，而节点连同 Tween 已经被释放，
+那个信号永远不来了。日志里从头到尾没有出现过 `Enemy attack phase`，说明它再也没往下走。
+
+把释放点挪到攻击阶段（220 帧）之后就正常收束了——所以这是**推进阶段独有**的形状，
+不是 #60 那个崩溃。
+
+**为什么不修**：要真正解决得给整条回合协程加取消（`CancellationToken`）或者在每个
+`await` 后统一检查存活，属于结构性改动，影响面远超本次需求。**而且它不产生任何
+用户可见症状**：不抛异常、不刷错误日志，场景正在销毁，挂着的那条 Task 连同它引用的
+节点图会一起变成垃圾回收的对象。记在这里是为了下次有人看到“敌方回合日志半截断掉”
+时知道该往哪查。
+
+**如果哪天要修**：最小做法是给 `cardBase_.MoveToPosition` 的 await 加一层超时或者
+存活轮询，而不是给整条 AI 链加取消。
