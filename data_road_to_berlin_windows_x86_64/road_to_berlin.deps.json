@@ -7,7 +7,7 @@
   "targets": {
     ".NETCoreApp,Version=v8.0": {},
     ".NETCoreApp,Version=v8.0/win-x64": {
-      "新建游戏项目/1.0.0": {
+      "road_to_berlin/1.0.0": {
         "dependencies": {
           "Godot.SourceGenerators": "4.5.0",
           "GodotSharp": "4.5.0",
@@ -15,7 +15,7 @@
           "runtimepack.Microsoft.NETCore.App.Runtime.win-x64": "8.0.13"
         },
         "runtime": {
-          "新建游戏项目.dll": {}
+          "road_to_berlin.dll": {}
         }
       },
       "runtimepack.Microsoft.NETCore.App.Runtime.win-x64/8.0.13": {
@@ -983,7 +983,7 @@
     }
   },
   "libraries": {
-    "新建游戏项目/1.0.0": {
+    "road_to_berlin/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
