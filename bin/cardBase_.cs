@@ -977,6 +977,38 @@ public partial class cardBase_ : Control
     }
 
 
+    /// <summary>转换动画露出的卡背，按阵营分：我方苏联、敌方德国。</summary>
+    public const string SovietCardBackPath = "res://assest/苏联卡背.png";
+    public const string GermanCardBackPath = "res://assest/德国卡背.png";
+
+    /// <summary>
+    /// 转换动画期间**露出卡背**：把盖住整张卡的那层（`cardbase.tscn` 的 `convertBack`）显示/隐藏。
+    ///
+    /// 盖住整张卡、而不是去逐个隐藏卡面节点：卡面上有 icon / name / attack / defence /
+    /// cost / description / country / unitType 八九个节点，一个个藏既啰嗦又容易漏
+    /// （漏一个就会从卡背里透出来）。一层盖子从上面压住，一个开关搞定。
+    ///
+    /// 卡背按**这张卡属于哪一方**选（我方苏联、敌方德国）：翻面时它就是「一张牌」，
+    /// 露的是它自己那一方的背面。每次显示都重新选一次——卡是从对象池里复用的，
+    /// 上一轮可能属于另一方。
+    /// </summary>
+    public void SetConvertBackVisible(bool visible)
+    {
+        var back = GetNodeOrNull<TextureRect>("convertBack");
+        if (back == null) return;
+
+        if (visible)
+        {
+            string path = GetIsFriend() == IsFriend.friend ? SovietCardBackPath : GermanCardBackPath;
+            Texture2D texture = ResourceManager.Instance?.GetTexture(path) ?? GD.Load<Texture2D>(path);
+            if (texture == null)
+                GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} cardBase_.cs: 卡背加载失败 {path}");
+            else if (back.Texture != texture)
+                back.Texture = texture;
+        }
+        back.Visible = visible;
+    }
+
 /// <summary>
 /// 设置卡牌信息
 /// </summary>

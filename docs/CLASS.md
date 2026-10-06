@@ -70,7 +70,7 @@
 | `Play(positions, time, source, count)` | 抽象方法。`source` 是触发它的卡（`flying` 要动这张卡本身），`count` 是要生成几个（`bombing` 的弹数 = 攻击力） |
 | `Configure(argument)` | 特效名括号里的参数——`playEffect = sfx(严冬)` 传进来的是「严冬」。**在 `AddChild` 之后、`Play` 之前调用**，所以需要时可安全 `GetNode`。不需要参数的特效忽略即可 |
 | `PrepareForUse()` / `ResetForPool()` | 取用与回收时的收尾 |
-| `PlayChildEffectAsync(name, positions, count)`（`protected`） | 播一个**子特效**：取（`EffectRegistry.Create`）→ 进树 → `PrepareForUse` → `Play` → 还。两个调用方共用：`AirStrikeEffect` 起飞时打出去的子特效、`BulletEffect` 的发射/落点烟。**子特效自己的弹数/时长/尺寸仍配在它自己的场景里**，本方法只把 `count` 原样传下去。出问题只 `PushWarning` 不抛出——调用方通常还有别的活在等（比如降落） |
+| `PlayChildEffectAsync(name, positions, count)`（`protected`） | 播一个**子特效**的入口。实现已收到 `EffectRegistry.PlayOnceAsync`（见下），这里只是一层转发（`AddChild` 到自身）。`AirStrikeEffect` 起飞时打出去的子特效、`BulletEffect` 的发射/落点烟走它 |
 
 ### `Bullet` : Effect (bin/Bullet.cs)
 
@@ -136,6 +136,26 @@
 
 > 子特效最初挂在 `StayAsync`（等起飞演完才打），实机反馈「炮弹发射得太晚」——起飞那一段有整整一秒。现在挂到 `DuringRiseAsync`，卡刚一离地弹就已经在飞了。
 
+### `ConvertEffect` : FlyingEffect (core_logic/ConvertEffect.cs)
+
+**转换**：把一张场上的卡原地变成另一个单位。演出分三段：
+
+| 段 | 谁做 |
+|----|------|
+| 轻微浮起 | 父类 `FlyingEffect`（`RiseHeight` / `RiseScale` / `RiseDuration`） |
+| 翻面 → **露卡背** | 本类覆写的 `StayAsync`：`Scale.X` 走 1→0，压扁到 0 那一刻 `SetConvertBackVisible(true)`，再走 0→1 |
+| 再翻面 → **换新单位** | 同上：压扁到 0 那一刻 `ApplyNewUnit(card)`（`SetCardInformation` + 收卡背），再走 0→1 |
+| 落回 / 还原 | 父类（Scale / Rotation / ZIndex / `isUnderCardEffect` / `_displayOrderDirty` 全沿用） |
+
+**翻面不用 shader**：2D 卡牌绕竖轴翻转的标准做法就是把 `Scale.X` 走 1→0→1，`X = 0` 那一刻
+正好是「侧对屏幕」，在那时换内容就是翻面。shader 版能看到透视，但要引 GLSL、
+还可能因为编译失败而**静默什么都不发生**。翻面期间只动 X，Y 保持飞掠抬起后的值。
+
+**换的是同一张卡**（同一节点/格子/阵营），`SetCardInformation` 会把攻防费、效果、特性、
+图标全刷成新卡的，并初始化生命周期状态（烟幕/冲击/动员/伏击、`shouldBeRemoved`、`isDiscarding`）
+——那些属于旧卡，本就不该跟过来。**行动次数不刷新**：转换不是部署，不白送一次攻击。
+id 不存在或新卡是总部时只报警、卡保持原样（翻面照常演完，看到的是「翻回来还是原来那张」）。
+
 ### `SoundEffect` : Effect (core_logic/SoundEffect.cs)
 
 **只放一段音效**、不画任何东西。卡牌语音（打出这张卡时喊一声）走它。
@@ -166,6 +186,17 @@
 > `smoke_small` **不参与对象池**：`BattleEffectPool.AcquireEffect` 只按名字认 `bullet` / `smoke`，
 > 所以它每次都是新实例 + `QueueFree`（`TankAttack` 同理）。一次攻击两个烟，开销可以接受；
 > 要池化的话得先解决「池按类型分、而两种烟是同一个类型、只有尺寸不同」这个冲突。
+
+### `EffectRegistry.PlayOnceAsync` (core_logic/Effect.cs)
+
+「取一个特效 → 挂到 host 上 → 传参 → 播完 → 回收」的**唯一实现**。三个调用方共用：
+`AirStrikeEffect`（起飞时打出去的子特效）、`BulletEffect`（发射与落点的烟）、
+`battlefield_`（`convert` 指令要**等**它演完）。
+
+与 `battlefield_.StartEffect` 的分工：**那个是不等的**（fire-and-forget，攻击特效走它），
+**这个是等的**。需要「演完再往下走」时才用这个——差别只在最后那一句 `await`。
+
+`Effect.PlayChildEffectAsync` 只是它的一层转发（`AddChild` 到自身）。
 
 ### `BattleEffectPool` : Node (core_logic/BattleEffectPool.cs)
 

@@ -1379,6 +1379,7 @@ InputState currentInputState = InputState.nil;
         "AddTrait()", "RemoveTrait()", "DrawACard()", "GetCardsBeingTreated",
         "getCount()", "setTargets()", "DiscardRandomly()", "DiscardPlayerRandomly()", "DiscardWithName()",
         "addANewUnitToBattlefieldWithCostAndType()", "GetHighestAttackFriendUnit()", "FightRandomEnemy()", "Fight", "GetLeftTarget", "GetRightTarget",
+        "convert()",
     };
 
     private void ToggleConsole()
@@ -4085,6 +4086,34 @@ InputState currentInputState = InputState.nil;
         await SceneLoader.ChangeSceneAsync(this, "res://bin/start_menu.tscn");
     }
 
+    // ============================ 转换 ============================
+
+    /// <summary>`EffectRegistry` 里转换特效的名字。卡上写 `convert(卡id)` 就是这个。</summary>
+    private const string ConvertEffectName = "convert";
+
+    /// <summary>
+    /// **播放一次转换**：抬起 → 翻面（露卡背）→ 再翻面（换成新单位）→ 落回。
+    ///
+    /// 这里**必须 await**，不能像攻击特效那样 fire-and-forget：
+    /// 卡牌数据是在**第二次翻面那一刻**才换掉的（见 `ConvertEffect.ApplyNewUnit`），
+    /// 不 await 的话，`convert(x)|GetAttack(2)` 这种写法会把 +2 加在**旧卡**上，
+    /// 然后被转换整个盖掉——不报任何错，只是数值凭空少了一截。
+    ///
+    /// 用 `EffectRegistry.PlayOnceAsync` 而不是 `StartEffect`：后者是「不等」的版本。
+    /// </summary>
+    private Task ConvertCardAsync(cardBase_ card, string newCardId)
+    {
+        if (card == null || !IsInstanceValid(card)) return Task.CompletedTask;
+        if (card.isHq == HQ.hq)
+        {
+            GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} battlefield_.cs: 总部不能被转换，已跳过");
+            return Task.CompletedTask;
+        }
+
+        return EffectRegistry.PlayOnceAsync(this, ConvertEffectName, newCardId,
+                                            new List<Vector2> { GetCardCenter(card) }, card);
+    }
+
     private async Task ReturnToStartMenuAfterDefeat()
     {
         ForbidControl();
@@ -4779,6 +4808,20 @@ InputState currentInputState = InputState.nil;
                             {
                                 target.AddChange(ChangeType.GetDefence, healAmount);
                             }
+                        }
+                    }
+                }
+
+                // convert(id) - 把目标**原地转换**成 id 所指代的单位
+                if (instruction.StartsWith("convert", StringComparison.OrdinalIgnoreCase))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
+                    if (match.Success)
+                    {
+                        string newCardId = match.Groups[1].Value.Trim().Trim('"', '\'');
+                        foreach (var target in targets)
+                        {
+                            if (target != null) await ConvertCardAsync(target, newCardId);
                         }
                     }
                 }

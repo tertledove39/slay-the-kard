@@ -40,6 +40,7 @@ AIRSTRIKE_SCENE = ROOT / "effects" / "air_strike_effect.tscn"
 CARD_INI = ROOT / "cards" / "card.ini"
 BULLET = ROOT / "bin" / "Bullet.cs"
 SMOKE = ROOT / "core_logic" / "SmokeEffect.cs"
+CONVERT = ROOT / "core_logic" / "ConvertEffect.cs"
 BATTLE = ROOT / "bin" / "battlefield_.cs"
 CARD_BASE = ROOT / "bin" / "cardBase_.cs"
 MUSIC_INI = ROOT / "configs" / "music.ini"
@@ -475,7 +476,8 @@ def main():
                                 ("effects/bombing_effect.tscn", [BULLET_EFFECT]),
                                 ("effects/tank_attack_effect.tscn", [BULLET_EFFECT]),
                                 ("effects/smoke_effect.tscn", [SMOKE]),
-                                ("effects/smoke_small_effect.tscn", [SMOKE])]:
+                                ("effects/smoke_small_effect.tscn", [SMOKE]),
+                                ("effects/convert_effect.tscn", [CONVERT, FLYING])]:
         cs_text = "\n".join(p.read_text(encoding="utf-8") for p in cs_paths)
         scene_text = (ROOT / scene_rel).read_text(encoding="utf-8")
         names = exports_of(cs_text)
@@ -540,19 +542,24 @@ def main():
                          "三段顺序：升起（含并行的事）→ 悬停 → 落回"))
 
     # 投弹是「子特效」，弹数/时长仍在 bombing 场景里配，这里只决定何时开投。
-    # 「取 → 进树 → 传参 → 播 → 还」那一套**已提到基类**：BulletEffect 的发射/落点烟
-    # 也要同一套，所以现在只有一份实现（规范 A 的「先找已有功能、适合改造就改造」）。
-    child_fn = method(effect, "protected async Task PlayChildEffectAsync(", "\n    }")
-    results.append(check('EffectRegistry.Create(effectName)' in child_fn,
+    # 「取 → 进树 → 传参 → 播 → 还」那一套**已收到注册表上**（`EffectRegistry.PlayOnceAsync`）：
+    # BulletEffect 的发射/落点烟、以及 battlefield_ 的 `convert` 指令都要同一套，
+    # 所以现在**只有一份实现**（规范 A 的「先找已有功能、适合改造就改造」）。
+    child_fn = method(effect, "public static async Task PlayOnceAsync(", "\n    }")
+    results.append(check("Effect effect = Create(name);" in child_fn,
                          "子特效复用已注册的特效，不重写弹道"))
-    results.append(check("await child.Play(positions, null, null, count);" in child_fn,
+    results.append(check("await effect.Play(positions, null, source, count);" in child_fn,
                          "count（= 攻击力）原样传给子特效"))
-    results.append(check("EffectRegistry.Release(child)" in child_fn, "子特效用完回收"))
-    results.append(check("AddChild(child);" in child_fn and "child.PrepareForUse();" in child_fn,
-                         "顺序与 StartEffect 一致：先进树、再 PrepareForUse、最后才开演"))
+    results.append(check("Release(effect)" in child_fn, "子特效用完回收"))
+    results.append(check("host.AddChild(effect);" in child_fn and "effect.Configure(argument);" in child_fn
+                         and "effect.PrepareForUse();" in child_fn,
+                         "顺序与 StartEffect 一致：先进树、再传参、再 PrepareForUse、最后才开演"))
     results.append(check("catch (Exception exception)" in child_fn,
                          "子特效出问题只报警不抛出（调用方通常还有降落等活要干）"))
 
+    results.append(check("protected Task PlayChildEffectAsync(string effectName" in effect
+                         and "=> EffectRegistry.PlayOnceAsync(this, effectName, null, positions, null, count);" in effect,
+                         "Effect.PlayChildEffectAsync 只是转调，自己不再写一遍"))
     results.append(check("=> PlayChildEffectAsync(StrikeEffectName, positions, count);" in airstrike,
                          "AirStrikeEffect 只把子特效名交给基类，自己不再抄一份"))
     results.append(check("EffectRegistry.Create" not in airstrike_code

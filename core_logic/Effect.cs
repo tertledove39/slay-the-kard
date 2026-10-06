@@ -44,33 +44,8 @@ public abstract partial class Effect : Control
     /// 出问题只报警不抛出：调用方通常还有别的活在等（比如降落），
     /// 一个烟放不出来不该把整段动画带塌。
     /// </summary>
-    protected async Task PlayChildEffectAsync(string effectName, IReadOnlyList<Vector2> positions, int count = 0)
-    {
-        if (string.IsNullOrWhiteSpace(effectName)) return;
-
-        Effect child = EffectRegistry.Create(effectName);
-        if (child == null)
-        {
-            GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} Effect.cs: 子特效取不到，本次跳过: '{effectName}'");
-            return;
-        }
-
-        AddChild(child);
-        child.PrepareForUse();
-        try
-        {
-            await child.Play(positions, null, null, count);
-        }
-        catch (Exception exception)
-        {
-            GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} Effect.cs: 子特效播放异常 "
-                         + $"'{effectName}': {exception.Message}");
-        }
-        finally
-        {
-            if (GodotObject.IsInstanceValid(child)) EffectRegistry.Release(child);
-        }
-    }
+    protected Task PlayChildEffectAsync(string effectName, IReadOnlyList<Vector2> positions, int count = 0)
+        => EffectRegistry.PlayOnceAsync(this, effectName, null, positions, null, count);
 }
 
 public static class EffectRegistry
@@ -97,7 +72,11 @@ public static class EffectRegistry
         ["sfx"] = "res://effects/sound_effect.tscn",
         // 坦克与火炮的攻击特效：打一发炮弹（`bin/tank_shell.tscn`）。
         // 名字沿用需求方给的大小写 `TankAttack`，**这张表是大小写敏感的**，写错了会报未知特效名。
-        ["TankAttack"] = "res://effects/tank_attack_effect.tscn"
+        ["TankAttack"] = "res://effects/tank_attack_effect.tscn",
+        // 转换：抬起 → 翻面（露卡背）→ 再翻面（换成新单位）→ 落回。
+        // 与 airstrike / strafe 一样是**继承 FlyingEffect、只覆写一个阶段**。
+        // 新单位的 id 走**特效名的参数**：`convert(panzer4)`（与 `sfx(严冬)` 同一套）。
+        ["convert"] = "res://effects/convert_effect.tscn"
     };
 
     /// <summary>
@@ -208,5 +187,53 @@ public static class EffectRegistry
         if (effect == null || !GodotObject.IsInstanceValid(effect)) return;
         if (BattleEffectPool.Instance?.ReleaseEffect(effect) == true) return;
         effect.QueueFree();
+    }
+
+    /// <summary>
+    /// 「取一个特效 → 挂到 `host` 上 → 传参（名字括号里那一段）→ 播完 → 回收」的**唯一实现**。
+    ///
+    /// 三个调用方共用：`AirStrikeEffect`（起飞时打出去的子特效）、
+    /// `BulletEffect`（发射与落点的烟）、`battlefield_`（`convert` 指令要**等**它演完）。
+    ///
+    /// 与 `battlefield_.StartEffect` 的分工：那个是**不等**的（fire-and-forget，攻击特效走它），
+    /// 这个是**等**的。需要「演完再往下走」时才用这个。
+    ///
+    /// 出问题只报警不抛出：调用方通常还有别的活在等（比如降落、后面的效果指令）。
+    /// </summary>
+    /// <param name="host">特效挂在谁下面（通常是触发它的那个场景/特效自身）。</param>
+    /// <param name="argument">特效名括号里的参数，不需要时传 null。</param>
+    /// <param name="source">触发它的单位（`flying` 要动的那张卡）。</param>
+    public static async Task PlayOnceAsync(Node host, string name, string argument,
+                                           IReadOnlyList<Vector2> positions,
+                                           cardBase_ source = null, int count = 0)
+    {
+        if (host == null || !GodotObject.IsInstanceValid(host)) return;
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        Effect effect = Create(name);
+        if (effect == null)
+        {
+            GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} Effect.cs: 特效取不到，本次跳过: '{name}'");
+            return;
+        }
+
+        // 顺序是刻意的：先进树（`_Ready` 跑完、子节点就绪），再传参数，最后才开演。
+        // 反过来的话 `Configure` 里 `GetNode` 会拿到 null。
+        host.AddChild(effect);
+        effect.Configure(argument);
+        effect.PrepareForUse();
+        try
+        {
+            await effect.Play(positions, null, source, count);
+        }
+        catch (Exception exception)
+        {
+            GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} Effect.cs: 特效播放异常 "
+                         + $"'{name}': {exception.Message}");
+        }
+        finally
+        {
+            if (GodotObject.IsInstanceValid(effect)) Release(effect);
+        }
     }
 }

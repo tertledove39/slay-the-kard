@@ -1377,3 +1377,77 @@ GDScript 传给 `call()` 会编组失败，所以这次用 C# 写临时测试）
 
 `tests/verify_save_load.py`（60 项）把上面这些连同「三处只写一份」一起钉住；
 `tests/verify_volume_settings.py` 的那条滑条断言改为指向共享的 `SettingRow`。
+
+### 第二十四轮（`convert(id)` 转换指令 + 翻面动画）
+
+需求：新增 `convert(id)` key，目标被转换成 id 指代的单位；过程播放动画
+① 轻微浮起（类似战斗机起飞）② 翻面（露出卡背）③ 再次翻面、回来时已经是新单位；
+老板新加了两张卡背，需要露卡背时就用它们。
+
+#### 两个技术选择
+
+**翻面不用 shader**。老板说「可以考虑上网找个 shader」，但 2D 卡牌绕竖轴翻转的标准做法
+就是把 `Scale.X` 走 1 → 0 → 1——`X = 0` 那一刻正好是「侧对屏幕」，在那时换掉正面内容就是翻面。
+shader 版能看到透视，代价是引 GLSL、还得赌它不会因为编译失败而**静默什么都不发生**。
+所以选了压扁方案，翻面期间只动 X、Y 保持飞掠抬起后的值。
+
+**动画继承 `FlyingEffect`、只覆写悬停段**。浮起/落回/还原 Scale·Rotation·ZIndex/
+`isUnderCardEffect`/`_displayOrderDirty` 全部沿用父类——与 `AirStrikeEffect` 覆写
+`DuringRiseAsync` 是同一个套路。测试专门断言「没有把 Rise/Land/Sway 抄一份过来」。
+
+#### 卡背
+
+两张卡背是**按阵营**分的新素材（`assest/苏联卡背.png` 1024²、`assest/德国卡背.png` 512²），
+比卡（180×240）大得多，所以不能直接换 `cardbase` 那个 Sprite2D 的贴图（会撑成 1024px）。
+做法是在 `cardbase.tscn` 里加一层**铺满整张卡的 `TextureRect`**（`convertBack`，默认隐藏）：
+
+- 只加**一层盖子**、而不是逐个隐藏卡面节点——卡面上有 icon / name / attack / defence /
+  cost / description / country / unitType 八九个，一个个藏既啰嗦又容易漏（漏一个就从卡背透出来）。
+- `StretchMode = KeepAspectCovered` + `ExpandMode = IgnoreSize`：铺满、不变形、不溢出。
+- 按**这张卡属于哪一方**选图（我方苏联、敌方德国），每次都重新选——卡是从对象池复用的，
+  上一轮可能属于另一方。
+
+#### 实机验证（临时 C# 场景，跑完即删）
+
+    cardbase.tscn 有 convertBack = True
+      读回来的 StretchMode = KeepAspectCovered  一致=True     <- 枚举值是我从文档猜的，实测确认
+      读回来的 ExpandMode  = IgnoreSize         一致=True
+      尺寸 = (180, 240)   默认 Visible = False
+    转换前：id=t70 攻/防=2/2 名=T-70 卡背显示=False
+      第一次见到卡背：贴图=res://assest/苏联卡背.png 缩放X=0   <- 正好在压扁到 0 那一帧盖上
+    [Convert] t70 → is2
+    过程中露出过卡背 = True，持续 96 帧
+    转换后：id=is2 攻/防=8/8 名=IS-2 费=10 卡背显示=False
+      Scale 还原=(1,1)   isUnderCardEffect 已复位=False
+    敌方卡背 = 德国卡背 / 我方卡背 = 苏联卡背
+    id 不存在 → 只报警，id 仍是 t70，卡背已收
+
+> 「枚举值是我猜的」这条值得单列：`NOTICE.md` 记过「`.tscn` 里枚举值写错是**静默生效**的」，
+> 所以 `stretch_mode = 6` / `expand_mode = 1` 不能靠眼力，必须读回来比对。实测两个都对。
+
+#### 指令侧
+
+`convert(id)` 照 `Heal(n)` 的同一套写法加在 `ParseAndExecuteEffect` 里（取括号里的参数、
+对 `targets` 批量作用），`timesList.ini` 的 `[keys]` 与 `ConsoleCommands` 同步登记。
+
+**指令必须 await 动画**：换卡发生在**第二次翻面那一刻**（只有动画知道那个瞬间），
+不 await 的话 `convert(x)|GetAttack(2)` 会把 +2 加在**旧卡**上、然后被转换整个盖掉——
+不报任何错，只是数值凭空少一截。所以这里用了 `EffectRegistry.PlayOnceAsync`（**等**的版本），
+而不是攻击特效那个 fire-and-forget 的 `StartEffect`。
+
+> 顺带把「取→挂→传参→播→还」收成了 `EffectRegistry.PlayOnceAsync` 一处实现：
+> 攻击机的子特效、炮弹的发射/落点烟、`convert` 指令三个调用方共用，
+> `Effect.PlayChildEffectAsync` 退化成一层转发。这是规范 A 那句
+> 「先找已有功能、适合改造就改造」的又一次落地。
+
+#### 踩到的坑
+
+- 测试里那条「没有引入着色器」一开始是红的——因为**它撞上了我自己写的注释**
+  （`///` 里写着「翻面不用 shader」）。剥掉注释再查才对，与 `verify_attack_effects`
+  的 `code_only` 是同一个坑。
+- 上一轮把 `PlayChildEffectAsync` 改成转调之后，`verify_attack_effects.py` 里
+  按函数体切片的断言直接 `ValueError` 崩了（**没有输出**，不是失败）。已改指 `PlayOnceAsync`。
+
+`tests/verify_convert.py`（42 项）把上面这些连同「换的是同一张卡」「行动次数不刷新」
+「总部拒绝转换」「id 不存在只报警」一起钉住；`effects/convert_effect.tscn` 也纳入了
+`verify_attack_effects.py` 的 Export 中文说明守卫。
