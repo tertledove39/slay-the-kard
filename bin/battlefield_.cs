@@ -3408,54 +3408,147 @@ InputState currentInputState = InputState.nil;
     }
 
     /// <summary>
-    /// 敌方行动：先把单位推进到前线（如果前线没有我方单位），再按优先级进行攻击
-    /// 优先级：能破坏总部 -> 能破坏单位 -> 能攻击总部 -> 随机攻击单位
+    /// 敌方AI最多跑几轮「移动 → 攻击」。正常情况 2 轮就收敛（第 2 轮没人动得动），
+    /// 这个数只是**保险丝**：万一以后有人改了 `HaveMoved()` 不再清 `moveAble`，
+    /// 循环就会永远转下去、整局卡死。宁可少打一轮也不能死循环。
+    /// </summary>
+    private const int MaxEnemyActionRounds = 20;
+
+    /// <summary>等尸体收走时的轮询间隔。</summary>
+    private const double DeathSettlePollSeconds = 0.1;
+
+    /// <summary>
+    /// 等尸体收走的硬上限。超过就照常往下走——宁可这一轮不推进，
+    /// 也不能因为一具没收走的尸体把整个敌方回合卡死。
+    /// </summary>
+    private const double DeathSettleTimeoutSeconds = 3.0;
+
+    /// <summary>
+    /// 敌方回合的行动循环：
+    ///
+    ///     1) 让所有**可移动**的敌方单位尝试移动（推进前线）
+    ///     2) 让所有**可攻击**的敌方单位尝试攻击
+    ///     3) 这一轮有人真的移动过 → 回到 1)；没有 → 结束
+    ///
+    /// 循环的意义在于**两阶段会互相创造条件**：攻击打死我方前线单位之后，
+    /// 前线才空出格子，下一轮的移动阶段才推得上去。原先是一趟走完，
+    /// 「打死了也没人补位」。
+    ///
+    /// 循环判据是「**这一轮场上有没有发生变化**」（有人移动 或 有人攻击），
+    /// **不是**「场上还有没有能移动的单位」。后者会死循环：空军/炮兵/已经在后方的
+    /// 单位永远满足 `CheckIfCanMove()`，但推进阶段永远不会动它们。
+    ///
+    /// **判据里必须有 `anybodyAttacked`**：前线被我方单位占住时推进阶段是空转的
+    /// （见 `EnemyAdvancePhaseAsync` 的提前返回），如果只看「有没有人移动」，
+    /// 第 1 轮攻击打死我方前线单位之后就立刻退出，前线空出来了也不会再推——
+    /// 那正是这个循环要修的场景。
+    ///
+    /// 收敛性：移动会 `HaveMoved()` 清 `moveAble`、攻击会 `HaveAttacked()` 减
+    /// `attackAble`，两者每回合都只在开头刷一次，所以「移动 + 攻击」的总次数有限，
+    /// 每转一轮至少消耗掉其中一次。`MaxEnemyActionRounds` 只是保险丝。
     /// </summary>
     async Task EnemyPerformActionsAsync()
     {
-        // 1) 如果前线没有我方单位，尝试把敌方单位推进前线
-        bool frontHasFriend = frontLine.Any(p => p.GetMyCard() != null && p.GetMyCard().GetIsFriend() == IsFriend.friend);
-        if (!frontHasFriend)
+        for (int round = 0; round < MaxEnemyActionRounds; round++)
         {
-            var enemyUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy).ToList();
-            foreach (var eCard in enemyUnits.Where(x=>x.isHq!=HQ.hq && x.CheckIfCanMove()))
-            {
-                // 总部不能移动
-                if (eCard.isHq == HQ.hq) continue;
+            bool anybodyMoved = await EnemyAdvancePhaseAsync();
+            bool anybodyAttacked = await EnemyAttackPhaseAsync();
 
-                // 空军单位和炮兵单位不会主动上前线
-                if (eCard.cardType == CardTypes.Plane || eCard.cardType == CardTypes.Bomber || 
-                    eCard.cardType == CardTypes.Artillery)
-                {
-                    continue;
-                }
+            // 这一轮谁都动不了也打不了：再转一圈也是白转，收工
+            if (!anybodyMoved && !anybodyAttacked) return;
 
-                if (frontLine.Contains(eCard.GetMyPlace()))
-                {
-                    continue;
-                }
-        // ============ 修复
-
-                // 找到第一个空的前线格子
-                var place = frontLine.FirstOrDefault(p => p.GetMyCard() == null);
-                if (place == null) break;
-
-                // 只有当单位还能移动时才尝试移动（CheckIfCanMove 会减少 moveAble）
-                if (!eCard.CheckIfCanMove()) continue;
-
-                await Move(eCard, place);
-                eCard.HaveMoved();
-
-                // 步兵、火炮、战斗机和轰炸机移动后不能攻击
-                if (eCard.cardType == CardTypes.Infantry || eCard.cardType == CardTypes.Artillery || 
-                    eCard.cardType == CardTypes.Plane || eCard.cardType == CardTypes.Bomber)
-                {
-                    eCard.HaveAttacked();
-                }
-
-                await Task.Delay(300);
-            }
+            // 刚打完就得等尸体收走。阵亡的单位只被立刻打上 destroyed 状态，
+            // 节点还要在场上留一拍（DeathPresentationDelaySeconds ≈ 1s）才 RemoveCard，
+            // 这一拍里 `frontLine` 的格子还被尸体占着。不等它，下一轮的推进阶段
+            // 看到的仍然是「前线有我方单位」，这一轮等于白转——正是本循环要修的场景。
+            if (anybodyAttacked) await WaitForCorpsesClearedAsync();
         }
+
+        GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} battlefield_.cs: 敌方行动跑了 "
+                     + $"{MaxEnemyActionRounds} 轮还没收敛，已强制结束（检查 HaveMoved 是否还在清 moveAble）");
+    }
+
+    /// <summary>
+    /// 等场上所有「已经死了、但格子还没腾出来」的单位被收走。
+    ///
+    /// 阵亡有两个阶段（见 `ProcessDeadUnitAsync`）：状态立刻变 `destroyed`，
+    /// 节点却要等 `PlayDeathPresentationAsync` 的那一拍结束才 `RemoveCard`
+    /// 解绑格子。也就是说这一拍里存在「逻辑上已死、格子上还在」的中间态，
+    /// 而 `frontLine`/`Move` 都只看格子有没有卡——敌方行动循环不等它就会误判。
+    ///
+    /// 上限 `DeathSettleTimeoutSeconds` 是必需的：`PlayDeathPresentationAsync`
+    /// 在节点已失效时会直接 return、不执行 `RemoveCard`，尸体可能永远留在
+    /// `cardInPlaces` 里；没有上限就会把整个敌方回合拖死。
+    /// </summary>
+    private async Task WaitForCorpsesClearedAsync()
+    {
+        for (double waited = 0; waited < DeathSettleTimeoutSeconds; waited += DeathSettlePollSeconds)
+        {
+            bool corpseLeft = ReadCardInPlaces()
+                .Any(c => c != null && c.getState() == CardState.destroyed);
+            if (!corpseLeft) return;
+
+            await ToSignal(GetTree().CreateTimer(DeathSettlePollSeconds), SceneTreeTimer.SignalName.Timeout);
+        }
+
+        GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} battlefield_.cs: 等了 "
+                     + $"{DeathSettleTimeoutSeconds}s 还有尸体没从格子上收走，敌方行动先继续");
+    }
+
+    /// <summary>
+    /// 推进阶段：前线没有我方单位时，把敌方支援线上的非空军/非炮兵单位推到前线。
+    ///
+    /// **返回值是「这一轮有没有人真的移动过」**。注意它返回 false 有两种含义——
+    /// 「前线被占住，压根没试」和「试了但都动不了」，调用方不能把 false 当成收敛
+    /// 信号（前线被占住时攻击阶段可能马上把它清空）。见 `EnemyPerformActionsAsync`。
+    /// </summary>
+    private async Task<bool> EnemyAdvancePhaseAsync()
+    {
+        bool frontHasFriend = frontLine.Any(p => p.GetMyCard() != null && p.GetMyCard().GetIsFriend() == IsFriend.friend);
+        if (frontHasFriend) return false;
+
+        bool anybodyMoved = false;
+        var enemyUnits = ReadCardInPlaces()
+            .Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy)
+            .ToList();
+
+        foreach (var eCard in enemyUnits)
+        {
+            if (eCard.isHq == HQ.hq) continue;              // 总部不能移动
+            if (!eCard.CheckIfCanMove()) continue;          // CheckIfCanMove 是只读检查
+
+            // 空军与炮兵不会主动上前线
+            if (eCard.cardType is CardTypes.Plane or CardTypes.Bomber or CardTypes.Artillery) continue;
+            if (frontLine.Contains(eCard.GetMyPlace())) continue;
+
+            // 找到第一个空的前线格子
+            var place = frontLine.FirstOrDefault(p => p.GetMyCard() == null);
+            if (place == null) break;
+
+            await Move(eCard, place);
+            // HaveMoved 已经是「本回合不能再移动 + 非坦克也不能再攻击」的唯一入口，
+            // 这里不要再补一次 HaveAttacked()——那会把 attackAble 减成 -1，
+            // 让「本回合额外 +1 次攻击」的效果白给（-1 + 1 = 0）。
+            eCard.HaveMoved();
+            anybodyMoved = true;
+
+            await Task.Delay(300);
+        }
+        return anybodyMoved;
+    }
+
+    /// <summary>
+    /// 攻击阶段：按优先级对每个敌方单位尝试攻击一次。
+    /// 优先级：能一击摧毁总部 → 能一击摧毁某单位 → 打总部 → 随机打一个合法目标。
+    ///
+    /// **返回值是「这一轮有没有人真的打出去过」**，调用方靠它决定要不要再来一轮：
+    /// 攻击可能清空我方前线，从而给下一轮的推进阶段腾出格子。`Attack` 每次成功
+    /// 出击都会 `HaveAttacked()` 减 `attackAble`（bin/battlefield_.cs 的 Attack 里），
+    /// 所以这个 true 最多出现「全场敌方单位攻击次数之和」次，不会没完没了。
+    /// </summary>
+    private async Task<bool> EnemyAttackPhaseAsync()
+    {
+        bool anybodyAttacked = false;
 
         // 2) 攻击阶段：按优先级对每个敌方单位尝试攻击
         var rnd = new Random();
@@ -3466,6 +3559,15 @@ InputState currentInputState = InputState.nil;
         {
             var attacker = attackers[i];
             if (attacker == null) continue;
+
+            // 出击的唯一入口：转发给 Attack 并记账。五处优先级分支都走它，
+            // 免得漏记某一处导致循环提前收敛（那样前线清空了也不会补位）。
+            async Task Strike(cardBase_ target)
+            {
+                await Attack(attacker, target);
+                anybodyAttacked = true;
+            }
+
             await Task.Delay(500);
             GD.Print($"Processing enemy unit: {attacker}, Type: {attacker.cardType}, Attack: {attacker.ReadAttack()}, Place: {attacker.GetMyPlace()}");
 
@@ -3500,7 +3602,7 @@ InputState currentInputState = InputState.nil;
             if (myHq != null && allowedTargets.Contains(myHq) && CanDestroyTarget(attacker, myHq))
             {
                 GD.Print($"  Attacking HQ");
-                await Attack(attacker, myHq);
+                await Strike(myHq);
                 continue;
             }
 
@@ -3508,14 +3610,14 @@ InputState currentInputState = InputState.nil;
             var killable = allowedTargets.FirstOrDefault(u => CanDestroyTarget(attacker, u));
             if (killable != null)
             {
-                await Attack(attacker, killable);
+                await Strike(killable);
                 continue;
             }
 
             // 其后：能攻击总部（非必定破坏，且总部在允许目标中）
             if (myHq != null && allowedTargets.Contains(myHq))
             {
-                await Attack(attacker, myHq);
+                await Strike(myHq);
                 continue;
             }
 
@@ -3523,16 +3625,14 @@ InputState currentInputState = InputState.nil;
             var targetRandom = allowedTargets[rnd.Next(allowedTargets.Count)];
             if (targetRandom != null)
             {
-                await Attack(attacker, targetRandom);
+                await Strike(targetRandom);
                 continue;
             }
         }
+
+        return anybodyAttacked;
     }
-    
-    /// <summary>
-    /// 刷一个敌方单位 目前只是随机从敌人卡组里抽一张放在支援阵线 之后会在这里写敌方ai的召唤逻辑
-    /// </summary>
-    async Task enemySummonAsync()
+async Task enemySummonAsync()
     {
         var card = enemyDeck[0];
         enemyDeck.RemoveAt(0);

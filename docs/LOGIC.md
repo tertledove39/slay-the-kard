@@ -267,14 +267,61 @@ cardsToShow = cardsToShow.Select(c => Copy(c)).Where(c => c != null).ToList();
 
 ### 敌方回合 (EnemyTurnAsync → EnemyPerformActionsAsync)
 
-位置：`battlefield_.cs` line 2195 / 2673
+位置：`EnemyTurnAsync` `battlefield_.cs` line 2768；`EnemyPerformActionsAsync` line 3450。
 
 1. `RefreshCardsInField(IsFriend.enemy)` 刷新敌方单位
 2. `ApplyEnemyTurnStartTraits()` 敌方动员buff
 3. `ExecuteEnemyActionQueue()` 执行行动脚本（tN/everyNt/ADD/default）；固定`tN=ADD:`在触发时注册，并从当回合起每个敌方回合重复执行
-4. `EnemyPerformActionsAsync()` AI行动：
-   - 阶段1：前线无我方单位时，把敌方支援线非空军单位推到前线
-    - 阶段2：攻击（优先级：能一击杀死HQ > 能杀死单位 > 攻击HQ > 随机攻击）
+4. `EnemyPerformActionsAsync()` AI行动循环
+
+#### AI 行动循环：移动 → 攻击 → 有人动过就回到移动
+
+    循环(最多 MaxEnemyActionRounds=20 轮):
+        anybodyMoved    = EnemyAdvancePhaseAsync()    // 推进前线
+        anybodyAttacked = EnemyAttackPhaseAsync()     // 攻击
+        if (!anybodyMoved && !anybodyAttacked) return // 场上没变化 -> 收敛
+        if (anybodyAttacked) await WaitForCorpsesClearedAsync()
+
+| 方法 | 位置 | 返回值语义 |
+|---|---|---|
+| `EnemyPerformActionsAsync()` | 3450 | 无。循环本体 |
+| `WaitForCorpsesClearedAsync()` | 3483 | 无。等场上所有 `destroyed` 状态单位被收走 |
+| `EnemyAdvancePhaseAsync()` | 3505 | 这一轮**有没有人真的移动过** |
+| `EnemyAttackPhaseAsync()` | 3549 | 这一轮**有没有人真的打出去过** |
+
+**循环判据是「这一轮场上有没有变化」，不是「场上还有没有能移动的单位」。**
+后者会死循环：空军/炮兵/已经在后方的单位永远满足 `CheckIfCanMove()`，
+但推进阶段永远不会动它们。
+
+**判据里必须有 `anybodyAttacked`。** 前线被我方单位占住时推进阶段是空转的
+（提前 `return false`，压根没试），只看 `anybodyMoved` 的话第 1 轮攻击打死挡路的
+之后就立刻退出，前线空出来了也不再推——那正是这个循环要修的场景。
+
+**攻击轮之后必须 `WaitForCorpsesClearedAsync()`。** 阵亡有两个阶段
+（`ProcessDeadUnitAsync`）：状态立刻变 `destroyed`，节点却要等
+`PlayDeathPresentationAsync` 的那一拍（`DeathPresentationDelaySeconds`，实机约 1s）
+结束才 `RemoveCard` 解绑格子。这一拍里格子还被尸体占着，而 `frontLine` 与 `Move`
+都只看格子有没有卡，不等就会把尸体当成活人。等待有硬上限
+`DeathSettleTimeoutSeconds`——`PlayDeathPresentationAsync` 在节点已失效时会直接
+`return`、不执行 `RemoveCard`，尸体可能永远留在 `cardInPlaces` 里。
+
+**只有坦克能体现这个循环。** 规则「步兵/火炮/飞机攻击后不能移动」在 `Attack`
+尾部对这几类调 `HaveMoved()`，所以它们打完就再也推不动了；坦克不在其列，
+「先打死挡路的、再推进上去」对坦克成立。验证用例因此用的是四号坦克。
+
+**收敛性**：移动会 `HaveMoved()` 清 `moveAble`、攻击会 `HaveAttacked()` 减
+`attackAble`，两者每回合只在开头刷一次，所以「移动 + 攻击」总次数有限，
+每转一轮至少消耗掉一次。`MaxEnemyActionRounds` 只是保险丝，跑满会 `PushWarning`。
+
+**推进阶段不补 `HaveAttacked()`**：`HaveMoved()` 已经是「本回合不能再移动 +
+非坦克也不能再攻击」的唯一入口，再补一次会把 `attackAble` 减成 -1，
+让「本回合额外 +1 次攻击」的效果白给。
+
+#### 攻击优先级（`EnemyAttackPhaseAsync`）
+
+能一击摧毁总部 → 能一击摧毁某单位 → 打总部 → 随机打一个合法目标。
+四处分支全部走内部的 `Strike()` 局部函数，它统一转发给 `Attack` 并置
+`anybodyAttacked = true`——漏记任何一处都会让循环提前收敛。
 
 ### 敌方行动脚本键 (enemyTurn.ini)
 

@@ -1496,3 +1496,60 @@ shader 版能看到透视，代价是引 GLSL、还得赌它不会因为编译�
 > 而老板新加的测试卡 `[convertTest]` 带了一行**空的** `attackEffect =`（从别的卡复制模板带来的）。
 > 空值是无操作（`ResolveAttackEffect` 拿到的还是空串），把它当失败属于假红灯。
 > 改成判「有没有**值**」。
+
+---
+
+## 第二十六轮：敌方行动循环（移动 → 攻击 → 有人动过就回到移动）
+
+老板的需求：`1)所有敌方单位尝试移动 2)所有敌方单位尝试攻击 3)如果这样之后还存在可以移动的单位 那应该再次从1)开始此流程`。
+
+### 结构回归 `tests/verify_enemy_action_loop.py`（15 项）
+
+钉住「一改就会静默退化」的骨架，尤其是三个返回值契约和循环判据：
+
+- 两个阶段被包在同一个有界循环 `for (int round = 0; round < MaxEnemyActionRounds; round++)` 里
+- 循环判据是 `if (!anybodyMoved && !anybodyAttacked) return;`，**两个标志缺一不可**
+- **不许**用 `CheckIfCanMove()` 当循环条件（空军/炮兵/已在后方的单位永远满足它，会死循环）
+- 攻击轮之后有 `await WaitForCorpsesClearedAsync()`
+- 等尸体是「轮询 `CardState.destroyed` + `DeathSettleTimeoutSeconds` 硬上限」，不是死等
+- `EnemyAdvancePhaseAsync` 返回「有没有人真的移动过」；`EnemyAttackPhaseAsync` 返回「有没有人真的打出去过」
+- 四处优先级分支全部走 `Strike()`（`await Strike(` 出现 4 次 + 定义 1 次），漏记一处就会提前收敛
+- `MaxEnemyActionRounds` / `DeathSettlePollSeconds` / `DeathSettleTimeoutSeconds` 都是命名常量
+- 推进阶段**不许**补 `HaveAttacked()`（会把 `attackAble` 减成 -1，吃掉「额外+1次攻击」）
+- `EnemyTurnAsync` 里 `RefreshCardsInField(IsFriend.enemy)` 必须早于 `EnemyPerformActionsAsync()`
+
+> 断言 `HaveAttacked` 那条先剥掉 `//` 注释再搜：代码里有一段注释专门解释「为什么**不**在这里补
+> `HaveAttacked()`」，直接搜原文会被自己的注释命中（这类假阳性本项目踩过不止一次）。
+
+### 行为验证（临时 C# 场景，跑完即删）
+
+结构测试证明不了循环真的会跑、跑得完。真起一次 `res://bin/battleField.tscn`：
+
+    布场：轻步兵(def1) → 前线 Place6；四号坦克(atk3) → 敌方支援阵线 Place1
+    手动调 RefreshCardsInField(IsFriend.enemy)（真局里 EnemyTurnAsync 会先做这一步）
+    然后 await 完整的 EnemyPerformActionsAsync()
+
+    [PASS] 布场：我方轻步兵在前线，德军四号坦克在敌方支援阵线
+    [PASS] 布场：德军四号坦克本回合的行动力已刷新      moveAble=1 attackAble=1
+    [PASS] 我方轻步兵已被打死
+    [PASS] 敌方单位在**同一回合内**推进到了前线        <- 本次修复的核心
+    [PASS] 推进落地在前线的某个格子上
+    [PASS] 前线有我方单位时，推进阶段返回 false（前线被挡）
+    [PASS] 攻击阶段返回 true（确实打出去了）
+    [PASS] 再次跑完整循环在 198 帧内收敛且无异常
+    ===> 全部通过
+
+**三个只有实测才能发现的坑**（都属于「想当然就写错了」）：
+
+1. **必须用坦克当被试。** 第一次用 `de_infantry`，怎么改都不动。原因是规则
+   「步兵/火炮/飞机攻击后不能移动」——`Attack` 尾部对这几类调 `HaveMoved()`，
+   步兵打完就再也推不动了。**只有坦克能体现这个循环。**
+2. **敌方单位在玩家回合 `moveAble/attackAble` 全是 0。** 不补
+   `RefreshCardsInField(IsFriend.enemy)` 的话，测的是一个「敌人什么都干不了」的假场景，
+   连「推进阶段返回 false」都会假绿。
+3. **尸体要在场上留一拍。** 实测格子腾空耗时 **146 帧（144fps，约 1.0s）**——
+   正好是 `DeathPresentationDelaySeconds`。不 `WaitForCorpsesClearedAsync()`
+   的话循环会在第 2 轮就退出，前线空出来了也不推。这个数字是量出来的，不是猜的。
+
+**收敛性**：整条循环跑满 20 轮的保险丝没有被触发过（实测 198 帧内收敛）。若将来有人改了
+`HaveMoved()` 不再清 `moveAble`，会看到 `PushWarning`：`敌方行动跑了 20 轮还没收敛`。
