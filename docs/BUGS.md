@@ -824,3 +824,60 @@ if (isFriendly)
 **谁守着**：`tests/verify_button_animations.py` 断言 `var host = map ?? parent;`、
 `host.AddChild(scene)`、并且 `parent.AddChild(scene)` **已消失**、挂载点写在
 `EnterEventOverlay` 之前；`tests/verify_area_intensity.py` 断言通关那句传的是 `host`。
+
+---
+
+### 59. 单位卡「部署后再点一次目标」永远走不到：鼠标一动就把待选状态清掉了（已修）
+
+**现象**（老板报的）：i42（步兵第42团，`Deployed:setTarget|Retreat` + `targetType = aFriendlyUnit`）
+打出去之后撤退效果**从来不结算**。
+
+**先排除的**：效果串本身没问题。真跑一场战斗，把 i42 摆上场再手工调
+`ParseAndExecuteEffect("Deployed:setTarget|Retreat[...]", i42, [友军])`，
+友军**确实**从 `placed` 变成了 `inHand`。所以断的不是解析，是**根本没人去调它**。
+
+**根因**：单位卡选目标是**两段式**的——
+1. 拖到空的支援位松手 → `P_InHandUnitNeedChooseTarget` 分支部署，然后置
+   `currentInputState = waitingForChoosingTarget`
+2. 玩家**再点一次**场上的友军 → `waitingForChoosingTarget` 分支 →
+   `ResolveTargetedCommandAsync` → 这才真正执行 `Retreat`
+
+断在第 1、2 步之间。玩家必须移动鼠标去点目标，而 `_Input` 开头有一条兜底：
+
+```csharp
+if (cardNowChoose != null && @event is InputEventMouseMotion
+    && !Input.IsMouseButtonPressed(MouseButton.Left))
+{
+    CancelCurrentDrag();   // 里面 cardNowChoose = null; currentInputState = InputState.nil;
+    return;
+}
+```
+
+松手之后左键本来就是抬起的，于是**鼠标一动，兜底就把待选状态整个清掉**，
+玩家还没点到目标，效果就没了。
+
+这条兜底本身是对的（它救的是「拖拽中途被截图工具抢走鼠标」，见第 32 条），
+错在它**分不清「正在拖拽」和「已部署完、在等点目标」**。`CancelCurrentDrag`
+的 switch 只收尾 `caught / commandCardCaught / inplaceAndCaught` 三种状态，
+i42 此刻是 `placed`——兜底对它唯一的实际作用就是破坏。
+
+**为什么指令卡没事**：指令卡是「按住拖动 → 直接松在目标身上」，中间没有松开
+左键的空档，兜底不会触发。所以这个 bug **只打单位卡**。
+
+**受影响的卡（同一个 bug）**：i42、i89、i173、i6、i175、i95 —— 所有
+「部署后需要选目标」的单位卡。
+
+**修复**（`bin/battlefield_.cs`）：
+1. 兜底加一条 `currentInputState != InputState.waitingForChoosingTarget`——
+   判据是「有没有在拖」而不是「`cardNowChoose` 是不是空」。
+2. **软锁保险**：修掉 1 之后这个状态只能靠点到合法目标才退出。进入时
+   `GetHowManyCardIsValid > 0` 保证那一刻有目标，但选择期间目标可能被打死。
+   所以补 `AbandonTargetChoice()`：**等目标时点到空地 = 放弃这次选择**。
+   收尾（箭头 + 高亮）抽成 `CloseTargetChoiceUi()`，与 `CancelCurrentDrag` 共用一份。
+
+**注意这不是「空转的第二处」**：`Move()` 里 `TriggerUnitEffects("Deployed", card, new List<cardBase_>())`
+传的是**空目标列表**，`setTarget` 拿不到 `targetCard`、`targets` 保持空，
+`Retreat` 遍历空表静默无事发生。这一趟是设计如此（真正执行在上面第 2 步），
+不用改——但排查时容易被它误导成「效果跑了但没生效」。
+
+**谁守着**：`tests/verify_unit_target_choice.py`（12 项）。真机验证记录见 `docs/TEST.md` 第二十七轮。

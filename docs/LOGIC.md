@@ -507,6 +507,47 @@ Alt-Tab 会让窗口失焦。这时卡会永久停在 `caught`，而 `RefreshMyH
 挡住，否则解锁前永远轮不到它。这与 `ShowCardChoice` 的模态点击同属一类：
 **凡是「等一个可能永远不来的事件」的收尾，都要能被打断。**
 
+### 但这条兜底不能误伤「不是拖拽的等待态」
+
+位置：`battlefield_.cs` 的 `_Input` 开头，条件里的
+`currentInputState != InputState.waitingForChoosingTarget`
+
+上面那条兜底的判据必须是「**有没有在拖**」，光看 `cardNowChoose != null` 不够。
+`waitingForChoosingTarget` 里 `cardNowChoose` 也非空，但它**不是拖拽**：
+单位卡此刻已经落到场上了（`state == placed`），左键本来就是松开的，玩家正要把
+鼠标移过去点目标。兜底一开火就把待选状态清成 `nil`，效果永远不结算。
+
+`CancelCurrentDrag()` 的 switch 只收尾 `caught / commandCardCaught /
+inplaceAndCaught` 三种状态——对 `placed` 的卡本来就是空操作，所以兜底对它
+唯一的作用就是破坏。**新增任何「等一下再确认」的输入状态时，都要在这条
+兜底的调用条件里排除掉。** 详见 `docs/BUGS.md` #59。
+
+---
+
+## 单位卡选目标是两段式的
+
+位置：`battlefield_.cs` 的 `_Input`，两个分支
+`P_InHandUnitNeedChooseTarget` 与 `waitingForChoosingTarget`
+
+| | 指令卡 | 单位卡 |
+|---|---|---|
+| 目标怎么选 | 按住拖到目标身上松手，**一步到位** | 先拖到空的支援位松手（**这一步就部署了**），再点一次目标，**两步** |
+| 执行入口 | `ExecuteCommandAndDiscard` | `ResolveTargetedCommandAsync` |
+
+两步之间 `currentInputState = waitingForChoosingTarget`，靠
+`GetHowManyCardIsValid(targetType) > 0` 保证进入时**至少有一个合法目标**。
+
+卡上 `effect` 的 `Deployed:` 前缀在这条路上只是个标记：
+`Move()` 里 `TriggerUnitEffects("Deployed", card, new List<cardBase_>())` 传的是
+**空目标列表**，跑到 `setTarget|Retreat` 是彻底的空转——**看到它没动静不代表
+效果坏了**，真正执行在第 2 步。排查这类卡时先看第二步有没有被走到，别被第一步误导。
+
+这个状态原本只能靠点到合法目标才退出。选择期间合法目标可能被打死，所以补了一条出口：
+**等目标时点到空地 = 放弃这次选择**（`AbandonTargetChoice()`；卡已打出、效果不结算，
+留日志）。箭头与高亮的收尾抽在 `CloseTargetChoiceUi()`，与 `CancelCurrentDrag` 共用一份。
+
+回归：`tests/verify_unit_target_choice.py`。
+
 ---
 
 ## 单位卡的弃置动画节奏

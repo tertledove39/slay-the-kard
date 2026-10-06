@@ -1553,3 +1553,61 @@ shader 版能看到透视，代价是引 GLSL、还得赌它不会因为编译�
 
 **收敛性**：整条循环跑满 20 轮的保险丝没有被触发过（实测 198 帧内收敛）。若将来有人改了
 `HaveMoved()` 不再清 `moveAble`，会看到 `PushWarning`：`敌方行动跑了 20 轮还没收敛`。
+
+---
+
+## 第二十七轮：单位卡「部署后再点一次目标」（BUGS #59 / i42）
+
+老板报「i42 没法正确执行效果」。i42 = `Deployed:setTarget|Retreat` + `targetType = aFriendlyUnit`。
+
+### 先复现，再定位
+
+临时 C# 场景真起 `battleField.tscn`，绕开 UI 直接把活干一遍：
+
+    A：ParseAndExecuteEffect("Deployed:setTarget|Retreat[icon=...,description=部署:...]", i42, [友军])
+       -> 友军 placed -> inHand        <- 效果串本身没问题
+    C：ResolveTargetedCommandAsync(i42, 友军)
+       -> 友军 placed -> inHand        <- UI 选完目标后走的那条路也没问题
+
+两条都通，说明断的不是解析，是**根本没人去调它**。回头查输入状态机，找到
+`_Input` 开头的鼠标移动兜底会 `CancelCurrentDrag()` → `currentInputState = nil`。
+
+### 修复后实测（同一个临时场景）
+
+    [PASS] 构造：已进入「等玩家点目标」状态
+    阶段一：CancelCurrentDrag 之后 state=nil        <- 老逻辑确实会清掉状态（根因复现）
+    [PASS] 鼠标移动后仍是 waitingForChoosingTarget   <- 本次修复的核心
+    [PASS] 鼠标移动后待执行的卡还是 i42
+    [PASS] 接着点目标 → 友方单位真的撤退了（placed -> inHand）
+    [PASS] 等目标时点到空地能退出该状态（实测 nil）——防软锁
+    [PASS] 放弃后 cardNowChoose 也清空
+    ===> 全部通过
+
+**两个只有实测才能发现的点**：
+
+1. **阶段二不能靠「点一下」验，得直接喂事件。** headless 下
+   `GetGlobalMousePosition()` 固定在 `(3, -351)`，`Viewport.WarpMouse` /
+   `Input.WarpMouse` 都不生效（warp 之后这一帧的打印根本没出来），鼠标**没法伪造**。
+   但 `_Input` 是 `public override`，可以直接 `field._Input(new InputEventMouseMotion())` ——
+   鼠标移动兜底恰好排在 `GetGlobalMousePosition()` **之前**，所以这一条能真真正正端到端跑通。
+2. **headless 里 `ReadControlState() == 1`。** 祭典（Mulligan）画面的 `add_child` 在
+   headless 下失败，开局的 `ForbidControl()` 一直没被放开，点到空地那条分支会在
+   `if (ReadControlState() == 1) return;` 处提前返回、假装「出口不生效」。
+   真机玩家回合必然是 0。测试里把 `allowControl` 直接清零——**是测试脚手架的问题，不是代码的**。
+
+### 结构回归 `tests/verify_unit_target_choice.py`（12 项）
+
+- 兜底里排除了 `waitingForChoosingTarget`，且排除条件写在 `CancelCurrentDrag()` 之前
+- **别修过头**：兜底本身还在（`InputEventMouseMotion` + 左键未按下），
+  `CancelCurrentDrag` 仍收尾三种拖拽状态、仍把卡归位到手牌
+- `AbandonTargetChoice()` 存在、只在等目标时生效、会清 `cardNowChoose`/`currentInputState`
+- 收尾只写一份：`CloseTargetChoiceUi()` 负责箭头 + `RestoreAllTargetsColor()`，
+  `CancelCurrentDrag` 与 `AbandonTargetChoice` 共用；`RestoreAllTargetsColor()` 不在别处重复出现
+- i42 的配置仍是 `setTarget|Retreat` + `aFriendlyUnit`（防止改配置去绕代码）
+
+### 顺带修的旧断言
+
+`tests/verify_combat_action_timing.py` 原来断言 `RestoreAllTargetsColor()` 出现在
+`CancelCurrentDrag` 的函数体里。收尾抽到 `CloseTargetChoiceUi()` 之后行为没变、
+断言却红了——改成断言「`CloseTargetChoiceUi` 里有、且 `CancelCurrentDrag` 调了它」，
+和之前抽 `SettingRow` 时同一类更新。27 项全绿。

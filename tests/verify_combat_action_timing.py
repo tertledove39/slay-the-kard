@@ -46,7 +46,10 @@ def main():
     # 归位：还在手上/地上的两种中间态都要还原，否则 RefreshMyHand 永远跳过它
     results.append(check("CardState.inHand" in cancel, "caught 的卡还原成 inHand"))
     results.append(check("CardState.placed" in cancel, "inplaceAndCaught 的卡还原成 placed"))
-    results.append(check("RestoreAllTargetsColor()" in cancel, "取消高亮，恢复单位颜色"))
+    # 收尾（箭头 + 高亮）已抽到 CloseTargetChoiceUi()，与「放弃选择目标」共用一份。
+    close_ui = method(battle, "private void CloseTargetChoiceUi()", "private void AbandonTargetChoice()")
+    results.append(check("RestoreAllTargetsColor()" in close_ui and "CloseTargetChoiceUi();" in cancel,
+                         "取消高亮，恢复单位颜色"))
     results.append(check("RefreshMyHand()" in cancel, "重新排列手牌，让卡真正归位"))
 
     # 必须在控制锁判定之前兜底：收尾不能被「当前不允许操作」挡住

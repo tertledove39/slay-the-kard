@@ -1513,6 +1513,41 @@ InputState currentInputState = InputState.nil;
     /// 只处理「卡还在手上 / 还在地上等着落位」这两种中间态；若效果已经结算
     /// （卡被消耗、或已经是 placed 以外的状态），这里不插手。
     /// </summary>
+    /// <summary>
+    /// 收起「跟随鼠标的箭头 + 合法目标高亮」。
+    ///
+    /// 拖拽取消与「放弃选择目标」共用一份：`HighlightValidTargets` 会把不合法单位
+    /// 染灰，`RestoreAllTargetsColor` 负责复原，两者必须成对——少收一次，
+    /// 下次高亮就会在一份已经变灰的状态上再染一遍。
+    /// </summary>
+    private void CloseTargetChoiceUi()
+    {
+        cardBase.ProcessMode = Node.ProcessModeEnum.Disabled;
+        cardBase.Visible = false;
+        RestoreAllTargetsColor();
+        _displayOrderDirty = true;
+    }
+
+    /// <summary>
+    /// 放弃当前正在等玩家点的那次目标选择（点到空地时走这里）。
+    ///
+    /// 这个状态是**只能靠点到合法目标才退出**的：进入时 `GetHowManyCardIsValid > 0`
+    /// 保证那一刻有目标可选，但选择期间目标可能被打死/撤退掉。没有这条出口，
+    /// `_Input` 就会一直停在 waitingForChoosingTarget 上，玩家之后点任何东西
+    /// 都被它吃掉——彻底点不动。
+    ///
+    /// 卡已经打出去了，效果就此不结算：这是玩家的主动放弃，不是静默失败，所以留日志。
+    /// </summary>
+    private void AbandonTargetChoice()
+    {
+        if (currentInputState != InputState.waitingForChoosingTarget) return;
+
+        GD.Print($"[TargetSelect] 玩家放弃选择目标，{cardNowChoose?.id} 的部署效果不再结算");
+        cardNowChoose = null;
+        currentInputState = InputState.nil;
+        CloseTargetChoiceUi();
+    }
+
     private void CancelCurrentDrag()
     {
         if (cardNowChoose == null)
@@ -1537,11 +1572,8 @@ InputState currentInputState = InputState.nil;
                 break;
         }
 
-        cardBase.ProcessMode = Node.ProcessModeEnum.Disabled;
-        cardBase.Visible = false;
-        RestoreAllTargetsColor();          // 取消高亮，恢复所有单位的原始颜色
+        CloseTargetChoiceUi();
         player1?.RefreshMyHand();
-        _displayOrderDirty = true;
 
         GD.Print($"[Drag] 拖拽被外部打断（窗口失焦或鼠标被抢占），已安全取消：{card.id}");
     }
@@ -1632,8 +1664,17 @@ InputState currentInputState = InputState.nil;
     // 兜底：拖拽中途鼠标被抢走（截图工具、输入法弹窗等），「松开左键」就再也送不进来了。
     // 鼠标一动就核对一次物理左键状态，发现其实早就松开，就安全取消这次拖拽。
     // 必须放在下面的控制锁判定之前——收尾不能被「当前不允许操作」挡住。
+    //
+    // **但 `waitingForChoosingTarget` 不是拖拽，绝不能取消。** 那个状态是
+    // 「单位卡已经落到场上了，正等玩家再点一次目标」（见 P_InHandUnitNeedChooseTarget
+    // 分支）：卡已经部署完，左键本来就是松开的，玩家必须移动鼠标去点目标——
+    // 于是这条兜底会在玩家点到目标之前就把状态清掉，效果永远不结算。
+    // 判据是「有没有在拖」而不是「cardNowChoose 是不是空」：拖拽的三种状态
+    // （caught / commandCardCaught / inplaceAndCaught）才会被 CancelCurrentDrag 收尾，
+    // 而此刻的卡是 placed，兜底对它唯一的作用就是破坏。
     if (cardNowChoose != null && @event is InputEventMouseMotion
-        && !Input.IsMouseButtonPressed(MouseButton.Left))
+        && !Input.IsMouseButtonPressed(MouseButton.Left)
+        && currentInputState != InputState.waitingForChoosingTarget)
     {
         CancelCurrentDrag();
         return;
@@ -1652,7 +1693,13 @@ InputState currentInputState = InputState.nil;
         {
             var card = CheckCardClick(mousePosition);
             if(currentInputState != InputState.waitingForChoosingTarget) cardNowChoose = card;
-            if (card == null) return; // 没有点击到卡牌，不处理
+            if (card == null)
+            {
+                // 点到空地：正常情况什么也不做；但正在等选目标时这是唯一的出口，
+                // 否则该状态会一直吃掉后续点击（见 AbandonTargetChoice）。
+                AbandonTargetChoice();
+                return;
+            }
             // 点击时立即将卡牌提升到最上层
             _displayOrderDirty = true;
             var validTargets = GetAllowedTargets(card);
