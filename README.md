@@ -62,3 +62,12 @@
 - 支持 foreach/End& 循环结构
 - 支持表达式计算（+-*/括号）
 - 时间前缀触发：Deployed:, FriendlyTurnBegin:, Dead: 等
+以结合kards和杀戮尖塔为努力方向的小游戏
+
+使用方式
+1.在timesList里面有卡牌的效果说明
+2.deck.ini里面有你的初始卡组的内容
+3.enemyTurn.ini中有敌方的意图
+
+相信你看到对应文件的时候就能明白这玩意要怎么写的QwQ
+QQ群:762301764
