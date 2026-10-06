@@ -31,11 +31,17 @@ public partial class SettingsMenu : Control
             }
             else if (item.Type == "float")
             {
+<<<<<<< HEAD
                 AddSlider(list, item);
+=======
+                // 与暂停菜单共用同一份行构建（见 bin/SettingRow.cs）
+                SettingRow.AddFloatSlider(list, item);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
             }
         }
     }
 
+<<<<<<< HEAD
     private static void AddSlider(VBoxContainer list, SettingItem item)
     {
         var row = new HBoxContainer { CustomMinimumSize = new Vector2(540, 48) };
@@ -68,6 +74,8 @@ public partial class SettingsMenu : Control
         ? Mathf.RoundToInt((float)value).ToString()
         : value.ToString("0.##");
 
+=======
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     private static void AnimateButton(Button button, float scale)
     {
         button.PivotOffset = button.Size / 2f;

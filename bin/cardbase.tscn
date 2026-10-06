@@ -745,6 +745,18 @@ texture = ExtResource("7_bwqk7")
 position = Vector2(91.999985, 229)
 scale = Vector2(1.0312498, 1.0312496)
 texture = ExtResource("7_pqwk4")
+<<<<<<< HEAD
+=======
+
+[node name="convertBack" type="TextureRect" parent="."]
+visible = false
+layout_mode = 0
+offset_right = 180.0
+offset_bottom = 240.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 0
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
 [connection signal="focus_entered" from="checkMouce" to="." method="MouceEntered"]
 [connection signal="focus_exited" from="checkMouce" to="." method="MouceExited"]

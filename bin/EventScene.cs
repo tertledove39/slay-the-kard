@@ -18,6 +18,12 @@ public partial class EventScene : CanvasLayer
     private const float HoverScale = 1.08f;
     private const float HoverDuration = 0.12f;
 
+<<<<<<< HEAD
+=======
+    /// <summary>悬浮预览面板的场景路径</summary>
+    private const string PreviewScenePath = "res://bin/event_card_preview.tscn";
+
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     /// <summary>左侧事件配图宽度（像素）</summary>
     private const float ImageWidth = 400f;
     private const float ImageHeight = 600f;
@@ -31,6 +37,7 @@ public partial class EventScene : CanvasLayer
     /// <param name="areaName">触发此事件的区域名，用于完成后标记</param>
     public static async Task Show(Node parent, EventData eventData, string areaName)
     {
+<<<<<<< HEAD
         var scene = new EventScene { Layer = 2 };
         parent.AddChild(scene);
         bool campaignCompleted = await scene.Run(eventData, areaName);
@@ -40,6 +47,50 @@ public partial class EventScene : CanvasLayer
 
         if (campaignCompleted)
             await CampaignVictory.ShowAndReturnToMenu(parent);
+=======
+        // ⚠️ 这里必须**向上找** WorldMap，不能写 `parent is WorldMap`：
+        // 事件的开场是 ChooseMission.StartEvent → EventScene.Show(this, ...)，
+        // 传进来的 parent 是**任务选择面板**而不是世界地图，直接判类型会永远为 false，
+        // 面板收不起来、区域按钮也锁不住（暗幕已改成不拦鼠标，点击就会穿透过去）。
+        var map = FindWorldMap(parent);
+
+        // ⚠️ 叠层要挂**世界地图**，不能挂 parent —— 下面那句 EnterEventOverlay 会把
+        // 任务选择面板 QueueFree 掉，而叠层是它的子节点，会被一起带走。表现是
+        // 「点了事件什么都不发生」，而且 `_eventOverlayActive` 永远停在 true，
+        // 地图从此点不动（见 BUGS.md #58）。
+        var host = map ?? parent;
+        var scene = new EventScene { Layer = 2 };
+        host.AddChild(scene);
+
+        // 事件期间收起任务选择面板，但**保留**本次抽到的那一批（走 CloseMissionPanel
+        // 而不是 Dismiss）：事件结束后玩家回到地图，看到的还是同样三个选项。
+        map?.EnterEventOverlay();
+
+        bool campaignCompleted = await scene.Run(eventData, areaName);
+        scene.QueueFree();
+
+        // 事件结算完毕才丢弃这一批——烈度已经被这次事件消耗掉了
+        map?.ExitEventOverlay();
+
+        // 这里也要传**存活的** host：parent（任务面板）在事件开场就被关掉了，
+        // 传它是空引用，`ShowAndReturnToMenu` 开头的存活判定会直接把通关界面整段跳过。
+        if (campaignCompleted)
+            await CampaignVictory.ShowAndReturnToMenu(host);
+    }
+
+    /// <summary>
+    /// 从任意节点向上找所属的世界地图。事件叠层的调用方可能是世界地图本身，
+    /// 也可能是它下面的任务选择面板，所以要沿父链找而不是直接判类型。
+    /// </summary>
+    private static WorldMap FindWorldMap(Node from)
+    {
+        for (var node = from; node != null; node = node.GetParent())
+        {
+            if (node is WorldMap map)
+                return map;
+        }
+        return null;
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     }
 
     /// <summary>
@@ -52,10 +103,29 @@ public partial class EventScene : CanvasLayer
         _event = eventData;
         _areaName = areaName;
 
+<<<<<<< HEAD
         var bg = new ColorRect();
         bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         bg.Color = new Color(0, 0, 0, 0.75f);
         bg.MouseFilter = Control.MouseFilterEnum.Stop;
+=======
+        // 悬浮预览面板：结构与配色在 event_card_preview.tscn 里，这里只实例化挂载
+        _cardPreview = ResourceLoader.Load<PackedScene>(PreviewScenePath)?.Instantiate() as EventCardPreview;
+        if (_cardPreview != null)
+        {
+            _cardPreview.ZIndex = 100;
+            AddChild(_cardPreview);
+        }
+
+        // 暗幕只负责压暗，**不拦截鼠标**：事件期间玩家要能点到世界地图上的
+        // 商店与卡组按钮（那两个弹层分别在 Layer 10 与 Layer 2 后加，天然盖在事件之上）。
+        // 挡点击的活交给 WorldMap.EnterEventOverlay()：它把区域按钮锁掉，
+        // 避免点到事件背后的区域又开一个任务面板。
+        var bg = new ColorRect();
+        bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        bg.Color = new Color(0, 0, 0, 0.75f);
+        bg.MouseFilter = Control.MouseFilterEnum.Ignore;
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         AddChild(bg);
 
         var viewSize = GetViewport().GetVisibleRect().Size;
@@ -117,10 +187,33 @@ public partial class EventScene : CanvasLayer
         {
             var choice = _event.Choices[i];
             var btn = new Button();
+<<<<<<< HEAD
             btn.Text = choice.Text;
             btn.Position = new Vector2(textX, choicesY + i * 50);
             btn.Size = new Vector2(480, 42);
             btn.AddThemeFontSizeOverride("font_size", 16);
+=======
+            btn.Position = new Vector2(textX, choicesY + i * 50);
+            btn.Size = new Vector2(480, 42);
+            btn.AddThemeFontSizeOverride("font_size", 16);
+
+            // 资源点不足的选项不可选：只把「花费」算进去（负数之和），
+            // 带收益的选项不因收益而放宽，避免出现「花了之后才发现不够」。
+            int cost = EventEffectRunner.ParseMaterialCost(choice.Effect);
+            btn.Text = cost > BattleStateManager.MaterialPoints
+                     ? $"{choice.Text}（需要 {cost} 资源点）"
+                     : choice.Text;
+            btn.Disabled = cost > BattleStateManager.MaterialPoints;
+
+            // 会往卡组加卡的选项：悬浮时预览这些卡
+            var preview = EventEffectRunner.ParseAddedCards(choice.Effect);
+            if (preview.Count > 0)
+            {
+                btn.MouseEntered += () => ShowCardPreview(preview, btn);
+                btn.MouseExited += HideCardPreview;
+            }
+
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
             btn.MouseEntered += () => AnimateButton(btn, HoverScale);
             btn.MouseExited += () => AnimateButton(btn, 1f);
             int idx = i;
@@ -135,7 +228,11 @@ public partial class EventScene : CanvasLayer
         if (string.IsNullOrEmpty(effect)) effect = "";
 
         // --- 执行效果 ---
+<<<<<<< HEAD
         await ExecuteEffect(effect);
+=======
+        await EventEffectRunner.Execute(this, effect);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
         // 事件与战斗同等消耗1点区域烈度；归零时解锁下一区域
         bool areaCleared = BattleStateManager.ConsumeAreaIntensity(_areaName);
@@ -150,6 +247,7 @@ public partial class EventScene : CanvasLayer
         tween.TweenProperty(button, "scale", Vector2.One * scale, HoverDuration);
     }
 
+<<<<<<< HEAD
     // ============================ 效果执行 ============================
 
     /// <summary>
@@ -250,6 +348,22 @@ public partial class EventScene : CanvasLayer
     /// <summary>
     /// 显示牌组选择界面，让玩家挑选一张要替换的卡
     /// </summary>
+=======
+    // ============================ 卡牌预览 ============================
+
+    /// <summary>「选项会加入哪些卡」的悬浮预览面板；结构与配色都在场景里，本类只负责开关与填数据。</summary>
+    private EventCardPreview _cardPreview;
+
+    private void ShowCardPreview(List<(CardData card, int count)> cards, Control anchor)
+    {
+        _cardPreview?.Show(cards, anchor);
+    }
+
+    private void HideCardPreview()
+    {
+        _cardPreview?.Hide();
+    }
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 }
 
 /// <summary>

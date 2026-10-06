@@ -32,6 +32,13 @@ public partial class ChooseMission : Control
     private Label[] _labels;
     private List<MissionEntry> _entries = new();
     private string _areaName;
+<<<<<<< HEAD
+=======
+    private Button _backButton;
+
+    /// <summary>玩家点「返回」时触发；由 WorldMap 接住并关闭本面板（面板本身不管外面的事）。</summary>
+    public event Action BackRequested;
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     private float _buttonY;
     private float _labelOffsetY;
 
@@ -58,8 +65,20 @@ public partial class ChooseMission : Control
         ConnectHover(_btn2);
         ConnectHover(_btn3);
 
+<<<<<<< HEAD
         ApplyNames();
         RefreshIntensityLabel();
+=======
+        _backButton = GetNodeOrNull<Button>("BackButton");
+        if (_backButton != null)
+            _backButton.Pressed += () => BackRequested?.Invoke();
+
+        ApplyNames();
+        RefreshIntensityLabel();
+
+        // 任务选择面板的四个按钮（三个选项 + 返回）都响按键音
+        UiClickSound.AttachAll(this);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     }
 
     /// <summary>设置任务条目列表和区域名，并刷新显示</summary>
@@ -200,9 +219,16 @@ public partial class ChooseMission : Control
         var eventData = BattleStateManager.GetEvent(eventId);
         if (eventData == null) return;
 
+<<<<<<< HEAD
         await EventScene.Show(this, eventData, _areaName);
 
         if (GetParent() is WorldMap wm)
             wm.DismissChooseMission();
+=======
+        // 事件期间收起本面板、锁住区域按钮等等，都由 EventScene 自己通过
+        // WorldMap.EnterEventOverlay / ExitEventOverlay 负责（它会沿父链找到世界地图）。
+        // 这里不要再自己关一次——同一个职责两处实现，改一处就会漏一处。
+        await EventScene.Show(this, eventData, _areaName);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     }
 }

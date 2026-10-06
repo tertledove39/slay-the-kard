@@ -3,6 +3,10 @@ using System;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
+<<<<<<< HEAD
+=======
+using System.Threading.Tasks;
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
 
 
@@ -109,6 +113,18 @@ public partial class WorldMap : Control
     private ChooseMission _chooseMissionPanel;
 
     /// <summary>
+<<<<<<< HEAD
+=======
+    /// 本次抽到的任务。点 area 进面板后按「返回」再进来时复用这一批，
+    /// 免得玩家靠反复进出刷出想要的组合。
+    /// 用实例字段而非静态：选了任务就会换场景（战斗 → battleField，事件 → 场景重载），
+    /// WorldMap 会被重建，缓存自然失效，不需要额外清理。
+    /// </summary>
+    private string _drawnArea;
+    private List<string> _drawnIds;
+
+    /// <summary>
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     /// 每个区域的敌人池（从AreaPool.ini加载）
     /// </summary>
     private Dictionary<string, Area> _areaPools = new();
@@ -162,6 +178,10 @@ public partial class WorldMap : Control
     }
 
     private Label pointNum;
+<<<<<<< HEAD
+=======
+    private Label hpNum;
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
 
     public override void _Ready()
@@ -177,7 +197,13 @@ public partial class WorldMap : Control
 
 
         pointNum = GetNodeOrNull<Label>("pointNum");
+<<<<<<< HEAD
         RefreshMaterialPoint();
+=======
+        hpNum = GetNodeOrNull<Label>("hpNum");
+        RefreshMaterialPoint();
+        RefreshHp();
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
         // 预加载选择任务界面
         _chooseMissionScene = ResourceLoader.Load<PackedScene>("res://bin/chooseMission.tscn");
@@ -192,6 +218,17 @@ public partial class WorldMap : Control
         ConnectHover("store");
         ConnectHover("deck");
 
+<<<<<<< HEAD
+=======
+        // 世界地图界面的**所有**按钮都响按键音（7 个区域按钮 + store + deck + 设置）。
+        // 递归挂载而不是逐个写名字：以后在场景里加按钮不用回来补这一行。
+        UiClickSound.AttachAll(this);
+
+        // 左上角的设置按钮：与 ESC 同一个入口（见 OpenPauseMenu）
+        var settingsBtn = GetNodeOrNull<Button>("SettingsButton");
+        if (settingsBtn != null) settingsBtn.Pressed += OpenPauseMenu;
+
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         RefreshAreaStates();
     }
 
@@ -199,6 +236,18 @@ public partial class WorldMap : Control
     {
         pointNum.Text = BattleStateManager.MaterialPoints.ToString();
     }
+<<<<<<< HEAD
+=======
+
+    /// <summary>
+    /// 刷新血量显示（心形图标 + 数字）。血量无上限，所以用数字承载数量，
+    /// 图标只作标识，不会因为血量变多而排不下。
+    /// </summary>
+    private void RefreshHp()
+    {
+        if (hpNum != null) hpNum.Text = BattleStateManager.Hp.ToString();
+    }
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     private void ConnectHover(string path)
     {
         var button = GetNodeOrNull<Button>(path);
@@ -255,6 +304,19 @@ public partial class WorldMap : Control
 
     public override void _Input(InputEvent @event)
     {
+<<<<<<< HEAD
+=======
+        // ESC 开关暂停菜单（设置 / 放弃 / 保存并退出）。菜单自己开着时由它处理 ESC，
+        // 所以这里只在**没开**的时候响应，不会一按就开了又关。
+        if (@event is InputEventKey escEvent && escEvent.Pressed && !escEvent.Echo
+            && escEvent.Keycode == Key.Escape && !PauseMenu.IsOpen)
+        {
+            OpenPauseMenu();
+            AcceptEvent();
+            return;
+        }
+
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         // 按 ` 键切换控制台，吞掉事件防止字符残留
         if (@event is InputEventKey keyEvent && keyEvent.Pressed && keyEvent.Keycode == Key.Quoteleft)
         {
@@ -455,6 +517,10 @@ public partial class WorldMap : Control
     /// </summary>
     private void OnAreaPressed(string areaName)
     {
+<<<<<<< HEAD
+=======
+        if (_eventOverlayActive) return;
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         if (_chooseMissionPanel != null) return;
         if (!BattleStateManager.UnlockedArea.TryGetValue(areaName, out int unlocked) || unlocked != 1) return;
 
@@ -471,10 +537,28 @@ public partial class WorldMap : Control
         // 首次进入该区域时按 AreaPool.ini 的 areaTimes 初始化战斗烈度
         BattleStateManager.EnsureAreaIntensity(areaName, pool.ReadAreaTimes());
 
+<<<<<<< HEAD
         // 抽取规则集中在 MissionDrawer：按当前烈度处理 boss，并保证 2战斗+1事件
         var candidates = pool.ReadEntrys();
         int intensity = BattleStateManager.ReadAreaIntensity(areaName);
         var selectedIds = MissionDrawer.Draw(candidates, pool.ReadBoss(), intensity);
+=======
+        // 同一个区域先前抽过就直接复用（返回世界地图后再进来是同一批）。
+        // 抽取规则集中在 MissionDrawer：按当前烈度处理 boss，并保证 2战斗+1事件。
+        List<string> selectedIds;
+        if (_drawnArea == areaName && _drawnIds != null)
+        {
+            selectedIds = _drawnIds;
+        }
+        else
+        {
+            var candidates = pool.ReadEntrys();
+            int intensity = BattleStateManager.ReadAreaIntensity(areaName);
+            selectedIds = MissionDrawer.Draw(candidates, pool.ReadBoss(), intensity);
+            _drawnArea = areaName;
+            _drawnIds = selectedIds;
+        }
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
         if (selectedIds.Count < 1)
         {
@@ -489,6 +573,10 @@ public partial class WorldMap : Control
         if (_chooseMissionPanel != null)
         {
             _chooseMissionPanel.SetEntries(entries, areaName);
+<<<<<<< HEAD
+=======
+            _chooseMissionPanel.BackRequested += CloseMissionPanel;
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
             _chooseMissionPanel.SetAnchorsPreset(LayoutPreset.FullRect);
             _chooseMissionPanel.ZIndex = 200;
             AddChild(_chooseMissionPanel);
@@ -504,16 +592,117 @@ public partial class WorldMap : Control
     }
 
     /// <summary>
+<<<<<<< HEAD
     /// 事件完成后关闭三选一面板并刷新区域状态
     /// </summary>
     public void DismissChooseMission()
     {
         if (_chooseMissionPanel != null)
         {
+=======
+    /// 事件叠加层是否正在显示。事件期间地图上只放开商店与卡组，
+    /// 区域按钮一律忽略——事件暗幕已改成不拦鼠标（好让商店/卡组能点），
+    /// 不在这里挡一下的话，点到底下的区域会在事件背后又叠一个任务面板。
+    /// </summary>
+    private bool _eventOverlayActive;
+
+    /// <summary>
+    /// 事件叠加层开始显示：收起任务选择面板，但**保留**本次抽到的那一批，
+    /// 并接管区域按钮。
+    /// </summary>
+    public void EnterEventOverlay()
+    {
+        CloseMissionPanel();
+        _eventOverlayActive = true;
+    }
+
+    /// <summary>
+    /// 事件结束：交还区域按钮，并丢弃本次抽到的一批——烈度已被事件消耗，
+    /// 下次进这个区域必须重新抽。
+    /// </summary>
+    public void ExitEventOverlay()
+    {
+        _eventOverlayActive = false;
+        DismissChooseMission();
+    }
+
+    // ============================ 暂停菜单 ============================
+
+    /// <summary>
+    /// 打开暂停菜单（ESC 或左上角的设置按钮）。与战斗那边**共用同一个菜单场景**，
+    /// 差别只在传进去的两个动作：这里是「放弃 / 保存并退出」。
+    ///
+    /// 打开期间锁住区域按钮（`_eventOverlayActive` 复用同一套判定，
+    /// 它本来就在 `OnAreaPressed` 开头挡着），关掉时解锁。
+    /// </summary>
+    private void OpenPauseMenu()
+    {
+        if (PauseMenu.IsOpen) return;
+
+        bool overlayBefore = _eventOverlayActive;
+        _eventOverlayActive = true;
+
+        PauseMenu.Show(this,
+            action1: new PauseAction
+            {
+                Text = "放弃",
+                ConfirmText = "放弃会**删掉这个存档**并回到主界面，本局进度不再保留。确定吗？",
+                OnPressed = AbandonAsync,
+            },
+            action2: new PauseAction
+            {
+                Text = "保存并退出",
+                OnPressed = SaveAndQuitAsync,
+            },
+            onClosed: () => _eventOverlayActive = overlayBefore);
+    }
+
+    /// <summary>
+    /// **放弃**：删档 + 重置整局进度 + 回主界面。
+    /// 重置进度不是可选项——不重置的话「继续」会因为没有存档而不可用，
+    /// 但内存里的卡组/区域还留着上一局的，从开始按钮进来就是脏状态。
+    /// </summary>
+    private async Task AbandonAsync()
+    {
+        SaveManager.Delete();
+        BattleStateManager.ResetCampaignProgress();
+        await SceneLoader.ChangeSceneAsync(this, "res://bin/start_menu.tscn");
+    }
+
+    /// <summary>**保存并退出**：把世界地图的状态写盘，然后回主菜单。</summary>
+    private async Task SaveAndQuitAsync()
+    {
+        SaveManager.Save();
+        await SceneLoader.ChangeSceneAsync(this, "res://bin/start_menu.tscn");
+    }
+
+    /// <summary>只关闭面板、保留本次抽到的任务——供「返回」按钮使用。</summary>
+    private void CloseMissionPanel()
+    {
+        if (_chooseMissionPanel != null)
+        {
+            _chooseMissionPanel.BackRequested -= CloseMissionPanel;
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
             _chooseMissionPanel.QueueFree();
             _chooseMissionPanel = null;
         }
         RefreshAreaStates();
+<<<<<<< HEAD
+=======
+        RefreshHp();
+    }
+
+    /// <summary>
+    /// 事件完成后关闭三选一面板并刷新区域状态。
+    /// 与 CloseMissionPanel 的差别：**丢弃本次抽到的任务**——事件已经消耗掉烈度，
+    /// 下次进这个区域必须重新抽，否则玩家能反复看到同一批里已被用掉的那一项。
+    /// </summary>
+    public void DismissChooseMission()
+    {
+        _drawnIds = null;
+        _drawnArea = null;
+        CloseMissionPanel();
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         RefreshMaterialPoint();
     }
 
@@ -601,7 +790,11 @@ public partial class WorldMap : Control
         _consoleOutput.Position = new Vector2(50, 50);
         _consoleOutput.Size = new Vector2(600, 0);
         _consoleOutput.ZIndex = 1001;
+<<<<<<< HEAD
         _consoleOutput.AddThemeColorOverride("font_color", Colors.LimeGreen);
+=======
+        _consoleOutput.AddThemeColorOverride("font_color", ConsoleStyle.TextColor);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         _consoleOutput.AddThemeFontSizeOverride("font_size", 13);
         _consoleOutput.Text = "";
         AddChild(_consoleOutput);
@@ -612,18 +805,30 @@ public partial class WorldMap : Control
         _consolePanel.Position = new Vector2(50, 10);
         _consolePanel.Size = new Vector2(600, 36);
         _consolePanel.ZIndex = 1000;
+<<<<<<< HEAD
         var style = new StyleBoxFlat();
         style.BgColor = new Color(0, 0, 0, 0.85f);
         _consolePanel.AddThemeStyleboxOverride("panel", style);
+=======
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         AddChild(_consolePanel);
 
         _consoleInput = new LineEdit();
         _consoleInput.SetAnchorsPreset(LayoutPreset.FullRect);
+<<<<<<< HEAD
         _consoleInput.AddThemeColorOverride("font_color", Colors.LimeGreen);
+=======
+        _consoleInput.AddThemeColorOverride("font_color", ConsoleStyle.TextColor);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         _consoleInput.AddThemeFontSizeOverride("font_size", 14);
         _consoleInput.PlaceholderText = "输入指令，回车执行。输入 help 查看可用指令...";
         _consoleInput.TextSubmitted += OnConsoleSubmit;
         _consolePanel.AddChild(_consoleInput);
+<<<<<<< HEAD
+=======
+
+        ConsoleStyle.Apply(_consolePanel, _consoleInput);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     }
 
 

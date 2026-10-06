@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 [gd_scene load_steps=8 format=3 uid="uid://d35dy87rvq1mc"]
+=======
+[gd_scene load_steps=9 format=3 uid="uid://d35dy87rvq1mc"]
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
 [ext_resource type="Script" uid="uid://dbkfpoeflekpg" path="res://bin/WorldMap.cs" id="1_kanex"]
 [ext_resource type="Texture2D" uid="uid://1wq05532vpn4" path="res://assest/worldMap.png" id="1_wpv1p"]
@@ -6,11 +10,19 @@
 [ext_resource type="Texture2D" uid="uid://tijuuut6gmwa" path="res://assest/chooseThisAreaPresssed.png" id="3_kanex"]
 [ext_resource type="Texture2D" uid="uid://cl2c37lfu3l2y" path="res://assest/chooseThisAreaHover.png" id="4_ord10"]
 [ext_resource type="Texture2D" uid="uid://357opc6t10uq" path="res://assest/资源点.png" id="6_kanex"]
+<<<<<<< HEAD
+=======
+[ext_resource type="Texture2D" uid="uid://cfi7vkyb2pxu5" path="res://assest/hearts.png" id="7_hearts"]
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
 [sub_resource type="LabelSettings" id="LabelSettings_cs12g"]
 font_size = 43
 
+<<<<<<< HEAD
 [node name="Control" type="Control"]
+=======
+[node name="Control2" type="Control"]
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -101,17 +113,36 @@ texture_pressed = ExtResource("3_kanex")
 texture_hover = ExtResource("4_ord10")
 stretch_mode = 0
 
+<<<<<<< HEAD
 [node name="pointNum" type="Label" parent="."]
 layout_mode = 0
 offset_left = 86.0
 offset_top = 25.0
 offset_right = 212.0
 offset_bottom = 86.0
+=======
+[node name="SettingsButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 100.0
+offset_bottom = 46.0
+theme_override_font_sizes/font_size = 24
+text = "设置"
+
+[node name="pointNum" type="Label" parent="."]
+layout_mode = 0
+offset_left = 86.0
+offset_top = 75.0
+offset_right = 212.0
+offset_bottom = 136.0
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 text = "1"
 label_settings = SubResource("LabelSettings_cs12g")
 
 [node name="store" type="Button" parent="."]
 layout_mode = 0
+<<<<<<< HEAD
 offset_left = 1401.0
 offset_top = 91.0
 offset_right = 1553.0
@@ -126,12 +157,47 @@ offset_top = 182.0
 offset_right = 1550.0
 offset_bottom = 240.0
 theme_override_font_sizes/font_size = 30
+=======
+offset_left = 1447.0
+offset_right = 1599.0
+offset_bottom = 68.0
+theme_override_font_sizes/font_size = 40
+text = "军需处"
+
+[node name="deck" type="Button" parent="."]
+layout_mode = 0
+offset_left = 1296.0
+offset_right = 1447.0
+offset_bottom = 68.0
+theme_override_font_sizes/font_size = 40
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 text = "卡组"
 
 [node name="pointPic" type="Sprite2D" parent="."]
 modulate = Color(1.6845763e-06, 0.706827, 9.62615e-07, 1)
+<<<<<<< HEAD
 position = Vector2(49, 55)
 texture = ExtResource("6_kanex")
 
+=======
+position = Vector2(49, 105)
+texture = ExtResource("6_kanex")
+
+[node name="heartPic" type="Sprite2D" parent="."]
+modulate = Color(0.7335228, 0.21810421, 0.21165666, 1)
+position = Vector2(47, 195)
+scale = Vector2(0.578125, 0.578125)
+texture = ExtResource("7_hearts")
+
+[node name="hpNum" type="Label" parent="."]
+layout_mode = 0
+offset_left = 84.0
+offset_top = 165.0
+offset_right = 210.0
+offset_bottom = 226.0
+text = "5"
+label_settings = SubResource("LabelSettings_cs12g")
+
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 [connection signal="pressed" from="store" to="." method="_on_store_pressed"]
 [connection signal="pressed" from="deck" to="." method="_on_deck_pressed"]

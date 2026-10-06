@@ -1,0 +1,15 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core_logic/AirStrikeEffect.cs" id="1"]
+
+[node name="StrafeEffect" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+mouse_filter = 2
+script = ExtResource("1")
+; 起飞的同时打出去的是**子弹**而不是航弹（"bullet" 是 EffectRegistry 里的键）
+StrikeEffectName = "bullet"
+SwaySecondsPerCycle = 0.5
+
+[node name="Sfx" type="AudioStreamPlayer" parent="."]
+bus = &"SFX"

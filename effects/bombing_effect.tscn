@@ -1,0 +1,21 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core_logic/BulletEffect.cs" id="1"]
+
+[node name="BombingEffect" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+; 弹体场景（航弹）
+ProjectileScenePath = "res://bin/bomb.tscn"
+; 打出几发。0 表示用调用方传进来的数量，也就是攻击力
+ProjectileCount = 0
+; 每发航弹飞完全程要几秒。航弹要慢才有投弹的感觉
+ProjectileFlightSeconds = 1.5
+; 相邻两发之间最多错开多少毫秒（实际取 0~本值之间的随机数）
+StaggerMaxMs = 100

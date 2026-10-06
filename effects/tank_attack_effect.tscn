@@ -1,0 +1,25 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core_logic/BulletEffect.cs" id="1"]
+
+[node name="TankAttackEffect" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+; 弹体场景（坦克炮弹）
+ProjectileScenePath = "res://bin/tank_shell.tscn"
+; 打出几发。坦克炮一次只开一炮，所以固定 1 发（不随攻击力变）
+ProjectileCount = 1
+; 每发炮弹飞完全程要几秒。**比子弹（0.3）还快**——坦克炮是直射，出手就到
+ProjectileFlightSeconds = 0.25
+; 只有一发，没有错开可言
+StaggerMaxMs = 0
+; 炮口烟：发射瞬间在攻击者身上冒一小股（特效名，留空 = 不冒）
+MuzzleEffect = "smoke_small"
+; 落点烟：炮弹飞抵目标之后再冒一小股
+ImpactEffect = "smoke_small"

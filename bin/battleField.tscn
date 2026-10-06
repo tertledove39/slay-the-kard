@@ -1,8 +1,16 @@
+<<<<<<< HEAD
 [gd_scene load_steps=15 format=3 uid="uid://evqf3f0uq3ao"]
 
 [ext_resource type="Script" uid="uid://bddqh2hovnp6b" path="res://bin/battlefield_.cs" id="1_8yftg"]
 [ext_resource type="Texture2D" uid="uid://chj5lq5e5hl7b" path="res://assest/table.jpeg" id="2_h5p18"]
 [ext_resource type="AudioStream" uid="uid://ce8je581yp3bm" path="res://assest/机枪.wav" id="3_ght0g"]
+=======
+[gd_scene load_steps=17 format=3 uid="uid://evqf3f0uq3ao"]
+
+[ext_resource type="Script" uid="uid://bddqh2hovnp6b" path="res://bin/battlefield_.cs" id="1_8yftg"]
+[ext_resource type="Texture2D" uid="uid://chj5lq5e5hl7b" path="res://assest/table.jpeg" id="2_h5p18"]
+[ext_resource type="AudioStream" uid="uid://c7a8rkcupyjik" path="res://assest/机枪_低.wav" id="3_ght0g"]
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 [ext_resource type="FontFile" uid="uid://cbd2hbmqcbhup" path="res://bin/FRADMCN.TTF" id="4_bmei2"]
 [ext_resource type="AudioStream" uid="uid://544883brg1l1" path="res://assest/爆炸20.wav" id="4_h5p18"]
 [ext_resource type="Texture2D" uid="uid://cdw8ii0fagl2k" path="res://assest/nextTurn.png" id="5_yx2c1"]
@@ -12,16 +20,37 @@
 [ext_resource type="Script" uid="uid://ceefw2hlywr3l" path="res://bin/Cardbase.cs" id="9_uwbmh"]
 [ext_resource type="Script" uid="uid://fcjignj7pq5c" path="res://End.cs" id="11_h5p18"]
 [ext_resource type="PackedScene" path="res://bin/settlement_panel.tscn" id="12_settle"]
+<<<<<<< HEAD
+=======
+
+[sub_resource type="Environment" id="Environment_3l6eg"]
+background_mode = 3
+glow_enabled = true
+glow_strength = 1.16
+glow_bloom = 0.13
+glow_hdr_threshold = 0.9
+adjustment_enabled = true
+
+[sub_resource type="CameraAttributesPractical" id="CameraAttributesPractical_6p26e"]
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
 [sub_resource type="LabelSettings" id="LabelSettings_ai4ba"]
 font = ExtResource("4_bmei2")
 font_size = 145
+<<<<<<< HEAD
 font_color = Color(1, 0.7254902, 0, 1)
+=======
+font_color = Color(1.4147556, 1.0323269, 0, 1)
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
 [sub_resource type="LabelSettings" id="LabelSettings_ac2xb"]
 font = ExtResource("4_bmei2")
 font_size = 130
+<<<<<<< HEAD
 font_color = Color(1, 0.7254902, 0, 1)
+=======
+font_color = Color(1.3729618, 1.0126046, 0, 1)
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 outline_size = 12
 outline_color = Color(1, 0.7254902, 0, 1)
 
@@ -37,6 +66,13 @@ offset_bottom = 12.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_8yftg")
+<<<<<<< HEAD
+=======
+
+[node name="environmentLight" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_3l6eg")
+camera_attributes = SubResource("CameraAttributesPractical_6p26e")
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
 [node name="backGround" type="Sprite2D" parent="."]
 z_index = -8
@@ -94,6 +130,19 @@ texture_normal = ExtResource("5_yx2c1")
 texture_pressed = ExtResource("6_pdf0m")
 texture_disabled = ExtResource("7_lxbgj")
 
+<<<<<<< HEAD
+=======
+[node name="SettingsButton" type="Button" parent="."]
+z_index = 1000
+layout_mode = 0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 100.0
+offset_bottom = 46.0
+theme_override_font_sizes/font_size = 24
+text = "设置"
+
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 [node name="Place1" parent="." instance=ExtResource("8_r58wv")]
 position = Vector2(270, 20)
 

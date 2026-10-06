@@ -1,0 +1,127 @@
+# 项目目录说明
+
+## 顶层目录
+
+| 目录/文件 | 说明 |
+|-----------|------|
+| bin/ | **核心源码目录** — 所有 .cs 文件和 .tscn 场景文件 |
+| cards/ | 卡牌图片素材 + card.ini（卡牌配置）+ enemyTurn.ini（敌方行动配置） |
+| data_*/ | Godot构建输出数据（.NET运行时DLL等），已配置进.gitignore |
+| docs/ | 项目文档目录 |
+| tests/ | 测试脚本（Python） |
+| core_logic/ | 独立核心逻辑服务，包括全局对白接口 |
+| configs/ | 结构化配置目录，包括背景音乐槽位配置 |
+| core_ui/ | 独立UI场景和脚本，包括Galgame对白气泡 |
+| dialogues/ | Dialogue Manager `.dialogue`对白内容与示例 |
+| assest/ | 其它美术素材（国旗、图标、字体等） |
+| memory/ | （空目录，预留） |
+| .godot/ | Godot编辑器自动生成目录 |
+| project.godot | Godot项目配置文件 |
+| StoreHpShop.cs | 商店「买血」入口（`Store` 的 partial 部分；拆出来是因为 Store.cs 加上这块会破 300 行的红线） |
+| bin/ConsoleStyle.cs | 调试控制台的外观（战斗与世界地图共用）：浅黑色、非圆角、无边框。原先两个文件各写了一遍同样的样式，现收敛到这一处 |
+| bin/UiClickSound.cs | **按键音**的统一入口（`[sfx] button`）。`AttachAll(root)` 递归给界面里所有按钮挂上，`Attach(button)` 给单个按钮挂。世界地图界面（9 个按钮）+ 战斗界面的「下一回合」用它；播放委托给 `MusicManager.PlaySfx` |
+| bin/SaveManager.cs | **存档 / 读档**（单存档位，`user://save.cfg`）。存的是 `BattleStateManager` 的本局进度 + 一个战斗 id（`SelectedEnemy`，如 berlin）——读档靠 `IsCampaignMode` 判断回战斗还是回世界地图。**战斗内的棋盘不还原**，读档是重打这一场 |
+| bin/UiConfirm.cs | **二次确认弹窗**的唯一实现（`ConfirmationDialog` 没有 await 形式，用 `TaskCompletionSource` 把「确定/取消/关闭」三个信号收成一个 Task）。暂停菜单的「认输/放弃」与主菜单的覆盖确认都用它 |
+| bin/SettingRow.cs | **设置行的唯一实现**（名称 + 滑条 + 数值）。设置界面与暂停菜单共用；改完走 `SettingsManager.SetFloat`，立即生效并落盘 |
+| bin/PauseMenu.cs / bin/pause_menu.tscn | **暂停菜单**：音量区 + 两个**由调用方传入**的动作。战斗传「认输/保存并退出」、世界地图传「放弃/保存并退出」——一个菜单服务两个界面 |
+| bin/EventEffectRunner.cs | 事件选项效果的解析与执行（从 EventScene 拆出） |
+| bin/EventCardPreview.cs | 事件选项的「会加入哪些卡」悬浮预览（只画卡，无底板无边框无文字）；场景在 bin/event_card_preview.tscn |
+| bin/event_card_preview.tscn | 上述预览面板的场景 |
+| core_logic/Effect.cs | 特效基类 `Effect` 与注册表 `EffectRegistry`（名字 -> 场景路径）。`Play` 的入参除坐标外还有 `source`（触发它的单位）与 `count`（生成几个） |
+| core_logic/FlyingEffect.cs | **飞掠特效**：让触发它的那张卡升起（位置 + 轻微放大）-> 原地悬停 -> 落回，期间抬高层级压住其他卡（`TopZIndex`，**必须低于手牌的 20**）。**全程不转角度**（`SwayDegrees` 默认 0 = 静止悬停）。参数全部 Export 在 `effects/flying_effect.tscn`。两个钩子：`DuringRiseAsync`（与起飞并行的事）与 `StayAsync`（悬停阶段） |
+| core_logic/AirStrikeEffect.cs | **「飞起来打一下」特效** `AirStrikeEffect : FlyingEffect`，只覆写 `DuringRiseAsync` = **起飞的同时把子特效打出去**。一个脚本、两个场景，靠 `StrikeEffectName` 区分：`bombing` = 投弹（`airstrike`）、`bullet` = 打枪（`strafe`）。升起/悬停/降落/还原/音效全部沿用父类 |
+| core_logic/ConvertEffect.cs | **转换特效** `ConvertEffect : FlyingEffect`，只覆写 `StayAsync`（悬停段）做两次翻面：①翻到侧对屏幕时**盖上卡背** → 停一拍 → ②再翻到侧对屏幕时**换成新单位**并收卡背。新单位的 id 走**特效名的参数**（`convert(panzer4)`）。**不用 shader**：把 `Scale.X` 走 1→0→1 就是绕竖轴翻转 |
+| effects/convert_effect.tscn | 上述转换特效的场景（抬起高度/各段时长都是 Export） |
+| core_logic/SoundEffect.cs | **只放一段音效**的特效（卡牌语音）。槽位从**特效名的参数**来：`playEffect = sfx(严冬)` → `Configure("严冬")` → `MusicManager.PickSfx`。`Play` 会**等音效放完**才返回，否则调用方回收节点时会把声音一起掐掉 |
+| core_logic/SfxPlayer.cs | **「放一次就完」的音效声部池**（4 个声部轮换，走 `SFX` 总线）。声部挂在传入的宿主节点下——`MusicManager` 是 autoload，所以「按下按钮→立刻切场景」时声音不会被掐断。从 `MusicManager` 拆出来是为了守住 300 行红线（规范 B）：两者唯一的交集只是「音效从哪来」，由构造函数传入的 `Func<string, AudioStream>` 提供 |
+| effects/sound_effect.tscn | 上述音效特效的场景。**全项目共用这一个**——语音不必一音效一场景 |
+| bin/bomb.tscn | 航弹弹体（复用 `bin/Bullet.cs`，贴图 `assest/航弹.png`），供 `bombing` 特效用 |
+| bin/tank_shell.tscn | 坦克炮弹弹体（复用 `bin/Bullet.cs`，贴图 `assest/tank_projetile.png`，原图只有 3×9 所以 `Sprite2D.scale` 给得比航弹大得多），供 `TankAttack` 特效用 |
+| effects/bombing_effect.tscn | `bombing` 特效：复用 `BulletEffect` 脚本，`ProjectileScenePath=bin/bomb.tscn`、`ProjectileCount=0`（0 = 用攻击力）、`ProjectileFlightSeconds=1.5` |
+| effects/tank_attack_effect.tscn | `TankAttack` 特效：复用 `BulletEffect` 脚本，`ProjectileScenePath=bin/tank_shell.tscn`、`ProjectileCount=1`、`ProjectileFlightSeconds=0.25`（比子弹还快）。**只有它带命中音与两端烟雾**：命中音槽位由特效名的参数给出，`MuzzleEffect`/`ImpactEffect` 填 `smoke_small` |
+| effects/smoke_small_effect.tscn | **小型烟雾**：与 `smoke_effect.tscn` 同脚本同贴图，只把 `SizeScale` 调小。用在坦克炮的炮口与落点 —— 不是第二套实现，是一个 Export 值 |
+| — | `bin/tank_shell.tscn` 的根节点写了与 `bin/bullet.tscn` **逐字相同**的 `modulate`：战场开着 glow，把它抬到远大于 1 就能让贴图进入 HDR 起 bloom（即「像子弹一样发光」） |
+| effects/flying_effect.tscn | 上述飞掠特效的场景（一个 Control + SFX 总线上的 AudioStreamPlayer） |
+| effects/air_strike_effect.tscn | `airstrike` 特效的场景（同上结构，脚本换 `AirStrikeEffect.cs`，`StrikeEffectName = "bombing"`） |
+| effects/strafe_effect.tscn | `strafe` 特效的场景：**与 `air_strike_effect.tscn` 只差 `StrikeEffectName = "bullet"`**（同一个脚本，不是第二套实现） |
+| road_to_berlin.sln / .csproj | .NET 解决方案和项目文件。文件名即程序集名，与 `project.godot` 的 `dotnet/project/assembly_name` 必须一致——改名时三件套要一起改，见 EXPORT.md「改名注意事项」 |
+
+## 核心源码文件 (bin/)
+
+| 文件 | 行数 | 说明 |
+|------|------|------|
+| `battlefield_.cs` | ~6826 | **主战场类** — 最核心文件。包含：战场输入控制（含拖拽被打断时的兜底收尾 `CancelCurrentDrag`）、卡牌管理、效果脚本解析执行、攻击/移动系统、敌方AI、回合流程（行动能力按阵营在各自回合开头刷新）。内含 `Player` 和 `CardMaganer` 内部类。 |
+| `cardBase_.cs` | ~2167 | **卡牌单位类** — 卡牌UI节点。管理卡牌属性（攻防费）、特性状态、动画（移动/弃牌/闪烁/悬停）、attribute图标面板。内含所有枚举定义和 `CardData`、`IconCache`、`EffectAttribute` 等辅助类型。 |
+| `Cardbase.cs` | ~288 | **箭头渲染器** — `Node2D` 子类，用于绘制从卡牌到鼠标/目标之间的贝塞尔曲线箭头。 |
+| `place_.cs` | ~33 | **位置类** — `Node2D` 子类，表示战场上的一个放置格子。管理格子上卡牌的绑定/解绑。 |
+| `Player` 类 | 嵌入 battlefield_.cs (line ~4904) | **玩家类** — 管理手牌、卡组、指挥点。包含手牌布局引擎（弧形/悬停/缩放动画）。 |
+| `CardMaganer` 类 | 嵌入 battlefield_.cs (line ~5551) | **卡牌数据管理器** — 卡牌数据库，按ID存取 `CardData`，加载总部卡。 |
+| `Bullet.cs` | ~44 | **子弹/飞弹动画** — 战斗中卡牌之间飞行的飞弹视觉效果。 |
+| `iniHandler.cs` | ~806 | **INI解析器** — 通用的 INI 文件读写库，支持 `IniFile`/`IniSection`/`IniValue`，支持有序节。 |
+| `ResourceManager.cs` | ~333 | **资源管理器** — 单例节点。缓存 Texture/Scene/Font，维护空卡池（对象池）。 |
+| `SceneLoader.cs` | ~151 | **场景加载器** — 静态类。异步场景切换，支持后台预加载 `PackedScene`，带 Loading 覆盖层。 |
+| `BattleStateManager` 类 | CardRestoration.cs (~167) | **跨场景状态管理** — 静态类。持久化卡组ID、选中的敌人、已完成的区域、卡牌数据缓存。 |
+| `MeterLabel.cs` | ~210 | **电表数字组件** — 机械式数字滚动显示（指挥点计数用）。 |
+| `WorldMap.cs` | ~645 | **世界地图场景** — 战役主界面。7个区域按钮，随递次解锁。点击弹出 ChooseMission。含调试控制台。 |
+| `StartMenu.cs` | ~50 | **开始菜单** — 初始化设置，处理继续、开始、设置和鸣谢入口，以及按钮悬浮缩放。 |
+| `SettingsMenu.cs` | ~50 | **设置界面** — 根据 `SettingsManager` 中的配置项动态生成设置控件。 |
+| `SettingsManager.cs` | ~65 | **设置静态管理器** — 读取 `setting.ini`，提供设置项枚举和布尔值读写。 |
+| `ChooseMission.cs` | ~113 | **任务选择界面** — 在 WorldMap 上叠加，显示3个任务（战斗/事件）。 |
+| `EventScene.cs` | ~290 | **事件界面** — 剧情事件叠加层。显示配图+描述+选项，支持资源点与卡牌替换效果。 |
+| `EventMaterialPoints.cs` | ~35 | **事件资源点效果** — 解析 `materialPoints(n)` 并提供防溢出的资源点加法。 |
+| `PostBattleReward.cs` | ~462 | **战后奖励界面** — 战斗胜利后的奖励系统。3组卡牌选择→卡组替换（稀有度限制）。 |
+| `ChooseSomeCard.cs` | ~210 | **统一卡组选卡界面** — 事件、商店、战后奖励共用；最高层CanvasLayer叠加，浅黑遮罩拦截下层输入。 |
+| `DisplayCard.cs` | ~128 | **卡组查看器** — 显示玩家卡组，支持滚轮翻页。 |
+| `BattleScore.cs` | ~40 | **战斗评分规则** — 物资点系数的唯一来源。`CalculateMaterialPoints()` 与结算面板共用同一组函数，保证「明细相加 = 总额」。 |
+| `End.cs` | ~150 | **战斗结束浮层**（**位于项目根目录，不在 bin/**）— CanvasLayer，负责暗幕与国徽显示，并驱动 `bin/settlement_panel.tscn` 的结算/失败两个面板。 |
+| `CampaignVictory.cs` | ~45 | **战役通关浮层** — 最后一个区域烈度归零时播放副官总结对白，结束后返回开始菜单。 |
+| `Area1.cs` | ~9 | **区域按钮桩** — `TextureButton` 扩展，空实现。 |
+| `TextureButton1.cs` | ~21 | **选择按钮桩** — `TextureButton` 扩展，三个空信号处理函数。 |
+| `oldInput.cs` | ~319 | **废弃的输入处理代码** — 整文件被注释掉，是旧版输入逻辑的存档。 |
+
+## 配置/数据文件
+
+| 文件 | 说明 |
+|------|------|
+| `cards/card.ini` | 卡牌数据定义（苏联卡 + 德军卡共16张de_前缀卡） |
+| `cards/enemyTurn.ini` | 东线历史战役行动脚本，每个section一个关卡；由`bin/AreaPool.ini`分配到area1-7 |
+| `bin/AreaPool.ini` | 区域任务池配置 |
+| `bin/deck.ini` | 玩家初始卡组配置 |
+| `bin/event.ini` | 剧情事件配置，每个section一个事件；由`bin/AreaPool.ini`分配到各区域 |
+| `bin/setting.ini` | 开始菜单设置项配置；每个 section 定义一个动态设置控件 |
+| `configs/music.ini` | `[music]` 段为BGM槽位、`[sfx]` 段为音效槽位；两段同格式（逗号分隔、随机抽一条），见 docs/MUSIC.md |
+
+## 测试文件
+
+| 文件 | 说明 |
+|------|------|
+| `tests/verify_enemy_cards.py` | 德军卡牌配置验证（7项测试：卡数量、稀有度、唯一性、无苏联卡引用等） |
+| `tests/verify_unit_dead_trigger.py` | 单位死亡时点触发验证（6项测试） |
+| `tests/verify_spliteffect_fix.py` | SplitEffectByComma 修复验证（7项测试：括号/引号内逗号不分割） |
+| `tests/verify_choose_some_card_overlay.py` | 统一选卡入口、最高层CanvasLayer、浅黑遮罩顺序与精确选卡数量验证 |
+| `tests/verify_command_point_meter.py` | 指挥点效果互斥解析、当前点数上限及下回合扣点路径验证 |
+| `tests/verify_store_card_feedback.py` | 商店待购卡复用手牌悬浮边框、上移反馈及售罄卡排除验证 |
+| `tests/verify_world_map_return_performance.py` | 返回地图时的配置缓存短路和无固定等待验证 |
+| `tests/verify_start_menu_settings.py` | 启动菜单入口、按钮、设置配置和动态设置界面验证 |
+| `tests/verify_campaign_content.py` | 战役内容一致性验证：区域池引用可解析、卡牌ID存在、`name`与意图元数据齐全、键名格式合法、孤立关卡提示 |
+| `tests/verify_game_dialogue.py` | 全局对白接口、开始菜单限制、立绘回退和示例资源验证 |
+| `tests/verify_performance_batches_ab.py` | 战斗异步串行、箭头绘制、Tween和UI热路径性能回归验证 |
+| `tests/verify_ambush.py` | 伏击先制伤害结算顺序和冲击交互验证 |
+| `tests/verify_button_animations.py` | 世界地图、任务选择、商店、事件、奖励与卡组查看按钮动态效果验证 |
+| `tests/verify_music_manager.py` | 全局音乐管理器autoload、配置与场景接入验证 |
+| `tests/verify_event_material_points.py` | 事件资源点效果配置、状态更新、日志和溢出边界验证 |
+| `tests/verify_world_map_areas.py` | 世界地图区域按钮、区域池段、AreaOrder 与 UnlockedArea 一致性及地理落点验证 |
+| `tests/verify_area_intensity.py` | 区域战斗烈度验证：areaTimes 解析与回退、烈度初始化与消耗、归零解锁、通关流程与对白资源 |
+| `tests/verify_campaign_reset.py` | 整局进度重置验证：卡组清空、区域与烈度复位、商店与统计清零、两个结束入口接入 |
+| `tests/verify_friendly_death_count.py` | 阵亡统计验证：计数只出现在 `ProcessDeadUnitAsync`，`RemoveCard` 不再计数 |
+| `tests/verify_hp_and_event_ui.py` | 事件选项资源点门槛与加卡预览、血量系统、UI 一律在场景里、任务面板返回按钮、商店买血 |
+| `tests/verify_guardian_trait.py` | 驻守（Garrison）特性：禁止主动移动与攻击、不影响反击、图标与描述同步点 |
+| `tests/verify_console_style.py` | 调试控制台外观：浅黑非圆角无边框、输入框三态覆盖、样式单一来源 |
+| `tests/verify_combat_action_timing.py` | 拖拽被打断后的兜底收尾、行动能力按阵营刷新、被撤退单位禁战、弃置动画错开 |
+| `tests/verify_enemy_scripts_and_spawn.py` | `DiscardPlayerRandomly` 语义、刷兵指令吃表达式、`battleStart=` 开局效果 |
+| `tests/verify_guardian_bypass_and_overlay.py` | 火炮/轰炸机无视守护、事件期间可开商店与卡组、标准弹药改打手牌+牌堆 |
+| `tests/verify_card_state_lifecycle.py` | 复用卡牌的生命周期状态归零（shouldBeRemoved / isDiscarding / LabelSettings 独占） |
+| `tests/verify_trigger_death_check.py` | 时点触发里的效果打死人后必须有死亡检查（女狙击手 + 机动防御那条） |
+| `tests/verify_explosion_sfx.py` | 阵亡爆炸音效随机池（爆炸3~21 且排除下划线开头）、`[sfx]` 槽位复用、场景引用的音频文件必须存在 |
+| `tests/verify_card_voice.py` | 卡牌语音整条链：`playEffect = sfx(槽位)` 的参数解析、`SoundEffect` 的「等放完再返回」、`[sfx]` 段的新槽位与配对音频、8 张卡的接线，以及**交叉核对「卡里写的槽位在 `[sfx]` 段里确实存在、音频确实被 Godot 导入过」** |
+| `tests/verify_attack_effects.py` | `attackEffect` 多效果、`Effect.Play` 的 source/count 上下文、flying 飞掠、bombing 航弹、airstrike 空袭（继承 + 盘旋投弹）、Export 中文说明的落点、弹体池按路径分池 |

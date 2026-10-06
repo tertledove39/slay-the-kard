@@ -145,6 +145,21 @@ public partial class cardBase_ : Control
         return (traits & ActionForbiddingTraits) != 0;
     }
 
+<<<<<<< HEAD
+=======
+    /// <summary>
+    /// 本兵种是否无视「守护」——被守护的目标对它而言没有保护，可以照常攻击。
+    ///
+    /// 火炮与轰炸机属于越顶火力，前排的守护单位拦不住它们。
+    /// 判定只认攻击方兵种，与阵营无关，所以玩家侧 `Attack()` 与敌方 AI 选目标
+    /// 走的是同一条规则，不会出现「玩家能打、AI 不能打」的不一致。
+    /// </summary>
+    public static bool IgnoresGuardian(CardTypes type)
+    {
+        return type == CardTypes.Artillery || type == CardTypes.Bomber;
+    }
+
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     public void RefreshUnit()
     {
         moveAble = 1;
@@ -168,6 +183,19 @@ public partial class cardBase_ : Control
             attackAble = 0;
         }
 
+<<<<<<< HEAD
+=======
+        // 已宣布弃置、正等着死亡检查移除的单位，不能因为回合刷新又「复活」。
+        // RetreatUnit 是先 DisableCombatAbility + 挂待弃置标记，而敌方回合开头的
+        // RefreshCardsInField(enemy) 跑在死亡检查之前——不挡这一下，被撤退的敌方单位
+        // 会被刷回 attackAble = 1，AI 照样把它派出去打你一下。
+        if (shouldBeRemoved == 1)
+        {
+            moveAble = 0;
+            attackAble = 0;
+        }
+
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         UpdateMoveableLight();
     }
     
@@ -548,6 +576,15 @@ public partial class cardBase_ : Control
 
     public int shouldBeRemoved = 0;
     public bool isDiscarding = false; // 正在播放弃牌动画，不参与ZIndex重置
+<<<<<<< HEAD
+=======
+
+    // 正在播「卡牌自身特效」（目前是 flying：升起→摆动→落回）期间置位。
+    // 这段时间卡的 Position / Scale / ZIndex 都归特效管，刷新显示顺序必须跳过它，
+    // 否则那套「场上卡一律 ZIndex = 10」会在下一帧就把抬起来的层级打回去，
+    // 漂浮就压不住别的卡了。
+    public bool isUnderCardEffect = false;
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     List<Change> ChangeList = new List<Change>();
     public async Task ExecChangeList()
     {
@@ -750,6 +787,15 @@ public partial class cardBase_ : Control
     private async Task AnimateCostRoll(int fromValue, int toValue)
     {
         if (fromValue == toValue) return;
+<<<<<<< HEAD
+=======
+
+        // 牌堆里的卡是「已实例化但不在场景树上」的对象（Player.deck），
+        // 对它们改费用是合法的，但纯视觉的滚动动画做不了——`GetTree()` 会返回 null。
+        // 不挡这一下，改牌堆费用的效果每张卡都会抛一次空引用。
+        if (!IsInsideTree()) return;
+
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         var costLabel = GetNode<Label>("cost");
         if (costLabel == null) return;
 
@@ -943,6 +989,66 @@ public partial class cardBase_ : Control
     }
 
 
+<<<<<<< HEAD
+=======
+    /// <summary>转换动画露出的卡背，按阵营分：我方苏联、敌方德国。</summary>
+    public const string SovietCardBackPath = "res://assest/苏联卡背.png";
+    public const string GermanCardBackPath = "res://assest/德国卡背.png";
+
+    /// <summary>
+    /// 转换动画期间**露出卡背**：把盖住整张卡的那层（`cardbase.tscn` 的 `convertBack`）显示/隐藏。
+    ///
+    /// 盖住整张卡、而不是去逐个隐藏卡面节点：卡面上有 icon / name / attack / defence /
+    /// cost / description / country / unitType 八九个节点，一个个藏既啰嗦又容易漏
+    /// （漏一个就会从卡背里透出来）。一层盖子从上面压住，一个开关搞定。
+    ///
+    /// 卡背按**这张卡属于哪一方**选（我方苏联、敌方德国）：翻面时它就是「一张牌」，
+    /// 露的是它自己那一方的背面。每次显示都重新选一次——卡是从对象池里复用的，
+    /// 上一轮可能属于另一方。
+    /// </summary>
+    public void SetConvertBackVisible(bool visible)
+    {
+        var back = GetNodeOrNull<TextureRect>("convertBack");
+        if (back == null) return;
+
+        if (visible)
+        {
+            string path = GetIsFriend() == IsFriend.friend ? SovietCardBackPath : GermanCardBackPath;
+            Texture2D texture = ResourceManager.Instance?.GetTexture(path) ?? GD.Load<Texture2D>(path);
+            if (texture == null)
+                GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} cardBase_.cs: 卡背加载失败 {path}");
+            else if (back.Texture != texture)
+                back.Texture = texture;
+
+            // 挪到**最后一个子节点**：同 ZIndex 下按子节点顺序画，而后加的排后面。
+            // `_attrPanel`（效果浮标）是运行时 AddChild 的，天生排在场景里的 convertBack 之后，
+            // 不挪就会被它压在卡背上。
+            //
+            // 为什么不干脆给 convertBack 一个大 ZIndex：Godot 的 z_index 是**相对父节点**的，
+            // 给子节点加 40 就等于把卡背抬到「卡自己的层级 + 40」——那会跑到手牌（20）上面去，
+            // 正是 NOTICE.md 层级表明令避免的。挪顺序同样盖得住浮标，层级却仍在卡自己那一层。
+            MoveChild(back, GetChildCount() - 1);
+        }
+
+        // 效果浮标（`_attrPanel`）与它的悬停提示不跟着翻面一起露出来：
+        // 浮标在卡右侧、还往右多探出一点点，光靠卡背盖不干净。
+        SetAttributePanelVisible(!visible);
+        back.Visible = visible;
+    }
+
+    /// <summary>
+    /// 显示/隐藏效果浮标（属性图标面板）与它的悬停提示。
+    /// 面板可能还没建（没有属性的卡不会建），所以两处都判空。
+    /// </summary>
+    private void SetAttributePanelVisible(bool visible)
+    {
+        if (_attrPanel != null && IsInstanceValid(_attrPanel)) _attrPanel.Visible = visible;
+        // 提示框本来就是碰上去才显示的，收起时不要去动它（一碰就会自己出来）
+        if (!visible && _attrTooltipPanel != null && IsInstanceValid(_attrTooltipPanel))
+            _attrTooltipPanel.Visible = false;
+    }
+
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 /// <summary>
 /// 设置卡牌信息
 /// </summary>
@@ -973,6 +1079,33 @@ public partial class cardBase_ : Control
         hasMobilize = HasTrait(UnitTraits.Mobilize);
         hasAmbushActive = HasTrait(UnitTraits.Ambush);
 
+<<<<<<< HEAD
+=======
+        // ===== 生命周期状态必须归零 =====
+        // SetCardInformation 是每张卡唯一的初始化入口——**对象池取回的卡
+        // （ResourceManager.AcquireEmptyCard*）与 GetCardTemplate().Duplicate() 出来的卡
+        // 都要走这里**。原先它只重置数值，这两项会被带着走：
+        //   · shouldBeRemoved 残留 1：手牌也在 cardInPlaces 里（AddCardToHand 会调
+        //     AddToBattleField），下一次死亡检查就会把它当成「待弃置」弃掉并移除。
+        //     表现就是「打着打着场上的卡莫名被弃」。
+        //   · isDiscarding 残留 true：RefreshAllCardDisplayOrder 会一直跳过它，
+        //     表现就是「弃牌之后卡不会回正」。
+        shouldBeRemoved = 0;
+        isDiscarding = false;
+        isUnderCardEffect = false;
+        ChangeList.Clear();
+
+        // ===== 属性文字的颜色必须由本实例独占 =====
+        // 三个属性 Label 的 LabelSettings 是从 cardbase.tscn 实例化的子资源，而
+        // GetCardTemplate().Duplicate()（卡组重建、战后奖励都走它）会让多张卡共用同一份。
+        // FlashAttributeWithColor 是**直接改 LabelSettings.FontColor** 的，于是改一张就连累
+        // 全部——「打出标准弹药后，卡牌奖励里的 cost 全变绿、数值却没变」正是这么来的。
+        // 这里给三个 Label 各复制一份，从根上杜绝串色。
+        OwnAttributeLabelSettings("attack");
+        OwnAttributeLabelSettings("defence");
+        OwnAttributeLabelSettings("cost");
+
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         // 初始化历史追踪值
         initialAttack = attack;
         initialDefence = defence;
@@ -992,6 +1125,26 @@ public partial class cardBase_ : Control
 /// 将内存中的状态和现实出来的刷新一下，一般用于卡牌信息改变的时候
 /// </summary>
     /// <summary>
+<<<<<<< HEAD
+=======
+    /// 让某个属性 Label 持有自己独占的 LabelSettings 副本。
+    ///
+    /// 见 `SetCardInformation` 里的说明：卡牌的 LabelSettings 可能被多张卡共用
+    /// （`GetCardTemplate().Duplicate()` 出来的卡组卡与奖励卡就是共用的），
+    /// 而 `FlashAttributeWithColor` 直接改 `LabelSettings.FontColor`，
+    /// 不先变成独占副本就会「一张卡改色、全体跟色」。
+    /// </summary>
+    private void OwnAttributeLabelSettings(string labelName)
+    {
+        var label = GetNodeOrNull<Label>(labelName);
+        if (label?.LabelSettings == null)
+            return;
+
+        label.LabelSettings = label.LabelSettings.Duplicate() as LabelSettings;
+    }
+
+    /// <summary>
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     /// 根据traits位标记自动合成加黑描述前缀。不包含效果描述，仅trait名。
     /// </summary>
     private string BuildTraitPrefix()
@@ -1774,6 +1927,15 @@ public partial class cardBase_ : Control
       /// </summary>
     private async void FlashAttributeWithColor(string attributeName, int currentValue, int initialValue, int extremeValue, bool isInverted = false)
     {
+<<<<<<< HEAD
+=======
+        // 不在场景树上的卡（牌堆里的卡就是这种）不做任何视觉动作。
+        // 它们的数值照改不误，但改色是纯展示行为：既没人看得见，
+        // 而 LabelSettings 又可能是跨卡共享的，改了只会连累别的卡。
+        if (!IsInsideTree())
+            return;
+
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
           // 根据属性名获取对应的Label节点
         Label targetLabel = attributeName switch
         {

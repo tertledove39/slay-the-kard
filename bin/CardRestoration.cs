@@ -22,6 +22,66 @@ public static class BattleStateManager
     // 是否处于战役模式
     public static bool IsCampaignMode { get; set; } = false;
     public static int MaterialPoints { get; set; } = 0;
+<<<<<<< HEAD
+=======
+
+    // ============================ 血量 ============================
+
+    /// <summary>开局血量。血量是「整局还能失败几次」的计数器，属于本局进度，随 ResetCampaignProgress 重置。</summary>
+    public const int InitialHp = 5;
+
+    /// <summary>商店里 1 点血量的价格（资源点）。</summary>
+    public const int HpPrice = 200;
+
+    /// <summary>
+    /// 当前血量。**无上限**——事件与商店都能加，可以攒到 5 以上。
+    /// 战斗失败不再立刻结束本局：普通战 -1、boss 战 -2、area7（终局区域）直接清零；
+    /// 归零时才走「游戏结束」流程。
+    /// </summary>
+    public static int Hp { get; set; } = InitialHp;
+
+    /// <summary>
+    /// 增减血量。负数扣血时下限钳到 0（不会变成负数），无上限。
+    /// 返回扣除后的实际血量，便于调用方判断是否归零。
+    /// </summary>
+    public static int AddHp(int amount)
+    {
+        Hp = Math.Max(0, Hp + amount);
+        return Hp;
+    }
+
+    /// <summary>
+    /// 当前选中的关卡是否为所在区域的 boss 战。
+    /// boss 按约定不写进 AreaPool.ini 的 enemyN，而是由 MissionDrawer 在烈度为 1 时单独提供，
+    /// 所以只能拿「本次抽中的关卡名」与该区域配置的 boss 名比对。
+    /// area7 的 berlin_final_battle 没有配 boss，走不到这里——它由 IsFinalArea 特判。
+    /// </summary>
+    public static bool IsBossBattle()
+    {
+        if (string.IsNullOrEmpty(SelectedArea)) return false;
+        if (!GetCachedAreaPools().TryGetValue(SelectedArea, out Area pool)) return false;
+
+        string boss = pool.ReadBoss();
+        return !string.IsNullOrEmpty(boss) && boss == SelectedEnemy;
+    }
+
+    /// <summary>
+    /// 战斗失败扣血规则（唯一实现，见 docs/LOGIC.md「血量」一节）：
+    ///   area7（终局区域）失败 → 血量直接清零
+    ///   boss 战失败           → -2
+    ///   其余战斗失败          → -1
+    /// 返回扣完之后的血量；调用方据此决定是回 worldMap 继续还是走「游戏结束」。
+    /// </summary>
+    public static int LoseHpOnBattleDefeat()
+    {
+        if (IsFinalArea(SelectedArea))
+        {
+            Hp = 0;
+            return Hp;
+        }
+        return AddHp(IsBossBattle() ? -2 : -1);
+    }
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     public static int LastBattleLandKilled { get; set; } = 0;
     public static int LastBattleAirKilled { get; set; } = 0;
     public static int LastBattleFriendlyDead { get; set; } = 0;
@@ -179,6 +239,30 @@ public static class BattleStateManager
         return _areaIntensity.TryGetValue(areaName, out int value) ? value : -1;
     }
 
+<<<<<<< HEAD
+=======
+    /// <summary>
+    /// 读出全部区域的剩余烈度（区域名 → 烈度），供**存档**序列化用。
+    /// 返回副本，调用方改它不会影响内部状态。
+    /// </summary>
+    public static Dictionary<string, int> ReadAllAreaIntensity() => new(_areaIntensity);
+
+    /// <summary>
+    /// 整表写回区域烈度，供**读档**还原用。会先清空，避免旧局的残留混进来。
+    /// 只收 >0 的项：0 与「没进过这个区域」在 <see cref="ReadAreaIntensity"/> 里
+    /// 都返回「没有」，混在一起会让存档多出一堆没意义的键。
+    /// </summary>
+    public static void RestoreAreaIntensity(Dictionary<string, int> values)
+    {
+        _areaIntensity.Clear();
+        if (values == null) return;
+        foreach (var pair in values)
+        {
+            if (pair.Value > 0) _areaIntensity[pair.Key] = pair.Value;
+        }
+    }
+
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     /// <summary>进入区域时按 areaTimes 初始化烈度；已初始化的区域不会被重置</summary>
     public static void EnsureAreaIntensity(string areaName, int areaTimes)
     {
@@ -233,7 +317,12 @@ public static class BattleStateManager
         StoreCardQueue.Clear();
         StoreCurrentSlots = null;
 
+<<<<<<< HEAD
         // 资源点与上局战斗统计
+=======
+        // 血量与资源点、上局战斗统计
+        Hp = InitialHp;
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         MaterialPoints = 0;
         LastBattleLandKilled = 0;
         LastBattleAirKilled = 0;

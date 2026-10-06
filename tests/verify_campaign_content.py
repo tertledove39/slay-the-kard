@@ -1,0 +1,256 @@
+#!/usr/bin/env python3
+"""战役内容一致性验证
+
+只验证引擎层面的事实约束，不约束关卡的设计风格与难度取舍。
+
+覆盖：
+- 冒烟测试：三份配置可解析，关卡文件非空
+- 引用完整性：区域池的 enemy*/entry* 引用、关卡内引用的卡牌ID全部可解析
+- 元数据完整性：每个关卡有 name，每条行动都带 [icon=...,description=...]
+- 键格式：只允许 name/tN/everyNt/default/ADD，且永久前缀必须写 ADD: 冒号
+- 区域一致性：AreaPool 的 section 与 AreaOrder 严格为 area1-area7
+- 孤立内容：列出未被任何区域引用的关卡（提示信息，不计失败）
+"""
+from configparser import ConfigParser
+from pathlib import Path
+import re
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+EVENT_INI = ROOT / "bin" / "event.ini"
+BATTLE_INI = ROOT / "cards" / "enemyTurn.ini"
+AREA_INI = ROOT / "bin" / "AreaPool.ini"
+CARD_INI = ROOT / "cards" / "card.ini"
+STATE_CS = ROOT / "bin" / "CardRestoration.cs"
+
+# battleStart 是关卡开局效果，只结算一次、不进行动队列（不会显示成敌方意图），
+# 所以它属于合法键名，但**不属于** ACTION_KEYS。
+KEY_PATTERN = re.compile(r"^(t\d+|every\d+t|default|ADD|battleStart)$")
+ACTION_KEYS = re.compile(r"^(t\d+|every\d+t|default)$")
+METADATA = re.compile(r"\[icon=[^\]]*?,\s*description=[^\]]*?\]")
+
+
+def check(condition, message):
+    print(f"[{'PASS' if condition else 'FAIL'}] {message}")
+    return condition
+
+
+def load(path):
+    """解析INI；解析失败时返回None并把原因交给调用方报告。"""
+    config = ConfigParser(interpolation=None, strict=True)
+    config.optionxform = str
+    try:
+        config.read(path, encoding="utf-8")
+    except Exception as exc:  # 重复键、格式错误等
+        return None, f"{path.name} 解析失败: {exc}"
+    return config, None
+
+
+def main():
+    missing = [p.name for p in (EVENT_INI, BATTLE_INI, AREA_INI, CARD_INI, STATE_CS) if not p.exists()]
+    if missing:
+        print(f"[FAIL] 冒烟测试：缺少文件 {missing}")
+        return 1
+
+    events, err_e = load(EVENT_INI)
+    battles, err_b = load(BATTLE_INI)
+    areas, err_a = load(AREA_INI)
+    parse_errors = [e for e in (err_e, err_b, err_a) if e]
+    if parse_errors:
+        print("[FAIL] 冒烟测试：配置解析失败")
+        for err in parse_errors:
+            print(f"       {err}")
+        return 1
+
+    card_text = CARD_INI.read_text(encoding="utf-8")
+    card_ids = set(re.findall(r"^\[([^]]+)\]", card_text, re.M))
+    card_names = {}
+    for block in re.split(r"^\[", card_text, flags=re.M)[1:]:
+        card_id = block.split("]", 1)[0].strip()
+        name_match = re.search(r"^name\s*=\s*(.+)$", block, re.M)
+        if name_match:
+            card_names[card_id] = name_match.group(1).strip()
+    area_order = re.search(r"AreaOrder\s*=\s*\{(.*?)\}", STATE_CS.read_text(encoding="utf-8"), re.S)
+
+    results = [
+        check(len(battles.sections()) > 0, f"冒烟：enemyTurn.ini 解析出 {len(battles.sections())} 个关卡"),
+        check(len(events.sections()) > 0, f"冒烟：event.ini 解析出 {len(events.sections())} 个事件"),
+    ]
+
+    # --- 区域一致性 ---
+    expected_areas = [f"area{i}" for i in range(1, 8)]
+    results.append(
+        check(sorted(areas.sections()) == expected_areas, "区域池 section 严格为 area1-area7")
+    )
+    if area_order:
+        declared = re.findall(r'"([^"]+)"', area_order.group(1))
+        results.append(check(declared == expected_areas, f"AreaOrder 与区域池一致（{declared}）"))
+    else:
+        results.append(check(False, "CardRestoration.cs 中未找到 AreaOrder"))
+
+    # --- 引用完整性 ---
+    referenced_battles, referenced_events = set(), set()
+    dangling_battles, dangling_events = [], []
+    for area in expected_areas:
+        if area not in areas:
+            continue
+        for key, value in areas[area].items():
+            if key.startswith("enemy") or key == "boss":
+                # boss 也是关卡引用：它由 MissionDrawer 在烈度为 1 时单独提供，
+                # 按约定不写进 enemyN，但同样「可达」。漏掉它会把 Bryansk /
+                # RedOctober 这类 boss 误报成「游戏内不可达」，且拼错时查不出来。
+                referenced_battles.add(value)
+                if value not in battles.sections():
+                    dangling_battles.append(f"{area}.{key}={value}")
+            elif key.startswith("entry"):
+                event_id = value[len("event:"):] if value.startswith("event:") else value
+                referenced_events.add(event_id)
+                if event_id not in events.sections():
+                    dangling_events.append(f"{area}.{key}={value}")
+
+    results.append(
+        check(not dangling_battles, f"区域池的关卡引用全部可解析（悬空 {len(dangling_battles)} 个）")
+    )
+    for item in dangling_battles:
+        print(f"       悬空引用: {item}")
+    results.append(
+        check(not dangling_events, f"区域池的事件引用全部可解析（悬空 {len(dangling_events)} 个）")
+    )
+    for item in dangling_events:
+        print(f"       悬空引用: {item}")
+
+    # --- 关卡内引用的卡牌ID ---
+    referenced_cards = set()
+    for section in battles.sections():
+        for value in battles[section].values():
+            referenced_cards.update(re.findall(r"addTo(?:Enemy)?SupportLine\(([^)]+)\)", value))
+    unknown_cards = sorted(c for c in referenced_cards if c not in card_ids)
+    results.append(
+        check(not unknown_cards, f"关卡部署的单位全部是已存在的卡牌（未知 {len(unknown_cards)} 个）")
+    )
+    for card in unknown_cards:
+        print(f"       未知卡牌ID: {card}")
+
+    # --- 元数据完整性 ---
+    unnamed = [s for s in battles.sections() if not battles[s].get("name", "").strip()]
+    results.append(check(not unnamed, f"每个关卡都有 name（缺失 {len(unnamed)} 个）"))
+    for section in unnamed:
+        print(f"       缺少 name: {section}")
+
+    # 意图面板按「每条行动」读取一个 icon，因此以整行值为单位检查，
+    # 不要求用逗号分隔的每个子动作各自携带元数据。
+    bad_metadata = []
+    for section in battles.sections():
+        for key, value in battles[section].items():
+            if ACTION_KEYS.match(key) and value.strip() and not METADATA.search(value):
+                bad_metadata.append(f"{section}.{key}: {value.strip()[:60]}")
+    results.append(
+        check(not bad_metadata, f"每条行动都带 [icon=...,description=...] 元数据（缺失 {len(bad_metadata)} 条）")
+    )
+    for item in bad_metadata[:10]:
+        print(f"       缺少元数据: {item}")
+
+    # --- 部署描述必须出现卡牌在 card.ini 中的准确名字 ---
+    bad_naming = []
+    for section in battles.sections():
+        for key, value in battles[section].items():
+            if not ACTION_KEYS.match(key):
+                continue
+            desc = METADATA.search(value)
+            if not desc:
+                continue
+            text = desc.group(0)
+            for card_id in set(re.findall(r"addTo(?:Enemy)?SupportLine\(([^)]+)\)", value)):
+                card_name = card_names.get(card_id)
+                if card_name and card_name not in text:
+                    bad_naming.append(f"{section}.{key}: 部署{card_id}({card_name})，描述却是「{text[:50]}」")
+    results.append(
+        check(not bad_naming, f"部署描述使用card.ini中的单位名（不符 {len(bad_naming)} 条）")
+    )
+    for item in bad_naming:
+        print(f"       {item}")
+
+    # --- 事件奖励不得使用研发衍生卡 ---
+    # 三条科技树（苏联/美国/皇家研发）经 Develop() 与 Choose() 逐级解锁；
+    # make* 卡是解锁包装，其 AddToHand(...) 的目标才是真卡。这些卡只能经由
+    # 研发获得，事件直接发放会绕过整条科技树。
+    # 注意 Develop/Choose 并非研发专用（赤色黎明、战略重心也在用），因此必须
+    # 从三条线的入口卡做传递遍历，不能把所有 Develop/Choose 的目标都算进来。
+    card_effects = {}
+    for block in re.split(r"^\[", card_text, flags=re.M)[1:]:
+        cid = block.split("]", 1)[0].strip()
+        eff_match = re.search(r"^effect\s*=\s*(.*)$", block, re.M)
+        card_effects[cid] = eff_match.group(1) if eff_match else ""
+
+    research_entries = ["苏联军事研发", "美国军事研发", "皇家研发"]
+    research_cards = set()
+    frontier = list(research_entries)
+    while frontier:
+        current = frontier.pop()
+        eff = card_effects.get(current, "")
+        targets = []
+        for group in re.findall(r"(?:Develop|Choose)\(([^)]*)\)", eff):
+            targets.extend(x.strip() for x in group.split(",") if x.strip())
+        if current.startswith("make"):
+            for group in re.findall(r"AddToHand\(([^)]*)\)", eff):
+                target = group.split(",")[0].strip()
+                if target:
+                    targets.append(target)
+        for target in targets:
+            if target not in research_cards:
+                research_cards.add(target)
+                frontier.append(target)
+    research_cards -= set(research_entries)
+
+    bad_research = []
+    for event in events.sections():
+        for key, value in events[event].items():
+            if not key.endswith("_effect"):
+                continue
+            for card_id in re.findall(r"replace(?:Random)?Card\(([^)]+)\)", value):
+                if card_id in research_cards:
+                    bad_research.append(f"{event}.{key}: {card_id}")
+    results.append(
+        check(not bad_research, f"事件奖励不使用研发衍生卡（违规 {len(bad_research)} 条）")
+    )
+    for item in bad_research:
+        print(f"       {item}")
+
+    # --- 键格式 ---
+    bad_keys, equals_prefix = [], []
+    for section in battles.sections():
+        for key, value in battles[section].items():
+            if key != "name" and not KEY_PATTERN.match(key):
+                bad_keys.append(f"{section}.{key}")
+            if re.match(r"^ADD[=]", value.strip()):
+                equals_prefix.append(f"{section}.{key}")
+    results.append(check(not bad_keys, f"关卡键名格式合法（非法 {len(bad_keys)} 个）"))
+    for item in bad_keys:
+        print(f"       非法键名: {item}")
+    results.append(
+        check(not equals_prefix, f"永久行动前缀统一写作 ADD:（写成 ADD= 的 {len(equals_prefix)} 条）")
+    )
+    for item in equals_prefix:
+        print(f"       ADD= 前缀不会被执行，实际失效: {item}")
+
+    # --- 提示信息：未被任何区域引用的内容 ---
+    orphan_battles = [s for s in battles.sections() if s not in referenced_battles]
+    orphan_events = [s for s in events.sections() if s not in referenced_events]
+    if orphan_battles:
+        print(f"\n[INFO] {len(orphan_battles)} 个关卡未被任何区域引用，游戏内不可达：")
+        print("       " + ", ".join(orphan_battles))
+    if orphan_events:
+        print(f"\n[INFO] {len(orphan_events)} 个事件未被任何区域引用，游戏内不可达：")
+        print("       " + ", ".join(orphan_events))
+
+    failed = results.count(False)
+    print(f"\nResult: {len(results) - failed} passed, {failed} failed")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://bin/EventCardPreview.cs" id="1_script"]
+
+[node name="EventCardPreview" type="Control"]
+layout_mode = 0
+offset_right = 344.0
+offset_bottom = 216.0
+mouse_filter = 2
+script = ExtResource("1_script")
