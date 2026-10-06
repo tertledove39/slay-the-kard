@@ -145,6 +145,8 @@ public partial class cardBase_ : Control
         return (traits & ActionForbiddingTraits) != 0;
     }
 
+<<<<<<< HEAD
+=======
     /// <summary>
     /// 本兵种是否无视「守护」——被守护的目标对它而言没有保护，可以照常攻击。
     ///
@@ -157,6 +159,7 @@ public partial class cardBase_ : Control
         return type == CardTypes.Artillery || type == CardTypes.Bomber;
     }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     public void RefreshUnit()
     {
         moveAble = 1;
@@ -180,6 +183,8 @@ public partial class cardBase_ : Control
             attackAble = 0;
         }
 
+<<<<<<< HEAD
+=======
         // 已宣布弃置、正等着死亡检查移除的单位，不能因为回合刷新又「复活」。
         // RetreatUnit 是先 DisableCombatAbility + 挂待弃置标记，而敌方回合开头的
         // RefreshCardsInField(enemy) 跑在死亡检查之前——不挡这一下，被撤退的敌方单位
@@ -190,6 +195,7 @@ public partial class cardBase_ : Control
             attackAble = 0;
         }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         UpdateMoveableLight();
     }
     
@@ -570,12 +576,15 @@ public partial class cardBase_ : Control
 
     public int shouldBeRemoved = 0;
     public bool isDiscarding = false; // 正在播放弃牌动画，不参与ZIndex重置
+<<<<<<< HEAD
+=======
 
     // 正在播「卡牌自身特效」（目前是 flying：升起→摆动→落回）期间置位。
     // 这段时间卡的 Position / Scale / ZIndex 都归特效管，刷新显示顺序必须跳过它，
     // 否则那套「场上卡一律 ZIndex = 10」会在下一帧就把抬起来的层级打回去，
     // 漂浮就压不住别的卡了。
     public bool isUnderCardEffect = false;
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     List<Change> ChangeList = new List<Change>();
     public async Task ExecChangeList()
     {
@@ -778,12 +787,15 @@ public partial class cardBase_ : Control
     private async Task AnimateCostRoll(int fromValue, int toValue)
     {
         if (fromValue == toValue) return;
+<<<<<<< HEAD
+=======
 
         // 牌堆里的卡是「已实例化但不在场景树上」的对象（Player.deck），
         // 对它们改费用是合法的，但纯视觉的滚动动画做不了——`GetTree()` 会返回 null。
         // 不挡这一下，改牌堆费用的效果每张卡都会抛一次空引用。
         if (!IsInsideTree()) return;
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         var costLabel = GetNode<Label>("cost");
         if (costLabel == null) return;
 
@@ -977,6 +989,8 @@ public partial class cardBase_ : Control
     }
 
 
+<<<<<<< HEAD
+=======
     /// <summary>转换动画露出的卡背，按阵营分：我方苏联、敌方德国。</summary>
     public const string SovietCardBackPath = "res://assest/苏联卡背.png";
     public const string GermanCardBackPath = "res://assest/德国卡背.png";
@@ -1034,6 +1048,7 @@ public partial class cardBase_ : Control
             _attrTooltipPanel.Visible = false;
     }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 /// <summary>
 /// 设置卡牌信息
 /// </summary>
@@ -1064,6 +1079,8 @@ public partial class cardBase_ : Control
         hasMobilize = HasTrait(UnitTraits.Mobilize);
         hasAmbushActive = HasTrait(UnitTraits.Ambush);
 
+<<<<<<< HEAD
+=======
         // ===== 生命周期状态必须归零 =====
         // SetCardInformation 是每张卡唯一的初始化入口——**对象池取回的卡
         // （ResourceManager.AcquireEmptyCard*）与 GetCardTemplate().Duplicate() 出来的卡
@@ -1088,6 +1105,7 @@ public partial class cardBase_ : Control
         OwnAttributeLabelSettings("defence");
         OwnAttributeLabelSettings("cost");
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         // 初始化历史追踪值
         initialAttack = attack;
         initialDefence = defence;
@@ -1107,6 +1125,8 @@ public partial class cardBase_ : Control
 /// 将内存中的状态和现实出来的刷新一下，一般用于卡牌信息改变的时候
 /// </summary>
     /// <summary>
+<<<<<<< HEAD
+=======
     /// 让某个属性 Label 持有自己独占的 LabelSettings 副本。
     ///
     /// 见 `SetCardInformation` 里的说明：卡牌的 LabelSettings 可能被多张卡共用
@@ -1124,6 +1144,7 @@ public partial class cardBase_ : Control
     }
 
     /// <summary>
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     /// 根据traits位标记自动合成加黑描述前缀。不包含效果描述，仅trait名。
     /// </summary>
     private string BuildTraitPrefix()
@@ -1906,12 +1927,15 @@ public partial class cardBase_ : Control
       /// </summary>
     private async void FlashAttributeWithColor(string attributeName, int currentValue, int initialValue, int extremeValue, bool isInverted = false)
     {
+<<<<<<< HEAD
+=======
         // 不在场景树上的卡（牌堆里的卡就是这种）不做任何视觉动作。
         // 它们的数值照改不误，但改色是纯展示行为：既没人看得见，
         // 而 LabelSettings 又可能是跨卡共享的，改了只会连累别的卡。
         if (!IsInsideTree())
             return;
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
           // 根据属性名获取对应的Label节点
         Label targetLabel = attributeName switch
         {

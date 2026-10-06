@@ -31,12 +31,51 @@ public partial class SettingsMenu : Control
             }
             else if (item.Type == "float")
             {
+<<<<<<< HEAD
+                AddSlider(list, item);
+=======
                 // 与暂停菜单共用同一份行构建（见 bin/SettingRow.cs）
                 SettingRow.AddFloatSlider(list, item);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
             }
         }
     }
 
+<<<<<<< HEAD
+    private static void AddSlider(VBoxContainer list, SettingItem item)
+    {
+        var row = new HBoxContainer { CustomMinimumSize = new Vector2(540, 48) };
+        var name = new Label { Text = item.Name, CustomMinimumSize = new Vector2(130, 0) };
+        name.AddThemeFontSizeOverride("font_size", 24);
+        var slider = new HSlider
+        {
+            MinValue = item.MinValue,
+            MaxValue = item.MaxValue,
+            Step = item.Step,
+            Value = SettingsManager.GetFloat(item.Key),
+            CustomMinimumSize = new Vector2(330, 48),
+            SizeFlagsHorizontal = SizeFlags.ExpandFill
+        };
+        var valueLabel = new Label { Text = FormatValue(slider.Value), CustomMinimumSize = new Vector2(70, 0) };
+        valueLabel.AddThemeFontSizeOverride("font_size", 22);
+        valueLabel.HorizontalAlignment = HorizontalAlignment.Right;
+        slider.ValueChanged += value =>
+        {
+            valueLabel.Text = FormatValue(value);
+            SettingsManager.SetFloat(item.Key, (float)value);
+        };
+        row.AddChild(name);
+        row.AddChild(slider);
+        row.AddChild(valueLabel);
+        list.AddChild(row);
+    }
+
+    private static string FormatValue(double value) => Mathf.IsEqualApprox((float)value, Mathf.Round((float)value))
+        ? Mathf.RoundToInt((float)value).ToString()
+        : value.ToString("0.##");
+
+=======
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     private static void AnimateButton(Button button, float scale)
     {
         button.PivotOffset = button.Size / 2f;

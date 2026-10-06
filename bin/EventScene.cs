@@ -18,9 +18,12 @@ public partial class EventScene : CanvasLayer
     private const float HoverScale = 1.08f;
     private const float HoverDuration = 0.12f;
 
+<<<<<<< HEAD
+=======
     /// <summary>悬浮预览面板的场景路径</summary>
     private const string PreviewScenePath = "res://bin/event_card_preview.tscn";
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     /// <summary>左侧事件配图宽度（像素）</summary>
     private const float ImageWidth = 400f;
     private const float ImageHeight = 600f;
@@ -34,6 +37,17 @@ public partial class EventScene : CanvasLayer
     /// <param name="areaName">触发此事件的区域名，用于完成后标记</param>
     public static async Task Show(Node parent, EventData eventData, string areaName)
     {
+<<<<<<< HEAD
+        var scene = new EventScene { Layer = 2 };
+        parent.AddChild(scene);
+        bool campaignCompleted = await scene.Run(eventData, areaName);
+        scene.QueueFree();
+        if (parent is WorldMap wm)
+            wm.DismissChooseMission();
+
+        if (campaignCompleted)
+            await CampaignVictory.ShowAndReturnToMenu(parent);
+=======
         // ⚠️ 这里必须**向上找** WorldMap，不能写 `parent is WorldMap`：
         // 事件的开场是 ChooseMission.StartEvent → EventScene.Show(this, ...)，
         // 传进来的 parent 是**任务选择面板**而不是世界地图，直接判类型会永远为 false，
@@ -76,6 +90,7 @@ public partial class EventScene : CanvasLayer
                 return map;
         }
         return null;
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     }
 
     /// <summary>
@@ -88,6 +103,12 @@ public partial class EventScene : CanvasLayer
         _event = eventData;
         _areaName = areaName;
 
+<<<<<<< HEAD
+        var bg = new ColorRect();
+        bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        bg.Color = new Color(0, 0, 0, 0.75f);
+        bg.MouseFilter = Control.MouseFilterEnum.Stop;
+=======
         // 悬浮预览面板：结构与配色在 event_card_preview.tscn 里，这里只实例化挂载
         _cardPreview = ResourceLoader.Load<PackedScene>(PreviewScenePath)?.Instantiate() as EventCardPreview;
         if (_cardPreview != null)
@@ -104,6 +125,7 @@ public partial class EventScene : CanvasLayer
         bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         bg.Color = new Color(0, 0, 0, 0.75f);
         bg.MouseFilter = Control.MouseFilterEnum.Ignore;
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         AddChild(bg);
 
         var viewSize = GetViewport().GetVisibleRect().Size;
@@ -165,6 +187,12 @@ public partial class EventScene : CanvasLayer
         {
             var choice = _event.Choices[i];
             var btn = new Button();
+<<<<<<< HEAD
+            btn.Text = choice.Text;
+            btn.Position = new Vector2(textX, choicesY + i * 50);
+            btn.Size = new Vector2(480, 42);
+            btn.AddThemeFontSizeOverride("font_size", 16);
+=======
             btn.Position = new Vector2(textX, choicesY + i * 50);
             btn.Size = new Vector2(480, 42);
             btn.AddThemeFontSizeOverride("font_size", 16);
@@ -185,6 +213,7 @@ public partial class EventScene : CanvasLayer
                 btn.MouseExited += HideCardPreview;
             }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
             btn.MouseEntered += () => AnimateButton(btn, HoverScale);
             btn.MouseExited += () => AnimateButton(btn, 1f);
             int idx = i;
@@ -199,7 +228,11 @@ public partial class EventScene : CanvasLayer
         if (string.IsNullOrEmpty(effect)) effect = "";
 
         // --- 执行效果 ---
+<<<<<<< HEAD
+        await ExecuteEffect(effect);
+=======
         await EventEffectRunner.Execute(this, effect);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
         // 事件与战斗同等消耗1点区域烈度；归零时解锁下一区域
         bool areaCleared = BattleStateManager.ConsumeAreaIntensity(_areaName);
@@ -214,6 +247,108 @@ public partial class EventScene : CanvasLayer
         tween.TweenProperty(button, "scale", Vector2.One * scale, HoverDuration);
     }
 
+<<<<<<< HEAD
+    // ============================ 效果执行 ============================
+
+    /// <summary>
+    /// 解析并执行事件效果字符串。支持三种内置效果语法：
+    /// materialPoints(数量)：获得指定数量的战役资源点；
+    /// replaceCard(卡牌ID)：让玩家从卡组中选择一张卡替换为指定卡；
+    /// replaceRandomCard(卡牌ID)：随机替换卡组中的一张卡。
+    /// 空字符串或"none"表示无效果，直接跳过。
+    /// </summary>
+    private async Task ExecuteEffect(string effect)
+    {
+        effect = effect.Trim();
+        if (string.IsNullOrEmpty(effect) || effect == "none")
+            return;
+
+        var segments = effect.Split(',');
+        var replaceCardIds = new List<string>();
+        var randomReplaceCardIds = new List<string>();
+
+        foreach (var seg in segments)
+        {
+            var s = seg.Trim();
+            if (s.StartsWith("materialPoints("))
+            {
+                var amount = s["materialPoints(".Length..^1].ToInt();
+                {
+                    if(BattleStateManager.MaterialPoints+amount<=0) BattleStateManager.MaterialPoints=0;
+                    else BattleStateManager.MaterialPoints+=amount;
+                }
+            }
+            else if (s.StartsWith("replaceCard(") && s.EndsWith(")"))
+            {
+                string cardId = s["replaceCard(".Length..^1];
+                replaceCardIds.Add(cardId);
+            }
+            else if (s.StartsWith("replaceRandomCard(") && s.EndsWith(")"))
+            {
+                string cardId = s["replaceRandomCard(".Length..^1];
+                randomReplaceCardIds.Add(cardId);
+            }
+        }
+
+
+        if (replaceCardIds.Count > 0)
+        {
+            var chosenOldIds = await ChooseSomeCard.Show(this, replaceCardIds.Count, "选择要替换的卡牌");
+            for (int i = 0; i < chosenOldIds.Count && i < replaceCardIds.Count; i++)
+            {
+                if (!string.IsNullOrEmpty(chosenOldIds[i]))
+                    ReplaceCardInDeck(chosenOldIds[i], replaceCardIds[i]);
+            }
+        }
+
+        foreach (var newCardId in randomReplaceCardIds)
+        {
+            await DoReplaceCard(newCardId, random: true);
+        }
+    }
+
+
+    private void ReplaceCardInDeck(string oldCardId, string newCardId)
+    {
+        var deckIds = BattleStateManager.DeckCardIds;
+        int idx = deckIds.IndexOf(oldCardId);
+        if (idx >= 0)
+        {
+            deckIds[idx] = newCardId;
+            GD.Print($"[EventScene] 卡牌替换: {oldCardId} -> {newCardId}");
+        }
+    }
+
+    /// <summary>
+    /// 执行卡牌替换逻辑。random=false时弹出牌组选择UI让玩家手动挑选要替换的卡；
+    /// random=true时随机从卡组中选一张替换。替换后同步更新DeckCardIds持久化列表。
+    /// </summary>
+    /// <param name="newCardId">新卡牌的ID（来自card.ini）</param>
+    /// <param name="random">true=随机替换，false=让玩家手动选择</param>
+    private async Task DoReplaceCard(string newCardId, bool random)
+    {
+        var deckIds = BattleStateManager.DeckCardIds;
+        if (deckIds == null || deckIds.Count == 0) return;
+
+        string oldCardId;
+        if (random)
+        {
+            oldCardId = deckIds[new Random().Next(deckIds.Count)];
+        }
+        else
+        {
+            var chosen = await ChooseSomeCard.Show(this, 1, "选择一张要替换的卡牌");
+            oldCardId = chosen.Count > 0 ? chosen[0] : null;
+            if (string.IsNullOrEmpty(oldCardId)) return;
+        }
+
+        ReplaceCardInDeck(oldCardId, newCardId);
+    }
+
+    /// <summary>
+    /// 显示牌组选择界面，让玩家挑选一张要替换的卡
+    /// </summary>
+=======
     // ============================ 卡牌预览 ============================
 
     /// <summary>「选项会加入哪些卡」的悬浮预览面板；结构与配色都在场景里，本类只负责开关与填数据。</summary>
@@ -228,6 +363,7 @@ public partial class EventScene : CanvasLayer
     {
         _cardPreview?.Hide();
     }
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 }
 
 /// <summary>

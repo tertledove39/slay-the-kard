@@ -21,6 +21,23 @@ public partial class StartMenu : Control
         _ = SceneLoader.ChangeSceneAsync(this, SettingsPath);
     }
 
+<<<<<<< HEAD
+    public void _on_start_pressed()
+    {
+        LoadWorldMap();
+    }
+    public void _on_continue_pressed()
+    {
+        LoadWorldMap();
+    }
+
+    async Task LoadWorldMap()
+    {
+
+        await SceneLoader.ChangeSceneAsync(this, WorldMapPath);
+    }
+
+=======
     /// <summary>
     /// **开始**：新开一局。已经有存档就先问要不要覆盖——覆盖是不可逆的，
     /// 直接开新局会把上一局的进度悄悄冲掉。
@@ -61,6 +78,7 @@ public partial class StartMenu : Control
         if (button != null) button.Disabled = !SaveManager.HasSave();
     }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     
 
 
@@ -75,11 +93,16 @@ public partial class StartMenu : Control
         ConnectHover("Menu/Settings");
         ConnectHover("Menu/Credits");
 
+<<<<<<< HEAD
+        
+
+=======
         // 主菜单四个按钮都响按键音
         UiClickSound.AttachAll(this);
 
         // 没有存档就把「继续」灰掉
         RefreshContinueButton();
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
     }
 

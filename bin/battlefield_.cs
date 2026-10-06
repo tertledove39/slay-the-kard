@@ -111,6 +111,8 @@ public partial class battlefield_ : Control
     private List<cardBase_> choiceCards = new List<cardBase_>();
 
     /// <summary>
+<<<<<<< HEAD
+=======
     /// 关卡开局效果，取自 `enemyTurn.ini` 该关 section 里可选的 `battleStart=` 键。
     /// 这是「游戏开始时，若 xxx 则 xxx」的通用入口，详见 RunBattleStartEffectAsync。
     /// </summary>
@@ -243,6 +245,7 @@ public partial class battlefield_ : Control
     private const string ImpactSlotSuffix = "impact";
 
     /// <summary>
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     /// 自定义内存变量：在当前战场场景中持久保存
     /// </summary>
     private Dictionary<string, int> memoryVariables = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -376,9 +379,14 @@ public partial class battlefield_ : Control
                 if (card == cardNowChoose)
                     continue;
 
+<<<<<<< HEAD
+                // 弃牌动画中的卡不参与Z-index/子节点顺序重置
+                if (card.isDiscarding)
+=======
                 // 弃牌动画中的卡不参与Z-index/子节点顺序重置；
                 // 正在播卡牌自身特效（flying）的卡同理——那会儿它的层级是特效在管。
                 if (card.isDiscarding || card.isUnderCardEffect)
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
                     continue;
 
                 // 跳过已临时Reparent到其他节点的卡（如ShowCardChoice期间）
@@ -487,9 +495,13 @@ public partial class battlefield_ : Control
         var aa = cardInPlaces.AsEnumerable().ToList();
         foreach (var card in aa)
         {
+<<<<<<< HEAD
+            if (card.GetGlobalRect().HasPoint(mousePosition))
+=======
             // 阵亡后暂留在场上的卡点不中：它已经死了，只是还没消失。
             // 放它过去的话，cardNowChoose 会变成那张尸卡，层级还会被抬到 100。
             if (CanBeSelected(card) && card.GetGlobalRect().HasPoint(mousePosition))
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
             {
                 // 点击到了卡牌
                 return card;
@@ -529,9 +541,12 @@ Player player1;
 Player player2;
     private cardBase_ myHq;
 
+<<<<<<< HEAD
+=======
     /// <summary>左上角的设置按钮（场景里的 `SettingsButton`）。与 ESC 走同一个入口。</summary>
     private Button settingsButton;
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     /// <summary>
     /// 检查卡牌是否在合法区域内
     /// </summary>
@@ -603,6 +618,8 @@ private const int OpeningHandSize = 5;
         cardRes = ResourceManager.Instance?.GetScene("res://bin/cardbase.tscn") ?? ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
         //初始化按钮
         buttonNextTurn           = GetNode<TextureButton>("NextTurnButton");
+<<<<<<< HEAD
+=======
         // 「下一回合」按下时响一声按键音（战斗界面里只有它用这个音）。
         UiClickSound.Attach(buttonNextTurn);
 
@@ -613,6 +630,7 @@ private const int OpeningHandSize = 5;
             settingsButton.Pressed += OpenPauseMenu;
             UiClickSound.Attach(settingsButton);
         }
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
         // 初始化卡组：优先复用WorldMap已缓存的卡牌数据，避免重复解析card.ini
         if (BattleStateManager.IsCardDataCached)
@@ -683,13 +701,21 @@ private const int OpeningHandSize = 5;
         
         GetNode<End>("end").Visible = false;
 
+<<<<<<< HEAD
+        _ = StartOpeningHandAsync();
+=======
         _ = StartBattleAsync();
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
         // 右上角"查看卡组"按钮
         CreateDeckViewButton();
     }
 
     /// <summary>
+<<<<<<< HEAD
+    /// 开局流程：抽起手牌 → 换牌界面 → 解锁操作。
+    /// _Ready 是同步的，所以这里自行把整条异步链接起来；
+=======
     /// 战斗开场：先结算关卡的开局效果，再走起手抽牌与换牌。
     /// `_Ready` 是同步的，所以这里自行把整条异步链接起来。
     /// 开局效果必须排在最前——它改的是总部防御这类开局状态，
@@ -726,6 +752,7 @@ private const int OpeningHandSize = 5;
 
     /// <summary>
     /// 开局流程：抽起手牌 → 换牌界面 → 解锁操作。
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     /// 全程锁住操作，避免换牌期间点到底下的战场。
     /// </summary>
     private async Task StartOpeningHandAsync()
@@ -760,11 +787,14 @@ private const int OpeningHandSize = 5;
             BattleStateManager.ShowDeckViewer(this, displayDeck);
         };
         AddChild(viewDeckBtn);
+<<<<<<< HEAD
+=======
 
         // 这个按钮是 `_Ready` 之后才建的，所以 `AttachAll` 那一轮扫不到它，
         // 得在**创建处**单独挂。（战斗里点开卡组之后那个「返回」按钮在 DisplayCard 里，
         // 由它自己的 `_Ready` 覆盖。）
         UiClickSound.Attach(viewDeckBtn);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     }
 
     /// <summary>
@@ -974,6 +1004,12 @@ private const int OpeningHandSize = 5;
 
 
 
+<<<<<<< HEAD
+    private void PlayCardEffect(cardBase_ card)
+    {
+        if (card == null || !IsInstanceValid(card)) return;
+        StartEffect(card.playEffect, new List<Vector2> { GetCardCenter(card) });
+=======
     /// <summary>
     /// 播「这张卡被打出」时的效果。**卡上写了 `playEffect` 就一律以卡为准**，
     /// 没写的才按兵种兜底：
@@ -1195,11 +1231,33 @@ private const int OpeningHandSize = 5;
             _ => null
         };
         return slot == null ? null : $"sfx({slot})";
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     }
 
     private bool PlayAttackEffect(cardBase_ from, cardBase_ to)
     {
         if (from == null || to == null || !IsInstanceValid(from) || !IsInstanceValid(to)) return false;
+<<<<<<< HEAD
+        if (from.ReadAttack() <= 0) return false;
+        return StartEffect(from.attackEffect, new List<Vector2> { GetCardCenter(from), GetCardCenter(to) });
+    }
+
+    private bool StartEffect(string effectName, IReadOnlyList<Vector2> positions, float? time = null)
+    {
+        Effect effect = EffectRegistry.Create(effectName);
+        if (effect == null) return false;
+        AddChild(effect);
+        effect.PrepareForUse();
+        _ = RunEffect(effect, positions, time);
+        return true;
+    }
+
+    private async Task RunEffect(Effect effect, IReadOnlyList<Vector2> positions, float? time)
+    {
+        try
+        {
+            await effect.Play(positions, time);
+=======
         int attack = from.ReadAttack();
         if (attack <= 0) return false;
 
@@ -1258,6 +1316,7 @@ private const int OpeningHandSize = 5;
         try
         {
             await effect.Play(positions, time, source, count);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         }
         finally
         {
@@ -1285,21 +1344,28 @@ private const int OpeningHandSize = 5;
     }
 
 /// <summary>
+<<<<<<< HEAD
+/// 播放死亡音效
+=======
 /// 播放死亡音效（单位阵亡的爆炸声）。
 ///
 /// 音效不再是场景里写死的那一条：每次播放从 `configs/music.ini` 的 `[sfx] dead`
 /// 槽位里随机抽一条爆炸 wav（清单里已排除下划线开头的未采用版本）。
 /// 抽不到（槽位没配 / 加载失败）就保持场景里原有的那条，不会变成没声音。
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 /// </summary>
 /// <param name="id"></param>
     void PlayDeadSound(int id)
     {
+<<<<<<< HEAD
+=======
         var stream = MusicManager.Instance?.PickSfx(DeadSfxSlot);
         if (stream != null)
         {
             deadSound.Stream = stream;
         }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         //if (deadSound.Playing != true)
         {
             deadSound.Play();
@@ -1377,9 +1443,14 @@ InputState currentInputState = InputState.nil;
         "KillAllTargets", "HealAllTargets", "Refresh", "Retreat", "Discard", "DiscardWithTarget",
         "foreach", "End&", "Develop", "Choose()", "Play",
         "AddTrait()", "RemoveTrait()", "DrawACard()", "GetCardsBeingTreated",
+<<<<<<< HEAD
+        "getCount()", "setTargets()", "DiscardRandomly()", "DiscardWithName()",
+        "addANewUnitToBattlefieldWithCostAndType()", "GetHighestAttackFriendUnit()", "FightRandomEnemy()", "Fight", "GetLeftTarget", "GetRightTarget",
+=======
         "getCount()", "setTargets()", "DiscardRandomly()", "DiscardPlayerRandomly()", "DiscardWithName()",
         "addANewUnitToBattlefieldWithCostAndType()", "GetHighestAttackFriendUnit()", "FightRandomEnemy()", "Fight", "GetLeftTarget", "GetRightTarget",
         "convert()",
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     };
 
     private void ToggleConsole()
@@ -1397,12 +1468,22 @@ InputState currentInputState = InputState.nil;
         _consolePanel.Position = new Vector2(50, 10);
         _consolePanel.Size = new Vector2(600, 200);
         _consolePanel.ZIndex = 1000;
+<<<<<<< HEAD
+        var style = new StyleBoxFlat();
+        style.BgColor = new Color(0, 0, 0, 0.85f);
+        _consolePanel.AddThemeStyleboxOverride("panel", style);
+=======
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         AddChild(_consolePanel);
 
         _consoleInput = new LineEdit();
         _consoleInput.Position = new Vector2(0, 0);
         _consoleInput.Size = new Vector2(600, 30);
+<<<<<<< HEAD
+        _consoleInput.AddThemeColorOverride("font_color", Colors.LimeGreen);
+=======
         _consoleInput.AddThemeColorOverride("font_color", ConsoleStyle.TextColor);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         _consoleInput.AddThemeFontSizeOverride("font_size", 14);
         _consoleInput.PlaceholderText = "输入效果指令，回车执行...";
         _consoleInput.TextSubmitted += OnConsoleSubmit;
@@ -1413,11 +1494,17 @@ InputState currentInputState = InputState.nil;
         _consoleOutput.Size = new Vector2(592, 162);
         _consoleOutput.ScrollFollowing = true;
         _consoleOutput.BbcodeEnabled = true;
+<<<<<<< HEAD
+        _consoleOutput.AddThemeColorOverride("default_color", Colors.LimeGreen);
+        _consoleOutput.AddThemeFontSizeOverride("normal_font_size", 12);
+        _consolePanel.AddChild(_consoleOutput);
+=======
         _consoleOutput.AddThemeColorOverride("default_color", ConsoleStyle.TextColor);
         _consoleOutput.AddThemeFontSizeOverride("normal_font_size", 12);
         _consolePanel.AddChild(_consoleOutput);
 
         ConsoleStyle.Apply(_consolePanel, _consoleInput);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     }
 
     private void ConsolePrint(string text)
@@ -1501,6 +1588,10 @@ InputState currentInputState = InputState.nil;
         _consoleInput.CaretColumn = newText.Length;
     }
 
+<<<<<<< HEAD
+    public override void _Input(InputEvent @event)
+    {
+=======
     /// <summary>
     /// 安全取消当前拖拽，把卡放回原处。
     ///
@@ -1603,6 +1694,7 @@ InputState currentInputState = InputState.nil;
         return;
     }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     // 按`键开关控制台
     if (@event is InputEventKey keyEvent && keyEvent.Pressed && keyEvent.Keycode == Key.Quoteleft)
     {
@@ -1661,6 +1753,8 @@ InputState currentInputState = InputState.nil;
         return; // 选择界面中不要处理其他输入
     }
 
+<<<<<<< HEAD
+=======
     // 兜底：拖拽中途鼠标被抢走（截图工具、输入法弹窗等），「松开左键」就再也送不进来了。
     // 鼠标一动就核对一次物理左键状态，发现其实早就松开，就安全取消这次拖拽。
     // 必须放在下面的控制锁判定之前——收尾不能被「当前不允许操作」挡住。
@@ -1680,6 +1774,7 @@ InputState currentInputState = InputState.nil;
         return;
     }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     //如果当前正处于无法操作状态 取消这一次操作
     if (ReadControlState() == 1) return;
 
@@ -1693,6 +1788,9 @@ InputState currentInputState = InputState.nil;
         {
             var card = CheckCardClick(mousePosition);
             if(currentInputState != InputState.waitingForChoosingTarget) cardNowChoose = card;
+<<<<<<< HEAD
+            if (card == null) return; // 没有点击到卡牌，不处理
+=======
             if (card == null)
             {
                 // 点到空地：正常情况什么也不做；但正在等选目标时这是唯一的出口，
@@ -1700,6 +1798,7 @@ InputState currentInputState = InputState.nil;
                 AbandonTargetChoice();
                 return;
             }
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
             // 点击时立即将卡牌提升到最上层
             _displayOrderDirty = true;
             var validTargets = GetAllowedTargets(card);
@@ -1887,11 +1986,15 @@ InputState currentInputState = InputState.nil;
                             cardNowChoose = null;
                             break;
                         }
+<<<<<<< HEAD
+                    else if(result.GetMyCard().GetIsFriend() != cardNowChoose.GetIsFriend())
+=======
                     // 攻击落点**不走 IsValidTarget**（那边是给指令用的目标类型筛选），
                     // 所以这里要自己挡一次：阵亡后暂留在场上的卡不能当攻击目标。
                     // 挡不住就能对着一具还没消失的尸体开火。
                     else if(CanBeSelected(result.GetMyCard())
                             && result.GetMyCard().GetIsFriend() != cardNowChoose.GetIsFriend())
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
                         {
                             Attack(cardNowChoose, result.GetMyCard());
                             cardNowChoose = null;
@@ -2073,11 +2176,14 @@ InputState currentInputState = InputState.nil;
                     case "friendDeckRemainingCount":
                         sb.Append(player1?.ReadDeckCount() ?? 0);
                         break;
+<<<<<<< HEAD
+=======
                     case "hp":
                         // 战役血量（「还能失败几次」）。非战役模式（直接跑战场场景调试）
                         // 没有血量概念，BattleStateManager.Hp 会停在初始值，属预期。
                         sb.Append(BattleStateManager.Hp);
                         break;
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
                     case "lifeTime":
                         if (targets != null && targets.Count > 0)
                             sb.Append(targets[0].ReadLifeTime());
@@ -2385,6 +2491,11 @@ InputState currentInputState = InputState.nil;
 
     }
 
+<<<<<<< HEAD
+    public void TriggerFriendlyCardDrawn(cardBase_ card)
+    {
+        _ = TriggerUnitEffects("FriendlyCardDrawn", card, new List<cardBase_> { card });
+=======
     /// <summary>
     /// 「友方抽到卡」时点。
     ///
@@ -2399,6 +2510,7 @@ InputState currentInputState = InputState.nil;
     {
         await TriggerUnitEffects("FriendlyCardDrawn", card, new List<cardBase_> { card });
         await CheckIfAnyUnitDiedAsync();
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     }
 
     /// <summary>
@@ -2588,6 +2700,9 @@ InputState currentInputState = InputState.nil;
                 attackPresentationTimer ??= GetTree().CreateTimer(0.5);
         }
 
+<<<<<<< HEAD
+        PlayBattleSound(1);
+=======
         // 攻击声一共三种可能，优先级从上到下：
         // 1. 攻击特效里带了自定义音效（flying / airstrike / sfx(...)）——它自己会响，不放别的；
         // 2. 坦克与火炮打的是 TankAttack —— 换成对应口径的炮声（小的也用 medium，坦克没有小档素材）；
@@ -2602,6 +2717,7 @@ InputState currentInputState = InputState.nil;
             else
                 PlayBattleSound(1);
         }
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
         // 标记单位已经攻击，减少可攻击次数
         from.HaveAttacked();
@@ -2744,9 +2860,12 @@ InputState currentInputState = InputState.nil;
             {
                 card.HaveMoved();
             }
+<<<<<<< HEAD
+=======
             // 在场上挪位置也响一声（卡上有 playEffect 就用它，飞机放「飞过」；
             // 入场那一声走 PlayCardEffect，两条互斥）
             PlayMoveEffect(card);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
             // 否则触发移动单位的 Moving 效果
             await TriggerUnitEffects("Moving", card, new List<cardBase_> { card }, checkOnlySourceCard: true);
         }
@@ -2816,7 +2935,11 @@ InputState currentInputState = InputState.nil;
     {
         turn++;
         ForbidControl();
+<<<<<<< HEAD
+        RefreshAllCardInField();
+=======
         RefreshCardsInField(IsFriend.enemy);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
         // 敌方回合开始时，对敌方单位应用动员等trait
         await ApplyEnemyTurnStartTraits();
@@ -2868,7 +2991,10 @@ InputState currentInputState = InputState.nil;
     {
         GD.Print($"LoadEnemyActionQueue called with enemyHqName: {enemyHqName}");
         enemyActionQueue.Clear(); // 清空现有队列
+<<<<<<< HEAD
+=======
         _battleStartEffect = "";  // 开局效果同理：换关卡不能沿用上一关的
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         
         var iniPath = "res://cards/enemyTurn.ini";
         
@@ -2927,6 +3053,15 @@ InputState currentInputState = InputState.nil;
             if (key == "name") continue;
             var value = configFile[enemyHqName][key].ToString().Trim();
             GD.Print($"Loading action: key={key}, value={value}");
+<<<<<<< HEAD
+            
+
+            
+            // 确定实际要添加到的队列
+            string actualQueueKey = key;
+            string actualValue = value;
+            
+=======
 
             // 开局效果走独立字段，不进行动队列：队列里的每一条都会作为「敌方意图」
             // 显示在左侧面板上，而开局效果只结算一次、不是意图。
@@ -2940,6 +3075,7 @@ InputState currentInputState = InputState.nil;
             string actualQueueKey = key;
             string actualValue = value;
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
             // 添加到对应的队列
             if (!enemyActionQueue.ContainsKey(actualQueueKey))
@@ -3347,11 +3483,14 @@ InputState currentInputState = InputState.nil;
     private bool IsTargetProtectedByGuardian(cardBase_ target, cardBase_ attacker)
     {
         if (target == null || attacker == null) return false;
+<<<<<<< HEAD
+=======
 
         // 火炮与轰炸机越顶射击，守护拦不住它们。这里只认攻击方兵种，
         // 所以玩家侧 Attack() 与敌方 AI 选目标两条路径天然一致。
         if (cardBase_.IgnoresGuardian(attacker.cardType)) return false;
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         // 具有烟幕的单位，守护不生效
         if (target.HasSmokeScreenActive())
         {
@@ -3455,6 +3594,57 @@ InputState currentInputState = InputState.nil;
     }
 
     /// <summary>
+<<<<<<< HEAD
+    /// 敌方行动：先把单位推进到前线（如果前线没有我方单位），再按优先级进行攻击
+    /// 优先级：能破坏总部 -> 能破坏单位 -> 能攻击总部 -> 随机攻击单位
+    /// </summary>
+    async Task EnemyPerformActionsAsync()
+    {
+        // 1) 如果前线没有我方单位，尝试把敌方单位推进前线
+        bool frontHasFriend = frontLine.Any(p => p.GetMyCard() != null && p.GetMyCard().GetIsFriend() == IsFriend.friend);
+        if (!frontHasFriend)
+        {
+            var enemyUnits = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy).ToList();
+            foreach (var eCard in enemyUnits.Where(x=>x.isHq!=HQ.hq && x.CheckIfCanMove()))
+            {
+                // 总部不能移动
+                if (eCard.isHq == HQ.hq) continue;
+
+                // 空军单位和炮兵单位不会主动上前线
+                if (eCard.cardType == CardTypes.Plane || eCard.cardType == CardTypes.Bomber || 
+                    eCard.cardType == CardTypes.Artillery)
+                {
+                    continue;
+                }
+
+                if (frontLine.Contains(eCard.GetMyPlace()))
+                {
+                    continue;
+                }
+        // ============ 修复
+
+                // 找到第一个空的前线格子
+                var place = frontLine.FirstOrDefault(p => p.GetMyCard() == null);
+                if (place == null) break;
+
+                // 只有当单位还能移动时才尝试移动（CheckIfCanMove 会减少 moveAble）
+                if (!eCard.CheckIfCanMove()) continue;
+
+                await Move(eCard, place);
+                eCard.HaveMoved();
+
+                // 步兵、火炮、战斗机和轰炸机移动后不能攻击
+                if (eCard.cardType == CardTypes.Infantry || eCard.cardType == CardTypes.Artillery || 
+                    eCard.cardType == CardTypes.Plane || eCard.cardType == CardTypes.Bomber)
+                {
+                    eCard.HaveAttacked();
+                }
+
+                await Task.Delay(300);
+            }
+        }
+
+=======
     /// 敌方AI最多跑几轮「移动 → 攻击」。正常情况 2 轮就收敛（第 2 轮没人动得动），
     /// 这个数只是**保险丝**：万一以后有人改了 `HaveMoved()` 不再清 `moveAble`，
     /// 循环就会永远转下去、整局卡死。宁可少打一轮也不能死循环。
@@ -3611,6 +3801,7 @@ InputState currentInputState = InputState.nil;
     {
         bool anybodyAttacked = false;
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         // 2) 攻击阶段：按优先级对每个敌方单位尝试攻击
         var rnd = new Random();
         var attackers = ReadCardInPlaces().Where(x => x.getState() == CardState.placed && x.GetIsFriend() == IsFriend.enemy).ToList();
@@ -3619,6 +3810,10 @@ InputState currentInputState = InputState.nil;
         for (int i = 0; i < attackers.Count; i++)
         {
             var attacker = attackers[i];
+<<<<<<< HEAD
+            if (attacker == null) continue;
+            await Task.Delay(500);
+=======
 
             // 出击的唯一入口：转发给 Attack 并记账。五处优先级分支都走它，
             // 免得漏记某一处导致循环提前收敛（那样前线清空了也不会补位）。
@@ -3637,6 +3832,7 @@ InputState currentInputState = InputState.nil;
             // 对已释放的包装会抛 ObjectDisposedException——栈顶就是这一行。
             if (!CanBeSelected(attacker)) continue;
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
             GD.Print($"Processing enemy unit: {attacker}, Type: {attacker.cardType}, Attack: {attacker.ReadAttack()}, Place: {attacker.GetMyPlace()}");
 
             // 如果是总部或攻击力为0则不主动攻击
@@ -3670,7 +3866,11 @@ InputState currentInputState = InputState.nil;
             if (myHq != null && allowedTargets.Contains(myHq) && CanDestroyTarget(attacker, myHq))
             {
                 GD.Print($"  Attacking HQ");
+<<<<<<< HEAD
+                await Attack(attacker, myHq);
+=======
                 await Strike(myHq);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
                 continue;
             }
 
@@ -3678,14 +3878,22 @@ InputState currentInputState = InputState.nil;
             var killable = allowedTargets.FirstOrDefault(u => CanDestroyTarget(attacker, u));
             if (killable != null)
             {
+<<<<<<< HEAD
+                await Attack(attacker, killable);
+=======
                 await Strike(killable);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
                 continue;
             }
 
             // 其后：能攻击总部（非必定破坏，且总部在允许目标中）
             if (myHq != null && allowedTargets.Contains(myHq))
             {
+<<<<<<< HEAD
+                await Attack(attacker, myHq);
+=======
                 await Strike(myHq);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
                 continue;
             }
 
@@ -3693,6 +3901,18 @@ InputState currentInputState = InputState.nil;
             var targetRandom = allowedTargets[rnd.Next(allowedTargets.Count)];
             if (targetRandom != null)
             {
+<<<<<<< HEAD
+                await Attack(attacker, targetRandom);
+                continue;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 刷一个敌方单位 目前只是随机从敌人卡组里抽一张放在支援阵线 之后会在这里写敌方ai的召唤逻辑
+    /// </summary>
+    async Task enemySummonAsync()
+=======
                 await Strike(targetRandom);
                 continue;
             }
@@ -3701,6 +3921,7 @@ InputState currentInputState = InputState.nil;
         return anybodyAttacked;
     }
 async Task enemySummonAsync()
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     {
         var card = enemyDeck[0];
         enemyDeck.RemoveAt(0);
@@ -3788,6 +4009,18 @@ async Task enemySummonAsync()
             await ProcessDeadUnitAsync(deadUnit);
         }
 
+<<<<<<< HEAD
+        foreach (var card in allCards.Where(x => x?.shouldBeRemoved == 1))
+        {
+            card.DisableCombatAbility();
+            await card.DiscardCard();
+            RemoveCard(card);
+        }
+
+        deathCheckRequested |= deadUnits.Count > 0;
+    }
+
+=======
         // 待弃置的单位：先一次性关掉全部战斗能力，再错开起飞播动画。
         // 关能力要在起飞前统一做完——动画期间它们还挂在场上，不能有任何一张
         // 处在「已宣布弃置、却仍可被选去攻击」的中间态。
@@ -3851,11 +4084,14 @@ async Task enemySummonAsync()
         RemoveCard(card);
     }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     private static bool IsDeadPlacedUnit(cardBase_ card)
     {
         return card != null && card.getState() == CardState.placed && card.ReadDefence() <= 0;
     }
 
+<<<<<<< HEAD
+=======
     /// <summary>
     /// 阵亡表现：让卡在场上**停留一拍**，再消失并冒烟、爆炸。
     ///
@@ -3877,6 +4113,7 @@ async Task enemySummonAsync()
         PlayDeadSound(1);
     }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     private async Task ProcessDeadUnitAsync(cardBase_ deadUnit)
     {
         // 阵亡统计的唯一入口。上游 ProcessDeadUnitsOnceAsync 已用 IsDeadPlacedUnit
@@ -3906,6 +4143,11 @@ async Task enemySummonAsync()
         await TriggerUnitEffects("Dead", deadUnit, checkOnlySourceCard: true);
         IsFriend side = deadUnit.GetIsFriend();
         Vector2 deathCenter = GetCardCenter(deadUnit);
+<<<<<<< HEAD
+        RemoveCard(deadUnit);
+        StartEffect("smoke", new List<Vector2> { deathCenter });
+        PlayDeadSound(1);
+=======
 
         // 立刻把状态打成 destroyed，但节点先在场上留一拍才消失（见 PlayDeathPresentationAsync）。
         // 这一步是延迟的关键前提，不是可有可无的标记：
@@ -3918,6 +4160,7 @@ async Task enemySummonAsync()
 
         _ = PlayDeathPresentationAsync(deadUnit, deathCenter);
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         if (side == IsFriend.friend) await TriggerUnitEffects("FriendlyUnitDead", deadUnit);
         else if (side == IsFriend.enemy) await TriggerUnitEffects("EnemyUnitDead", deadUnit);
     }
@@ -3978,12 +4221,15 @@ async Task enemySummonAsync()
         await EnemyTurnAsync();
         
         // 触发友方回合开始时点
+<<<<<<< HEAD
+=======
         // 友方回合开始：刷新友方单位。
         // 放在 FriendlyTurnBegin 时点之前，理由有二：
         // ① 与从前「敌方回合开头刷全部」的时序一致，时点里读到的 attackCountThisTurn 仍是 0；
         // ② 敌方回合里被效果刷进场的单位，到这里才终于获得行动能力。
         RefreshCardsInField(IsFriend.friend);
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         await TriggerUnitEffects("FriendlyTurnBegin", null);
         await TriggerUnitEffects("TurnBegin", null);
 
@@ -4013,6 +4259,11 @@ async Task enemySummonAsync()
         RefreshEnemyIntentPanel();
     }
 
+<<<<<<< HEAD
+    void RefreshAllCardInField()
+    {
+        foreach(var card in cardInPlaces.Where(x=>x.getState()==CardState.placed).ToList())
+=======
     /// <summary>
     /// 刷新场上一方的单位，恢复其移动与攻击次数。
     ///
@@ -4032,6 +4283,7 @@ async Task enemySummonAsync()
         foreach (var card in cardInPlaces
                      .Where(x => x != null && x.getState() == CardState.placed && x.GetIsFriend() == side)
                      .ToList())
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         {
             card.RefreshUnit();
         }
@@ -4147,6 +4399,9 @@ async Task enemySummonAsync()
         if (card.GetIsFriend() == IsFriend.friend && card.isHq == HQ.hq && !defeatTransitionStarted)
         {
             defeatTransitionStarted = true;
+<<<<<<< HEAD
+            _ = ReturnToStartMenuAfterDefeat();
+=======
 
             // 战役模式下失败不再立刻结束本局：先按规则扣血（area7 清零 / boss 战 -2 /
             // 其余 -1，规则集中在 BattleStateManager.LoseHpOnBattleDefeat），
@@ -4167,6 +4422,7 @@ async Task enemySummonAsync()
             {
                 _ = ReturnToStartMenuAfterDefeat();
             }
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         }
         if(card.GetIsFriend()== IsFriend.enemy && card.isHq == HQ.hq)
         {
@@ -4189,6 +4445,8 @@ async Task enemySummonAsync()
         _displayOrderDirty = true;
     }
 
+<<<<<<< HEAD
+=======
     // ============================ 暂停菜单 ============================
 
     /// <summary>
@@ -4282,6 +4540,7 @@ async Task enemySummonAsync()
                                             new List<Vector2> { GetCardCenter(card) }, card);
     }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     private async Task ReturnToStartMenuAfterDefeat()
     {
         ForbidControl();
@@ -4320,6 +4579,8 @@ async Task enemySummonAsync()
     /// <summary>
     /// 战役模式下敌方总部被摧毁后，标记区域已完成并返回世界地图
     /// </summary>
+<<<<<<< HEAD
+=======
     /// <summary>
     /// 战败但血量未归零：显示撤退面板，扣掉本次的区域烈度，回世界地图继续本局。
     ///
@@ -4342,6 +4603,7 @@ async Task enemySummonAsync()
         await SceneLoader.ChangeSceneAsync(this, "res://bin/worldMap.tscn");
     }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     private async System.Threading.Tasks.Task ReturnToWorldMapAfterVictory()
     {
         var endNode = GetNodeOrNull<End>("end");
@@ -4405,6 +4667,9 @@ async Task enemySummonAsync()
         await CheckIfAnyUnitDiedAsync();
     }
 
+<<<<<<< HEAD
+    private int _discardZCounter = 50;
+=======
     /// <summary>
     /// 阵亡/弃置动画期间用的层级区间。**下限要高于场上卡（10），上限必须低于手牌（20）。**
     ///
@@ -4425,6 +4690,7 @@ async Task enemySummonAsync()
 
     /// <summary>一批弃置开始前重置，让同一批里的先后顺序从下往上排。</summary>
     private void ResetDiscardZCounter() => _discardZCounter = DiscardZBase;
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
     /// <summary>
     /// 播放弃牌动画并在完成后移除（fire-and-forget，Z-index递增确保后弃置的在上方）
@@ -4432,7 +4698,11 @@ async Task enemySummonAsync()
     public async Task CardDiscardAndRemove(cardBase_ card)
     {
         card.isDiscarding = true;
+<<<<<<< HEAD
+        card.ZIndex = _discardZCounter++;
+=======
         card.ZIndex = NextDiscardZIndex();
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         await card.DiscardCard();
         RemoveCard(card);
     }
@@ -4480,10 +4750,14 @@ async Task enemySummonAsync()
     /// </summary>
     public void HighlightValidTargets(TargetType targetType)
     {
+<<<<<<< HEAD
+        foreach (var card in cardInPlaces.Where(x=>x.getState()==CardState.placed).ToList())
+=======
         // 阵亡后暂留在场上的卡（destroyed，但节点还在）也要一起变灰：
         // 它已经不是合法目标，单独留着原色会被看成「这个能打」。
         foreach (var card in cardInPlaces
                      .Where(x => x.getState() is CardState.placed or CardState.destroyed).ToList())
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         {
             if (IsValidTarget(card, targetType))
             {
@@ -4518,6 +4792,12 @@ async Task enemySummonAsync()
     }
 
     /// <summary>
+<<<<<<< HEAD
+    /// 检查卡牌是否匹配指定的TargetType
+    /// </summary>
+    private bool IsValidTarget(cardBase_ card, TargetType targetType)
+    {
+=======
     /// 这张卡还能不能被玩家选中 / 当成目标。
     ///
     /// 阵亡的卡会在场上**停留 `DeathPresentationDelaySeconds` 秒才消失**
@@ -4553,6 +4833,7 @@ async Task enemySummonAsync()
     {
         if (!CanBeSelected(card)) return false;
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         switch (targetType)
         {
             case TargetType.aPlace:
@@ -4991,6 +5272,8 @@ async Task enemySummonAsync()
                     }
                 }
 
+<<<<<<< HEAD
+=======
                 // convert(id) - 把目标**原地转换**成 id 所指代的单位
                 if (instruction.StartsWith("convert", StringComparison.OrdinalIgnoreCase))
                 {
@@ -5005,6 +5288,7 @@ async Task enemySummonAsync()
                     }
                 }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
                 if (instruction.StartsWith("GetAttack", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
@@ -5202,6 +5486,9 @@ async Task enemySummonAsync()
                     }
                 }
 
+<<<<<<< HEAD
+                // DiscardRandomly(i) - 随机弃置i张卡
+=======
                 // DiscardPlayerRandomly(i) - 随机弃置**玩家**i张手牌
                 //
                 // 为什么不复用 DiscardRandomly：那条是按「效果来源卡的阵营」派发的。
@@ -5220,6 +5507,7 @@ async Task enemySummonAsync()
                 }
 
                 // DiscardRandomly(i) - 随机弃置i张卡（来源方自己的手牌）
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
                 if (instruction.StartsWith("DiscardRandomly", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^)]*)\)");
@@ -5562,6 +5850,13 @@ async Task enemySummonAsync()
                 // addANewUnitToBattlefieldWithCostAndType(type, cost) - 从非Unobtainable卡中按类型和费用选卡加入战场
                 if (instruction.StartsWith("addANewUnitToBattlefieldWithCostAndType", StringComparison.OrdinalIgnoreCase))
                 {
+<<<<<<< HEAD
+                    var match = System.Text.RegularExpressions.Regex.Match(instruction, @"\(([^,]+),\s*(\d+)\)");
+                    if (match.Success)
+                    {
+                        string typeStr = match.Groups[1].Value.Trim();
+                        int targetCost = int.Parse(match.Groups[2].Value.Trim());
+=======
                     // 第二个参数是**表达式**而不是字面量：`&result`（经 ReplaceVariables 后已经
                     // 是数字）、`&targetCost+3`、`4` 都要能用。原先的正则写死 `(\d+)`，实参只要
                     // 不是纯数字就整体不匹配、整条指令静默失效——「卡打出去了但什么都没发生」
@@ -5575,16 +5870,21 @@ async Task enemySummonAsync()
                     {
                         string typeStr = match.Groups[1].Value.Trim();
                         int targetCost = EvaluateExpression(match.Groups[2].Value.Trim(), result, targets, sourceCard);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
                         var cardType = CardParser.GetTypes(typeStr);
                         var allCards = GetCardMaganer().GetAllCards()
                             .Where(c => c.Rarity != Rarity.Unobtainable && c.CardType == cardType && c.IsHq != HQ.hq)
                             .ToList();
+<<<<<<< HEAD
+                        if (allCards.Count > 0)
+=======
 
                         if (allCards.Count == 0)
                         {
                             GD.Print($"[SpawnByCost] 卡池里没有可用的 {typeStr}，已跳过");
                         }
                         else
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
                         {
                             var sorted = allCards.OrderBy(c => Math.Abs(c.Cost - targetCost)).ToList();
                             int minDiff = Math.Abs(sorted[0].Cost - targetCost);
@@ -5592,6 +5892,9 @@ async Task enemySummonAsync()
                             var chosen = candidates[new Random().Next(candidates.Count)];
                             bool isFriend = sourceCard?.GetIsFriend() == IsFriend.friend;
                             var place = isFriend ? GetTheFirstValidFriendlyPlace() : GetTheFirstValidEnemySupportPlace();
+<<<<<<< HEAD
+                            if (place != null)
+=======
 
                             if (place == null)
                             {
@@ -5601,6 +5904,7 @@ async Task enemySummonAsync()
                                        + $"{chosen.Name}({chosen.Id}, {chosen.Cost}费) 无法入场");
                             }
                             else
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
                             {
                                 var newCard = cardRes.Instantiate() as cardBase_;
                                 newCard.SetCardInformation(chosen);
@@ -6227,6 +6531,8 @@ async Task enemySummonAsync()
         if (unit == null || unit.getState() != CardState.placed)
             return;
 
+<<<<<<< HEAD
+=======
         // 总部不能撤退。
         //
         // 这是本函数唯一能把一张**场上卡**变成**手牌卡**的出口，而总部一旦进了手牌就
@@ -6242,6 +6548,7 @@ async Task enemySummonAsync()
             return;
         }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         var unitPlace = unit.GetMyPlace();
         if (unitPlace == null)
             return;
@@ -6283,6 +6590,12 @@ async Task enemySummonAsync()
             }
         }
 
+<<<<<<< HEAD
+        // 无法返回手牌或敌方单位，直接弃置
+        unit.AddChange(ChangeType.DiscardCard,1);
+
+        await Task.Delay(100);
+=======
         // 无法返回手牌或敌方单位，直接弃置。
         //
         // 这里必须**立刻**关掉战斗能力，理由和友方回手牌那条分支一样：这张卡要到
@@ -6293,6 +6606,7 @@ async Task enemySummonAsync()
         unit.AddChange(ChangeType.DiscardCard,1);
 
         await Task.Delay(RetreatSettleDelayMs);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
 
         return;
     }
@@ -6420,12 +6734,15 @@ async Task enemySummonAsync()
         // 必须放在自身效果结算之后——结算完毕才算真正「打出过」这张指令。
         // 两处打出入口（_Input 的无目标/有目标分支）都经由本函数，故只需挂这里一处。
         await TriggerUnitEffects("FriendlyCommandPlayed", commandCard);
+<<<<<<< HEAD
+=======
 
         // 上面那次死亡检查只覆盖了**指令自身**的效果。时点里的效果一样能打死人
         // （「女狙击手」的 FriendlyCommandPlayed:GetRandomEnemyTarget|damage(2) 就在这条
         // 路径上），而 damage(n) 是缓存型变更，跑完时点后目标防御已经是 0 了。
         // 这里不再查一次，单位就会顶着 0 防杵在场上不死。
         await CheckIfAnyUnitDiedAsync();
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     }
 
     /// <summary>
@@ -6996,6 +7313,8 @@ public class Player
     /// <param name="card"></param>
     public async Task AddCardToHand(cardBase_ card)
     {
+<<<<<<< HEAD
+=======
         // 总部不该出现在手牌里。这是「进手牌」的唯一入口，在这里喊一声，
         // 任何把总部送进手牌的路径都会在控制台留下痕迹（含它当时的状态）。
         if (card != null && card.isHq == HQ.hq)
@@ -7005,6 +7324,7 @@ public class Player
                    + "总部只应待在支援阵线，请查调用方");
         }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         // 如果手牌已满，直接弃掉（动画后台播放，不阻塞效果结算）
         if (cardsInHand.Count >= maxHandSize)
         {
@@ -7318,7 +7638,10 @@ public class Player
         {
             var card = deck[0];
             deck.RemoveAt(0);
+<<<<<<< HEAD
+=======
             battlefield.PlayDrawSound();
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
             if (cardsInHand.Count >= maxHandSize)
             {
                 battlefield.AddToBattleField(card);
@@ -7331,7 +7654,11 @@ public class Player
             card.Visible = true;
             await AddCardToHand(card);
             SetLastDrawnCards(new List<cardBase_> { card });
+<<<<<<< HEAD
+            battlefield.TriggerFriendlyCardDrawn(card);
+=======
             await battlefield.TriggerFriendlyCardDrawn(card);
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         }
         
     }
@@ -7431,7 +7758,10 @@ public class Player
             if (card != null)
             {
                 deck.Remove(card);
+<<<<<<< HEAD
+=======
                 battlefield.PlayDrawSound();
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
                 if (cardsInHand.Count >= maxHandSize)
                 {
                     await card.DiscardCard();
@@ -7461,7 +7791,10 @@ public class Player
                 if (card != null)
                 {
                     deck.Remove(card);
+<<<<<<< HEAD
+=======
                     battlefield.PlayDrawSound();
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
                     if (cardsInHand.Count >= maxHandSize)
                     {
                         battlefield.AddToBattleField(card);
@@ -7493,7 +7826,10 @@ public class Player
             if (card != null)
             {
                 deck.Remove(card);
+<<<<<<< HEAD
+=======
                 battlefield.PlayDrawSound();
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
                 if (cardsInHand.Count >= maxHandSize)
                 {
                     battlefield.AddToBattleField(card);
@@ -7524,6 +7860,8 @@ public class Player
 
             int index = random.Next(cardsInHand.Count);
             var card = cardsInHand[index];
+<<<<<<< HEAD
+=======
 
             // 总部绝不该出现在手牌里。真出现了说明有别的路径破坏了
             // 「总部只待在支援阵线」这条不变量（已知的一条是 RetreatUnit，
@@ -7536,6 +7874,7 @@ public class Player
                 continue;
             }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
             RemoveFromHand(card);
             await card.DiscardCard();
             battlefield.RemoveCard(card);

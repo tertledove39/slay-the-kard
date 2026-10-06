@@ -141,6 +141,8 @@ offset_right = 270.0
 offset_bottom = 123.0
 theme_override_font_sizes/font_size = 20
 text = "返回主菜单"
+<<<<<<< HEAD
+=======
 
 [node name="Retreat" type="Control" parent="."]
 visible = false
@@ -182,3 +184,4 @@ offset_right = 300.0
 offset_bottom = 160.0
 theme_override_font_sizes/font_size = 20
 text = "返回世界地图"
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249

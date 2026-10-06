@@ -50,6 +50,8 @@ theme_override_font_sizes/font_size = 32
 text = "战斗烈度：3"
 horizontal_alignment = 1
 vertical_alignment = 1
+<<<<<<< HEAD
+=======
 
 [node name="BackButton" type="Button" parent="."]
 layout_mode = 0
@@ -59,3 +61,4 @@ offset_right = 190.0
 offset_bottom = 88.0
 theme_override_font_sizes/font_size = 24
 text = "返回"
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249

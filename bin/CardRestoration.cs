@@ -22,6 +22,8 @@ public static class BattleStateManager
     // 是否处于战役模式
     public static bool IsCampaignMode { get; set; } = false;
     public static int MaterialPoints { get; set; } = 0;
+<<<<<<< HEAD
+=======
 
     // ============================ 血量 ============================
 
@@ -79,6 +81,7 @@ public static class BattleStateManager
         }
         return AddHp(IsBossBattle() ? -2 : -1);
     }
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     public static int LastBattleLandKilled { get; set; } = 0;
     public static int LastBattleAirKilled { get; set; } = 0;
     public static int LastBattleFriendlyDead { get; set; } = 0;
@@ -236,6 +239,8 @@ public static class BattleStateManager
         return _areaIntensity.TryGetValue(areaName, out int value) ? value : -1;
     }
 
+<<<<<<< HEAD
+=======
     /// <summary>
     /// 读出全部区域的剩余烈度（区域名 → 烈度），供**存档**序列化用。
     /// 返回副本，调用方改它不会影响内部状态。
@@ -257,6 +262,7 @@ public static class BattleStateManager
         }
     }
 
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
     /// <summary>进入区域时按 areaTimes 初始化烈度；已初始化的区域不会被重置</summary>
     public static void EnsureAreaIntensity(string areaName, int areaTimes)
     {
@@ -311,8 +317,12 @@ public static class BattleStateManager
         StoreCardQueue.Clear();
         StoreCurrentSlots = null;
 
+<<<<<<< HEAD
+        // 资源点与上局战斗统计
+=======
         // 血量与资源点、上局战斗统计
         Hp = InitialHp;
+>>>>>>> afb9f4d401f2e531fad3d7f1d723c9ed7d6ce249
         MaterialPoints = 0;
         LastBattleLandKilled = 0;
         LastBattleAirKilled = 0;
