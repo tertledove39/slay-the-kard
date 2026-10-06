@@ -1,0 +1,31 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core_logic/ConvertEffect.cs" id="1"]
+
+; 转换特效：与 flying / airstrike / strafe 同一套结构（FlyingEffect + SFX 播放器）。
+; 抬起高度、停多久、各段时长都在这里调；翻面那两下由 ConvertEffect.cs 覆写悬停阶段完成。
+[node name="ConvertEffect" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+; 轻微浮起：比攻击用的飞掠矮一些，转换不需要飞那么高
+RiseHeight = 30.0
+; 浮起时轻微放大
+RiseScale = 1.04
+; 浮起要几秒
+RiseDuration = 0.22
+; 落回要几秒
+LandDuration = 0.22
+; 抬高层级压住其他卡（必须低于手牌的 20，见 NOTICE.md 的层级表）
+TopZIndex = 12
+; 飞掠音效：[sfx] 段的槽位名
+SfxSlot = "flyby"
+; 每一次半翻（1→0 或 0→1）要几秒
+HalfFlipSeconds = 0.18
+; 露出卡背之后停多久
+BackHoldSeconds = 0.35

@@ -1,0 +1,16 @@
+[remap]
+
+importer="dialogue_manager"
+importer_version=15
+type="Resource"
+uid="uid://k8uvs7hol3gj"
+path="res://.godot/imported/campaign_victory.dialogue-512ec514d79fe7ae25bb267d9cdc874c.tres"
+
+[deps]
+
+source_file="res://dialogues/campaign_victory.dialogue"
+dest_files=["res://.godot/imported/campaign_victory.dialogue-512ec514d79fe7ae25bb267d9cdc874c.tres"]
+
+[params]
+
+defaults=true

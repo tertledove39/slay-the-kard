@@ -283,6 +283,27 @@ public class IniFile : IEnumerable<KeyValuePair<string, IniSection>>, IDictionar
         return sections.ContainsKey(section);
     }
 
+    /// <summary>
+    /// 检查是否存在指定的节
+    /// </summary>
+    /// <param name="section">节名称</param>
+    /// <returns>如果存在返回true，否则返回false</returns>
+    public bool HasSection(string section) {
+        return sections.ContainsKey(section);
+    }
+
+    /// <summary>
+    /// 获取指定节下的所有键
+    /// </summary>
+    /// <param name="section">节名称</param>
+    /// <returns>包含该节下所有键的集合</returns>
+    public ICollection<string> GetSectionKeys(string section) {
+        if (sections.ContainsKey(section)) {
+            return sections[section].Keys;
+        }
+        return new List<string>();
+    }
+
     public bool TryGetSection(string section, out IniSection result) {
         return sections.TryGetValue(section, out result);
     }

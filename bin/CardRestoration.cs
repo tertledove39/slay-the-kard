@@ -1,0 +1,477 @@
+using System;
+using System.Collections.Generic;
+using System.Formats.Asn1;
+using System.Linq;
+using Godot;
+
+/// <summary>
+/// 跨场景静态数据管理器，用于在WorldMap / ChooseMission / Battlefield之间传递状态
+/// </summary>
+public static class BattleStateManager
+{
+    public static string PlayerDeckId { get; set; } = "default_deck";
+    public static battlefield_ battlefield { get; set; }
+
+    /// <summary>非战役模式（直接运行战场场景调试）时使用的敌人预设</summary>
+    public const string DefaultEnemyPreset = "berlin";
+
+    // 战役模式：选中的敌人预设名
+    public static string SelectedEnemy { get; set; } = DefaultEnemyPreset;
+    // 战役模式：当前选中的区域名
+    public static string SelectedArea { get; set; } = "";
+    // 是否处于战役模式
+    public static bool IsCampaignMode { get; set; } = false;
+    public static int MaterialPoints { get; set; } = 0;
+
+    // ============================ 血量 ============================
+
+    /// <summary>开局血量。血量是「整局还能失败几次」的计数器，属于本局进度，随 ResetCampaignProgress 重置。</summary>
+    public const int InitialHp = 5;
+
+    /// <summary>商店里 1 点血量的价格（资源点）。</summary>
+    public const int HpPrice = 200;
+
+    /// <summary>
+    /// 当前血量。**无上限**——事件与商店都能加，可以攒到 5 以上。
+    /// 战斗失败不再立刻结束本局：普通战 -1、boss 战 -2、area7（终局区域）直接清零；
+    /// 归零时才走「游戏结束」流程。
+    /// </summary>
+    public static int Hp { get; set; } = InitialHp;
+
+    /// <summary>
+    /// 增减血量。负数扣血时下限钳到 0（不会变成负数），无上限。
+    /// 返回扣除后的实际血量，便于调用方判断是否归零。
+    /// </summary>
+    public static int AddHp(int amount)
+    {
+        Hp = Math.Max(0, Hp + amount);
+        return Hp;
+    }
+
+    /// <summary>
+    /// 当前选中的关卡是否为所在区域的 boss 战。
+    /// boss 按约定不写进 AreaPool.ini 的 enemyN，而是由 MissionDrawer 在烈度为 1 时单独提供，
+    /// 所以只能拿「本次抽中的关卡名」与该区域配置的 boss 名比对。
+    /// area7 的 berlin_final_battle 没有配 boss，走不到这里——它由 IsFinalArea 特判。
+    /// </summary>
+    public static bool IsBossBattle()
+    {
+        if (string.IsNullOrEmpty(SelectedArea)) return false;
+        if (!GetCachedAreaPools().TryGetValue(SelectedArea, out Area pool)) return false;
+
+        string boss = pool.ReadBoss();
+        return !string.IsNullOrEmpty(boss) && boss == SelectedEnemy;
+    }
+
+    /// <summary>
+    /// 战斗失败扣血规则（唯一实现，见 docs/LOGIC.md「血量」一节）：
+    ///   area7（终局区域）失败 → 血量直接清零
+    ///   boss 战失败           → -2
+    ///   其余战斗失败          → -1
+    /// 返回扣完之后的血量；调用方据此决定是回 worldMap 继续还是走「游戏结束」。
+    /// </summary>
+    public static int LoseHpOnBattleDefeat()
+    {
+        if (IsFinalArea(SelectedArea))
+        {
+            Hp = 0;
+            return Hp;
+        }
+        return AddHp(IsBossBattle() ? -2 : -1);
+    }
+    public static int LastBattleLandKilled { get; set; } = 0;
+    public static int LastBattleAirKilled { get; set; } = 0;
+    public static int LastBattleFriendlyDead { get; set; } = 0;
+    public static int LastBattleHqDefenceLost { get; set; } = 0;
+    public static int LastBattleEnemyHqDamage { get; set; } = 0;
+    public static int LastBattlePointsGained { get; set; } = 0;
+    private static readonly string[] AreaOrder = { "area1", "area2", "area3", "area4", "area5", "area6", "area7" };
+    public static Dictionary<string, int> UnlockedArea { get; } = new()
+    {
+        ["area1"] = 1,
+        ["area2"] = 0,
+        ["area3"] = 0,
+        ["area4"] = 0,
+        ["area5"] = 0,
+        ["area6"] = 0,
+        ["area7"] = 0
+    };
+
+    /// <summary>
+    /// 各区域的剩余战斗烈度。进入区域时按 AreaPool.ini 的 areaTimes 初始化，
+    /// 每完成一场战斗或事件减1，归零时解锁下一区域。尚未进入过的区域不在此字典中。
+    /// </summary>
+    private static readonly Dictionary<string, int> _areaIntensity = new();
+
+    // ============================ 敌人预设 ============================
+
+    /// <summary>
+    /// 当前战斗应加载的敌人预设名：战役模式取任务界面所选关卡，否则用默认预设。
+    /// 战斗脚本加载与战斗专属BGM（battleBGM_&lt;预设名&gt;）都以此为准，保证听到的曲子与实际敌人一致。
+    /// </summary>
+    public static string ResolveEnemyPreset()
+    {
+        return IsCampaignMode ? SelectedEnemy : DefaultEnemyPreset;
+    }
+
+    // ============================ 卡组持久化 ============================
+
+    /// <summary>临时卡牌引用列表（当前场景的Player.deck引用，不跨场景持久）</summary>
+    public static List<cardBase_> Deck { get; set; } = new();
+    /// <summary>从deck.ini或奖励交换中生成的持久卡牌ID列表（不含战斗中临时卡）</summary>
+    public static List<string> DeckCardIds { get; set; } = new();
+    /// <summary>deck.ini是否已加载（避免重复加载）</summary>
+    public static bool IsDeckInitialized { get; set; } = false;
+    /// <summary>所有卡牌的CardData缓存（card.ini解析结果，跨场景复用）</summary>
+    private static Dictionary<string, CardData> _allCards;
+    /// <summary>所有事件数据缓存（event.ini解析结果）</summary>
+    private static Dictionary<string, EventData> _allEvents;
+
+    /// <summary>
+    /// 储存所有area对应数据的池子
+    /// </summary>
+    private static Dictionary<string, Area> _areaPools;
+
+    /// <summary>缓存所有卡牌数据，供跨场景访问</summary>
+    public static void CacheAllCards(Dictionary<string, CardData> cards)
+    {
+        if (cards != null && cards.Count > 0)
+            _allCards = cards;
+    }
+
+    /// <summary>根据ID获取缓存的卡牌数据</summary>
+    public static CardData GetCachedCard(string id)
+    {
+        if (_allCards != null && _allCards.TryGetValue(id, out var card))
+            return card;
+        return null;
+    }
+
+    /// <summary>获取所有已缓存的卡牌数据（复用缓存，避免重复解析INI文件）</summary>
+    public static Dictionary<string, CardData> GetAllCachedCards()
+    {
+        return _allCards != null ? new Dictionary<string, CardData>(_allCards) : new Dictionary<string, CardData>();
+    }
+
+    /// <summary>卡牌数据是否已缓存（WorldMap加载完成后即为true）</summary>
+    public static bool IsCardDataCached => _allCards != null && _allCards.Count > 0;
+
+    /// <summary>缓存所有事件数据</summary>
+    public static void CacheAllEvents(Dictionary<string, EventData> events)
+    {
+        if (events != null && events.Count > 0)
+            _allEvents = events;
+    }
+
+    public static bool IsEventDataCached => _allEvents != null && _allEvents.Count > 0;
+
+    public static void CacheAreaPools(Dictionary<string, Area> areaPools)
+    {
+        if (areaPools != null && areaPools.Count > 0)
+            _areaPools = areaPools;
+    }
+
+
+/// <summary>
+/// 阅读缓存的areaPool池
+/// </summary>
+/// <returns></returns>
+    public static Dictionary<string,Area> GetCachedAreaPools()
+    {
+        return _areaPools;
+    }
+
+    /// <summary>根据ID获取事件数据</summary>
+    public static EventData GetEvent(string id)
+    {
+        if (_allEvents != null && _allEvents.TryGetValue(id, out var ev))
+            return ev;
+        return null;
+    }
+
+    /// <summary>从DeckCardIds构建cardBase_列表（仅用于显示，不入战斗）</summary>
+    public static List<cardBase_> BuildDisplayDeck()
+    {
+        var result = new List<cardBase_>();
+        if (DeckCardIds == null || DeckCardIds.Count == 0) return result;
+
+        var cardScene = ResourceLoader.Load<PackedScene>("res://bin/cardbase.tscn");
+        foreach (var id in DeckCardIds)
+        {
+            var cd = GetCachedCard(id);
+            if (cd == null) continue;
+            var card = cardScene.Instantiate() as cardBase_;
+            card.SetCardInformation(cd);
+            card.SetIsFriend(IsFriend.friend);
+            result.Add(card);
+        }
+        return result;
+    }
+
+    // ============================ 区域管理 ============================
+
+    /// <summary>关闭当前区域并解锁下一个区域</summary>
+    public static void AdvanceArea(string areaName)
+    {
+        int index = Array.IndexOf(AreaOrder, areaName);
+        if (index < 0) return;
+        UnlockedArea[areaName] = 0;
+        if (index + 1 < AreaOrder.Length)
+            UnlockedArea[AreaOrder[index + 1]] = 1;
+    }
+
+    /// <summary>解锁所有区域（控制台调试用）</summary>
+    public static void UnlockAllAreas()
+    {
+        foreach (string area in AreaOrder)
+            UnlockedArea[area] = 1;
+    }
+
+    // ============================ 区域战斗烈度 ============================
+
+    /// <summary>读取区域剩余战斗烈度；返回 -1 表示该区域尚未进入过</summary>
+    public static int ReadAreaIntensity(string areaName)
+    {
+        if (string.IsNullOrEmpty(areaName)) return -1;
+        return _areaIntensity.TryGetValue(areaName, out int value) ? value : -1;
+    }
+
+    /// <summary>
+    /// 读出全部区域的剩余烈度（区域名 → 烈度），供**存档**序列化用。
+    /// 返回副本，调用方改它不会影响内部状态。
+    /// </summary>
+    public static Dictionary<string, int> ReadAllAreaIntensity() => new(_areaIntensity);
+
+    /// <summary>
+    /// 整表写回区域烈度，供**读档**还原用。会先清空，避免旧局的残留混进来。
+    /// 只收 >0 的项：0 与「没进过这个区域」在 <see cref="ReadAreaIntensity"/> 里
+    /// 都返回「没有」，混在一起会让存档多出一堆没意义的键。
+    /// </summary>
+    public static void RestoreAreaIntensity(Dictionary<string, int> values)
+    {
+        _areaIntensity.Clear();
+        if (values == null) return;
+        foreach (var pair in values)
+        {
+            if (pair.Value > 0) _areaIntensity[pair.Key] = pair.Value;
+        }
+    }
+
+    /// <summary>进入区域时按 areaTimes 初始化烈度；已初始化的区域不会被重置</summary>
+    public static void EnsureAreaIntensity(string areaName, int areaTimes)
+    {
+        if (string.IsNullOrEmpty(areaName)) return;
+        if (_areaIntensity.ContainsKey(areaName)) return;
+        _areaIntensity[areaName] = Math.Max(1, areaTimes);
+    }
+
+    /// <summary>
+    /// 消耗1点区域烈度；归零时解锁下一区域。
+    /// 返回 true 表示本次消耗后烈度刚好归零。
+    /// </summary>
+    public static bool ConsumeAreaIntensity(string areaName)
+    {
+        if (string.IsNullOrEmpty(areaName)) return false;
+        if (!_areaIntensity.TryGetValue(areaName, out int value) || value <= 0) return false;
+
+        value--;
+        _areaIntensity[areaName] = value;
+        if (value > 0) return false;
+
+        AdvanceArea(areaName);
+        return true;
+    }
+
+    /// <summary>判断是否为战役的最后一个区域</summary>
+    public static bool IsFinalArea(string areaName)
+    {
+        return Array.IndexOf(AreaOrder, areaName) == AreaOrder.Length - 1;
+    }
+
+    // ============================ 整局进度重置 ============================
+
+    /// <summary>
+    /// 重置整局战役进度：卡组、已解锁区域、区域烈度、物资点、上局战斗统计与商店库存，
+    /// 全部回到初始状态（仅 area1 解锁、卡组重新读取 deck.ini）。
+    /// 不重置内容缓存（card.ini / event.ini / AreaPool.ini 的解析结果），那属于配置而非本局状态。
+    /// </summary>
+    public static void ResetCampaignProgress()
+    {
+        // 卡组：清空持久 ID 并允许重新从 deck.ini 加载
+        DeckCardIds.Clear();
+        IsDeckInitialized = false;
+        Deck.Clear();
+
+        // 区域：仅第一个区域解锁
+        foreach (string area in AreaOrder)
+            UnlockedArea[area] = area == AreaOrder[0] ? 1 : 0;
+        _areaIntensity.Clear();
+
+        // 商店：库存与已售状态属于本局进度
+        StoreCardQueue.Clear();
+        StoreCurrentSlots = null;
+
+        // 血量与资源点、上局战斗统计
+        Hp = InitialHp;
+        MaterialPoints = 0;
+        LastBattleLandKilled = 0;
+        LastBattleAirKilled = 0;
+        LastBattleFriendlyDead = 0;
+        LastBattleHqDefenceLost = 0;
+        LastBattleEnemyHqDamage = 0;
+        LastBattlePointsGained = 0;
+
+        // 场景选择状态与上一局的战场节点引用
+        SelectedEnemy = DefaultEnemyPreset;
+        SelectedArea = "";
+        IsCampaignMode = false;
+        battlefield = null;
+
+        GD.Print("[BattleStateManager] 整局进度已重置");
+    }
+
+    // ============================ 商店数据 ============================
+
+    public class StoreSlot
+    {
+        public string CardId;
+        public int OriginalPrice;
+        public bool IsDiscounted;
+        public bool IsSold;
+        public int EffectivePrice => IsDiscounted ? OriginalPrice / 2 : OriginalPrice;
+    }
+
+    public static Queue<string> StoreCardQueue { get; set; } = new();
+    public static List<StoreSlot> StoreCurrentSlots { get; set; }
+
+    private static readonly (Rarity rarity, double weight)[] StoreRarityWeights = new[]
+    {
+        (Rarity.Common, 0.4),
+        (Rarity.Rare, 0.3),
+        (Rarity.Epic, 0.2),
+        (Rarity.Legendary, 0.1),
+    };
+
+    // 由原始表（5/2、10/3、20/4、30/5）累计 +200% 基准价、+140% 浮动：
+    //   5/2 →10/3 →15/5、10/3 →20/5 →30/8、20/4 →40/6 →60/9、30/5 →60/8 →90/12
+    // 浮动必须是整数（rnd.Next(-variance, variance + 1)），小数按四舍五入取整，
+    // 因此实际浮动比例与 140% 有零点几的偏差。
+    // 最终售价 = 基准价 ± 浮动，下限 1。
+    private static readonly Dictionary<Rarity, (int basePrice, int variance)> StorePriceTable = new()
+    {
+        { Rarity.Common, (15, 5) },
+        { Rarity.Rare, (30, 8) },
+        { Rarity.Epic, (60, 9) },
+        { Rarity.Legendary, (90, 12) },
+    };
+
+    public static void GenerateStoreCardBatch(int count)
+    {
+        var rnd = new Random();
+        var allCards = GetAllCachedCards()?.Values
+            .Where(c => c.IsHq == HQ.normalCard && c.Rarity != Rarity.Unobtainable)
+            .ToList();
+        if (allCards == null || allCards.Count == 0) return;
+
+        var byRarity = allCards.GroupBy(c => c.Rarity)
+            .ToDictionary(g => g.Key, g => g.Select(c => c.Id).ToList());
+
+        for (int i = 0; i < count; i++)
+        {
+            var rarity = PickStoreRarity(rnd);
+            if (byRarity.TryGetValue(rarity, out var pool) && pool.Count > 0)
+                StoreCardQueue.Enqueue(pool[rnd.Next(pool.Count)]);
+            else
+                StoreCardQueue.Enqueue(allCards[rnd.Next(allCards.Count)].Id);
+        }
+    }
+
+    private static Rarity PickStoreRarity(Random rnd)
+    {
+        double roll = rnd.NextDouble();
+        double cumulative = 0;
+        foreach (var (rarity, weight) in StoreRarityWeights)
+        {
+            cumulative += weight;
+            if (roll <= cumulative) return rarity;
+        }
+        return Rarity.Common;
+    }
+
+    public static void EnsureStoreCardQueue(int minCount)
+    {
+        while (StoreCardQueue.Count < minCount)
+            GenerateStoreCardBatch(100);
+    }
+
+    public static void InitializeStoreSlots()
+    {
+        EnsureStoreCardQueue(14);
+        var rnd = new Random();
+        var slots = new List<StoreSlot>();
+
+        for (int i = 0; i < 7; i++)
+        {
+            if (StoreCardQueue.Count == 0) break;
+            var cardId = StoreCardQueue.Dequeue();
+            var cardData = GetCachedCard(cardId);
+            if (cardData == null) continue;
+
+            // 兜底值与 Common 保持一致（商店已过滤掉 Unobtainable，正常不会走到）
+            var (basePrice, variance) = StorePriceTable.GetValueOrDefault(cardData.Rarity, (15, 5));
+            int price = basePrice + rnd.Next(-variance, variance + 1);
+            if (price < 1) price = 1;
+
+            slots.Add(new StoreSlot
+            {
+                CardId = cardId,
+                OriginalPrice = price,
+                IsDiscounted = false,
+                IsSold = false,
+            });
+        }
+
+        double discountRoll = rnd.NextDouble();
+        int discountCount = discountRoll < 0.5 ? 1 : (discountRoll < 0.75 ? 2 : 0);
+
+        var indices = Enumerable.Range(0, slots.Count).OrderBy(_ => rnd.Next()).ToList();
+        for (int i = 0; i < discountCount && i < indices.Count; i++)
+            slots[indices[i]].IsDiscounted = true;
+
+        StoreCurrentSlots = slots;
+    }
+
+    public static void RefreshStoreSlots()
+    {
+        InitializeStoreSlots();
+    }
+
+    // ============================ UI辅助 ============================
+
+    /// <summary>
+    /// 以CanvasLayer叠加显示卡组查看界面。
+    /// 将展示用卡牌挂到holder上确保Godot管理其生命周期，DisplayCard关闭时一并清理。
+    /// </summary>
+    public static void ShowDeckViewer(Node parent, List<cardBase_> deckCards)
+    {
+        deckCards ??= new();
+        Deck = deckCards;
+
+        var canvasLayer = new CanvasLayer();
+        canvasLayer.Layer = 2;
+        parent.AddChild(canvasLayer);
+
+        // 将展示卡牌挂到不可见holder上，确保Godot统一管理生命周期（避免GC时native handle失效）
+        var holder = new Control { Visible = false, MouseFilter = Control.MouseFilterEnum.Ignore };
+        canvasLayer.AddChild(holder);
+        foreach (var card in deckCards)
+            holder.AddChild(card);
+
+        var displayScene = ResourceLoader.Load<PackedScene>("res://bin/display_card.tscn");
+        var display = displayScene.Instantiate() as DisplayCard;
+        canvasLayer.AddChild(display);
+
+        // DisplayCard关闭时清理整个CanvasLayer（holder及其中的display cards一起释放）
+        display.TreeExiting += () => canvasLayer.QueueFree();
+    }
+}

@@ -1,0 +1,21 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core_logic/BulletEffect.cs" id="1"]
+
+[node name="BulletEffect" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+; 弹体场景（子弹）
+ProjectileScenePath = "res://bin/bullet.tscn"
+; 打出几发。正数 = 固定发数；子弹固定 10 发，不随攻击力变
+ProjectileCount = 10
+; 相邻两发之间最多错开多少毫秒（实际取 0~本值之间的随机数）
+StaggerMaxMs = 100
+; 每发子弹飞完全程要几秒
+ProjectileFlightSeconds = 0.3

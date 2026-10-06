@@ -1,0 +1,61 @@
+[gd_scene load_steps=3 format=3 uid="uid://dvbulsso8ffup"]
+
+[ext_resource type="Script" uid="uid://hn0wy5xlxby7" path="res://bin/ChooseMission.cs" id="1_ihdb6"]
+[ext_resource type="Texture2D" uid="uid://c17c0d6olkwms" path="res://assest/battleButton.png" id="2_r4pno"]
+
+[node name="Control" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_ihdb6")
+
+[node name="TextureButton" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 189.0
+offset_top = 233.0
+offset_right = 505.0
+offset_bottom = 732.0
+texture_normal = ExtResource("2_r4pno")
+stretch_mode = 0
+
+[node name="TextureButton2" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 639.0
+offset_top = 233.0
+offset_right = 955.0
+offset_bottom = 732.0
+texture_normal = ExtResource("2_r4pno")
+stretch_mode = 0
+
+[node name="TextureButton3" type="TextureButton" parent="."]
+layout_mode = 0
+offset_left = 1089.0
+offset_top = 233.0
+offset_right = 1405.0
+offset_bottom = 732.0
+texture_normal = ExtResource("2_r4pno")
+stretch_mode = 0
+
+[node name="intensityLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 500.0
+offset_top = 100.0
+offset_right = 1100.0
+offset_bottom = 150.0
+theme_override_colors/font_color = Color(1, 0.843137, 0, 1)
+theme_override_font_sizes/font_size = 32
+text = "战斗烈度：3"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BackButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 30.0
+offset_right = 190.0
+offset_bottom = 88.0
+theme_override_font_sizes/font_size = 24
+text = "返回"

@@ -1,0 +1,33 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://bin/Bullet.cs" id="1_bomb"]
+[ext_resource type="Texture2D" uid="uid://bleqda1mrmjqm" path="res://assest/航弹.png" id="2_bomb"]
+
+; 航弹弹体：与 bin/bullet.tscn 结构相同，只是换了贴图。
+; 弹道由 Bullet.cs 决定——从攻击者直线飞向目标，并让贴图的「上边」对准飞行方向。
+; 若实机看到航弹是倒着飞的，把下面 Sprite2D 的 rotation 改成 3.14159（转 180°）即可。
+[node name="Bomb" type="Control"]
+layout_mode = 3
+anchor_left = -0.001
+anchor_top = -0.004
+anchor_right = 0.001
+anchor_bottom = 0.004
+offset_left = -0.39999998
+offset_top = -0.39999986
+offset_right = 0.39999998
+offset_bottom = 0.39999986
+grow_horizontal = 2
+grow_vertical = 2
+; 整体缩放（与子弹一致）
+scale = Vector2(3, 3)
+script = ExtResource("1_bomb")
+; 飞行缓动。0 = In（一直加速、不减速，到最快那一刻消失）；子弹那边保持默认的 InOut
+FlightEase = 0
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+; 贴图相对弹体中心的偏移
+position = Vector2(1, 3.1666665)
+; 贴图大小。航弹原图 10x14，嫌大嫌小改这里；若要转 180° 请在上面加一行 rotation = 3.14159
+; 净尺寸 = 根节点 scale(3) × 本值，当前 3 × 1.2 = 3.6（原先 0.6，太小看不见）
+scale = Vector2(1.2, 1.2)
+texture = ExtResource("2_bomb")

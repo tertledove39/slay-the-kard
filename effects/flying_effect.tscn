@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3 uid="uid://c45uapp63i4ka"]
+
+[ext_resource type="Script" uid="uid://dxpkige6lpdf4" path="res://core_logic/FlyingEffect.cs" id="1"]
+
+[node name="FlyingEffect" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+mouse_filter = 2
+script = ExtResource("1")
+SwaySecondsPerCycle = 1.0
+
+[node name="Sfx" type="AudioStreamPlayer" parent="."]
+bus = &"SFX"
