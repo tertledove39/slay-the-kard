@@ -1671,3 +1671,67 @@ shader 版能看到透视，代价是引 GLSL、还得赌它不会因为编译�
 
 > 定位 `GetTree()` 时先剥掉 `//` 注释再搜——方法里那段注释正好解释了「为什么
 > `GetTree()` 会抛」，直接搜会先命中注释。这类假阳性本项目已经踩到第三次了。
+
+---
+
+## 第二十九轮：排掉所有「await 之后插值对象」的地方 + GameDialogue 闸门（BUGS #62）
+
+老板贴的第二份异常是 **Visual Studio 调试器**的输出，后半段（`VsDbg.BrokeredServices`
+/ `StreamJsonRpc` / `ConnectionLostException`）是 VS 自己跟调试目标的 RPC 通道断了，
+不是游戏代码。真正要看的只有第一行 `ObjectDisposedException`——而**它没有栈**。
+
+### 先扩大排查面：`tests/scan_await_interp.py`
+
+上一轮修的是「跨 await 拿着卡牌引用」。这一轮干脆写个扫描器把同类形状一次列全：
+在 `async` 方法内、某个 `await` 之后，日志语句里插值了非基本类型标识符的地方。
+
+    python tests/scan_await_interp.py
+
+跑出来 21 处，逐条看下来**只有 1 处是真对象**：
+
+| 位置 | 插值对象 | 结论 |
+|---|---|---|
+| `battlefield_.cs:3639` `EnemyAttackPhaseAsync` | `attacker` | 上一轮已修（确认语句就在它上面） |
+| `battlefield_.cs:3669` 同一方法 | `myHq` | **安全**，理由见下 |
+| `battlefield_.cs:3804` `ProcessDeadUnitsOnceAsync` | `card.id` / `GetIsFriend()` / `isHq` | 安全，全是**托管字段**读取 |
+| `Store.cs:225` | `selected[0]`（CardData） | 安全，不是 Godot 对象 |
+| `SceneLoader.cs` / `EventScene.cs` / 其它 | 字符串、int | 安全 |
+
+`myHq` 那处为什么安全：`myHq` 是友方总部。**总部被移除时必然走 `RemoveCard(myHq)`
+→ 判负 → `ChangeScene`**，那一瞬间整场战斗连同 `attacker` 一起被释放，上面那句
+`CanBeSelected(attacker)` 已经 `continue` 掉了，走不到这一行。而万一
+`defeatTransitionStarted` 已置位、跳过了转场，`card.Dead()` 也只是把卡**还进对象池**
+（`ResourceManager.ReleaseEmptyCard`，不 `QueueFree`）——实测池里的卡插值正常。
+**所以这一处不动**（规范 A：没有实际缺陷就不改）。
+
+> 这个扫描器留在 `tests/` 下，**不叫 `verify_` 所以不参与全量回归**，是排查工具。
+> 以后再看到 `ObjectDisposedException`，先跑它。
+
+### 找到的真问题：GameDialogue 的 dispose-之后-再用
+
+`GameDialogue` 是 autoload，`_ExitTree` 只在关闭游戏/停止调试时触发——那一刻可能
+正好有对白在播。`_ExitTree` 里 `playGate.Dispose()`，而 `PlayAsync` 的 `finally`
+还有一次 `playGate.Release()`；`TrySetCanceled()` 会把那个 await 抛出来走 `finally`，
+于是对着已释放的 SemaphoreSlim 调用。而且 `Play()` 是 fire-and-forget，异常存进没人
+观察的 Task，退出时才炸，从栈上看不出跟对白有关。
+
+实测（临时 C# 场景，跑完即删）：
+
+    [PASS] 危险确认：SemaphoreSlim 释放后再 Release 抛
+           ObjectDisposedException('System.Threading.SemaphoreSlim')
+    [PASS] 老形状确认：gate 被释放后 PlayAsync 抛同一个异常
+    [PASS] _ExitTree 之后 PlayAsync 不再抛
+    [PASS] _ExitTree 之后 PlayAsync 返回 false（拒绝播放，不硬闯）
+
+> 「老形状确认」那一条第一次跑是**绿的假象反面**——它 FAIL 了，因为探针用的
+> `res://dialogues/__probe__.dialogue` 不存在，`LoadDialogue` 提前返回、根本没走到
+> `WaitAsync`。换成真实存在的 `res://dialogues/example.dialogue` 才真的撞上。
+> 教训：验证「某条路会炸」时，得先确认那条路真的被走到了。
+
+### 结构回归 `tests/verify_dialogue_gate_lifetime.py`（7 项）
+
+- `_ExitTree` 里有 `shutdownStarted = true;`，且**排在 `playGate.Dispose()` 之前**
+- `_ExitTree` 仍然退订 `DialogueEnded`（原有行为没丢）
+- `PlayAsync` 在 `await playGate.WaitAsync()` **之前**就检查标记
+- `finally` 里的 `playGate.Release()` 被标记包住
+- `playGate` 仍是 `readonly` 字段（没被改成可空绕过去）

@@ -971,3 +971,66 @@ card.getState() != CardState.destroyed`）。实测**已释放的卡上 `getStat
 
 **如果哪天要修**：最小做法是给 `cardBase_.MoveToPosition` 的 await 加一层超时或者
 存活轮询，而不是给整条 AI 链加取消。
+
+---
+
+### 62. `GameDialogue` 在 `_ExitTree` 里释放了闸门，而 `finally` 还会再用（已修）
+
+**怎么找到的**：老板贴了第二份异常，这次是 **Visual Studio 调试器**的输出：
+
+```
+引发的异常:“System.ObjectDisposedException”(位于 System.Private.CoreLib.dll 中) 'Cannot access a disposed object.'
+异常: StreamJsonRpc.ConnectionLostException: The JSON-RPC connection with the remote party was lost ...
+ ---> System.OperationCanceledException: The operation was canceled.
+   at VsDbg.BrokeredServices.Services.HotReloadServiceSender.EnterBreakAsync()
+```
+
+后两行**不是游戏代码**——`VsDbg.BrokeredServices` / `StreamJsonRpc` 是 Visual Studio
+调试器自己跟调试目标之间的 RPC 通道；`HotReloadServiceSender.EnterBreakAsync` 是它为了
+热重载要「进入断点」的那一步。这个异常的含义是：**游戏抛了一个异常，调试器正要去处理，
+而这时调试会话已经断了**（进程没了 / 手动停止）。所以真正要看的只有第一行。
+
+于是照着「`ObjectDisposedException` + 会话正在结束」去查，找到了本项目唯一一处
+**dispose 之后还用**的写法：
+
+```csharp
+public override void _ExitTree()
+{
+    DialogueManager.DialogueEnded -= OnDialogueEnded;
+    completion?.TrySetCanceled();
+    playGate.Dispose();          // ← 释放了
+}
+
+public async Task<bool> PlayAsync(...)
+{
+    await playGate.WaitAsync();  // ← 之后还会用
+    try { ... return await completion.Task; }
+    finally { playGate.Release(); }   // ← 这里也会用
+}
+```
+
+`GameDialogue` 是 **autoload**，所以 `_ExitTree` 只在**关闭游戏 / 停止调试**时触发——
+而那一刻完全可能正好有一段对白在播（`PlayAsync` 停在 `await completion.Task` 上）。
+`_ExitTree` 那句 `TrySetCanceled()` 会把那个 await 抛出来走 `finally`，于是
+**对着已经释放的 SemaphoreSlim 调 `Release()`**。
+
+**为什么它特别难查**：`Play()` 是 **不 await 的 fire-and-forget**（`_ = PlayAsync(...)`）。
+异常存进一个没人观察的 Task，要等 GC 或同步上下文收尾时才炸出来——调用栈上
+完全看不出跟对白有关，表现就是退出游戏时冒一条 `ObjectDisposedException`。
+
+**修复**（`core_logic/GameDialogue.cs`）：加 `shutdownStarted` 标记，`_ExitTree` 里
+**先置标记再 Dispose**；`PlayAsync` 在 `WaitAsync` 之前就拒绝，`finally` 里的
+`Release()` 用同一个标记包住。
+
+**验证**（临时 C# 场景，跑完即删）：
+
+    [PASS] 危险确认：SemaphoreSlim 释放后再 Release 抛
+           ObjectDisposedException('System.Threading.SemaphoreSlim')
+    [PASS] 老形状确认：gate 被释放后 PlayAsync 抛同一个异常
+    [PASS] _ExitTree 之后 PlayAsync 不再抛
+    [PASS] _ExitTree 之后 PlayAsync 返回 false（拒绝播放，不硬闯）
+
+> **注意**：这一条**没有**被确认为老板那份日志的真凶——那份日志没有栈。它的异常类型
+> 和触发时机（会话正在结束）都对得上，而且是全项目唯一一处 dispose-之后-再用，
+> 所以不管是与不是都该修。真要定位，需要 Godot 控制台那份带 C# 回溯的输出，
+> 而不是 VS 的「引发异常」一行。
