@@ -126,7 +126,13 @@ public partial class MeterLabel : Control
             float y = c == ' '
                 ? -10f * _digitH
                 : -(9 - (c - '0')) * _digitH;
-            _strips[displayCount - 1 - i].Position = new Vector2(0, y);
+            // 下标方向必须和 `RebuildStrips`（`_windows[0]` 摆在 x=0，是最左窗口）
+            // 与 `AnimateTo`（`int stripIdx = pos;`）一致：字符串第 i 个字符 → 第 i 条滚条。
+            // 这里原先写的是 `_strips[displayCount - 1 - i]`，**是反的**——单独调用时
+            // `DisplayImmediate(12)` 会显示成 "21"。平时看不出来，是因为紧接着
+            // `AnimateTo` 会把「变了的位」重新滚一遍盖过去；只有某一位这一步没变
+            // （例如 1→11 时个位都是 1）时才会露馅。见 BUGS #64。
+            _strips[i].Position = new Vector2(0, y);
         }
     }
 
@@ -144,6 +150,15 @@ public partial class MeterLabel : Control
                 t?.Kill();
             _activeTweens.Clear();
             _isAnimating = false;
+
+            // **被打断的那次动画只滚到一半，条带停在了半路**，必须先把它们
+            // snap 回那次动画的目标值——那正好就是此刻的 `_currentValue`。
+            //
+            // 下面只给「数字变了」的那几位开 tween（`if (oldStr[pos] == newStr[pos]) continue;`），
+            // 所以停错位的那一位如果这一步数字没变，就**永远不会被纠正**。
+            // 实测：9→10→11 连着来，十位停在 '9'，显示成 "91"；1→11 显示成 "1_"。
+            // 见 BUGS #64。
+            DisplayImmediate(_currentValue);
         }
 
         _isAnimating = true;

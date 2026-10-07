@@ -2494,7 +2494,14 @@ InputState currentInputState = InputState.nil;
         if (to.HasTrait(UnitTraits.HeavyArmor)) attackDamage = Math.Max(0, attackDamage - 1);
         if (to.HasTrait(UnitTraits.Immunity)) attackDamage = 0;
         lastDamage = attackDamage;
-        lastOverflowDamage = Math.Max(0, attackDamage - to.ReadDefence());
+        // 溢出只在「打的是单位、打过量了，多出来的溅到敌方总部」这个语义下才有意义
+        // （伊尔2M / 乌拉 / 步兵第756团 三张卡都靠 `Attacking:enemyHq|damage(&overflow)`）。
+        // **目标本身就是总部时必须算 0**：否则那份「溢出」会被效果再打回同一个总部，
+        // 等于把这一击对同一个目标算了两遍——实测总部防御 2、攻击力 4 时掉 6 血而不是 4。
+        // 见 BUGS #64。
+        lastOverflowDamage = to.isHq == HQ.hq
+            ? 0
+            : Math.Max(0, attackDamage - to.ReadDefence());
 
         // 触发攻击者的 Attacking 效果
         await TriggerUnitEffects("Attacking", from, new List<cardBase_> { to }, checkOnlySourceCard: true);
