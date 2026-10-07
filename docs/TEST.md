@@ -1840,3 +1840,62 @@ shader 版能看到透视，代价是引 GLSL、还得赌它不会因为编译�
 
 - `tests/verify_overflow_damage.py`（8 项）
 - `tests/verify_meter_digits.py`（9 项）
+
+---
+
+## 第三十二轮：卡名描边被抹掉（BUGS #67）
+
+老板给的截图里有卡**名字看不见了**。上一轮我答偏了（去追 `test.png` 白底美术），
+这一轮重新查。
+
+### 定位过程
+
+1. `SetCardInformation` 里有一组按类型隐藏元素的分支（`isHq == HQ.hq` 时会把
+   费用/名字/图标/兵种全藏起来）——先排掉这条：截图里那些卡的**费用数字是显示的**，
+   所以不是 HQ 分支。
+2. 顺着"哪段代码会动 Label"找到 `AdjustFontSizeToFit`。它在场景里读 name 标签的
+   `LabelSettings`，**整个换成 `new LabelSettings()`**：
+
+       label.LabelSettings = new LabelSettings();   // 只设 Font + FontSize
+       label.LabelSettings.Font = font;
+       label.LabelSettings.FontSize = bestSize;
+
+3. 读 `cardbase.tscn` 的 `LabelSettings_dte16`（name 用的那份）：`outline_size = 2`、
+   `outline_color = 黑`、**没写 `font_color`（默认白）** —— 卡名本来是「白字 + 黑描边」。
+4. 真起 battleField 实测三种状态：
+
+       === 场景里原生写死的 ===
+       name : size=23 color=(1,1,1,1) outline_size=2 outline_color=(0,0,0,1) line_spacing=0
+       === 走一遍 SetCardInformation 之后 ===
+       [轻步兵]      size=25 color=白 outline_size=0 outline_color=白 line_spacing=3
+       [i4]          size=20 color=白 outline_size=0 outline_color=白 line_spacing=3
+       [i89]         size=25 color=白 outline_size=0 outline_color=白 line_spacing=3
+       [t34_85_1944] size=22 color=白 outline_size=0 outline_color=白 line_spacing=3
+
+   **描边没了**（颜色、行距也一起丢了）。
+
+### 修复后实测
+
+       [轻步兵]      size=25 color=白 outline_size=2 outline_color=黑 line_spacing=0
+       [i4]          size=20 color=白 outline_size=2 outline_color=黑 line_spacing=0
+       [i89]         size=25 color=白 outline_size=2 outline_color=黑 line_spacing=0
+       [t34_85_1944] size=22 color=白 outline_size=2 outline_color=黑 line_spacing=0
+
+### 为什么"时有时无"
+
+`AdjustFontSizeToFit` 只在 `currentName != lastNameText || nameLabel.Size != lastNameLabelSize`
+成立时才跑。所以同一种卡（截图里 5 张轻步兵）有的重算过、描边没了，有的还没重算、
+描边还在——**同一张卡在同一屏里表现不一致**，这正是老板截图里看到的。
+
+### 顺手确认的一件事
+
+`FindBestFontSizeForLabel` 里那个**一次性测量用的 `tempLabel`** 仍然 `new LabelSettings()`
+——它只要字号、不需要外观，用完 `QueueFree`。**那里不动是对的**，测试里专门断言了
+这一条，免得以后有人"顺手统一"成 Duplicate 反而多分配资源。
+
+### 结构回归 `tests/verify_name_label_settings.py`（7 项）
+
+- 对**真正的** label 用 `Duplicate()`，不再 `new`
+- 复制之后仍然设置 Font + bestSize（自适应没改坏）
+- 场景里 name 的那份仍然是 `outline_size = 2` + 黑色描边（就是要保住的东西）
+- 临时测量标签照旧 `new` + `QueueFree`

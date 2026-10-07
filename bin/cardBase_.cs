@@ -1571,10 +1571,26 @@ public partial class cardBase_ : Control
 
         int bestSize = FindBestFontSizeForLabel(label, font, text, 6, maxSize, effectiveSize);
 
-        // 确保 Label 有独立 LabelSettings 并正确设置字体（新建，避免共享 sub_resource）
-        label.LabelSettings = new LabelSettings();
-        label.LabelSettings.Font = font;
-        label.LabelSettings.FontSize = bestSize;
+        // 每张卡必须持有**自己的** LabelSettings（`.tscn` 里的那份是 sub_resource，
+        // 多张卡共享同一个实例，改字号会串到别的卡上）。所以这里要复制一份。
+        //
+        // **但必须是 Duplicate()，不能 new 一个新的。** `new LabelSettings()` 会把
+        // 外观一起丢掉：卡名在场景里配的是「白字 + 黑色描边 `outline_size = 2`」，
+        // 新建出来的 `outline_size` 是 0、`outline_color` 是默认白，于是**描边没了**
+        // ——白字没描边压在卡面的深色条上/浅色底上，字就糊掉甚至看不见。
+        // `line_spacing` 也会从 0 被换成默认的 3。
+        //
+        // 实测（真起 battleField，读 name 标签的 LabelSettings）：
+        //     场景原生    size=23 color=白 outline_size=2 outline_color=黑 line_spacing=0
+        //     new 之后    size=2x color=白 outline_size=0 outline_color=白 line_spacing=3
+        //     Duplicate() 之后 外观与场景原生一致，只有 FontSize 变了。
+        // 见 BUGS #67。
+        LabelSettings settings = label.LabelSettings != null
+            ? (LabelSettings)label.LabelSettings.Duplicate()
+            : new LabelSettings();
+        settings.Font = font;
+        settings.FontSize = bestSize;
+        label.LabelSettings = settings;
     }
 
     private int FindBestFontSizeForLabel(Label label, Font font, string text, int minSize, int maxSize, Vector2 containerSize)

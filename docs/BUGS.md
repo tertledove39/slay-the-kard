@@ -1207,3 +1207,69 @@ tween 被 `Kill()` 时**永远不会返回**（Kill 不触发 `finished`），�
 `battlefield_.cs:626`（`res://cards/card.ini`）、`battlefield_.cs:633`
 （`cards\card.ini`）、`WorldMap.cs:251`（`res://cards/card.ini`）**都指向 `cards/`**，
 根目录那份没有任何代码或场景引用，删除安全。
+
+---
+
+### 67. 卡名的黑色描边被"重建 LabelSettings"抹掉（已修）
+
+**现象**（老板报的）：截图里有的卡**名字看不见了**。
+
+**怎么定位的**：卡面文字由几个 Label 组成，其中「名字」这个 Label 的设置在
+场景里是这样写的（`cardbase.tscn` 的 `LabelSettings_dte16`）：
+
+```
+font_size = 23
+outline_size = 2                 <- 黑色描边
+outline_color = Color(0, 0, 0, 1)
+（没写 font_color -> 默认白色）
+```
+
+也就是说**卡名本来是「白字 + 黑描边」**。而 `cardBase_.AdjustFontSizeToFit`
+为了让每张卡持有独立的 `LabelSettings`（`.tscn` 里那份是 sub_resource，多张卡
+共享同一个实例，改字号会串到别的卡上——那是更早一版「cost 串色」的教训），
+写成了：
+
+```csharp
+label.LabelSettings = new LabelSettings();   // ← 只设了下面两项
+label.LabelSettings.Font = font;
+label.LabelSettings.FontSize = bestSize;
+```
+
+`new LabelSettings()` 其余属性全是**默认值**，于是场景里配好的外观被整体抹掉。
+
+**实测**（真起 `battleField.tscn`，读 name 标签的 `LabelSettings`）：
+
+| | 字号 | 字色 | **描边大小** | **描边颜色** | 行距 |
+|---|---|---|---|---|---|
+| 场景原生 | 23 | 白 | **2** | **黑** | 0 |
+| `new` 之后 | 20~25 | 白 | **0** | **白** | **3** |
+| `Duplicate()` 之后 | 20~25 | 白 | **2** | **黑** | 0 |
+
+**为什么时有时无**：`AdjustFontSizeToFit` 只在
+
+```csharp
+if (currentName != lastNameText || nameLabel.Size != lastNameLabelSize)
+```
+
+成立时才跑。所以同一张卡（例如轻步兵）在不同实例上表现不一样——有的重算过、
+描边没了，有的还没重算、描边还在。截图里正是同一种卡有的正常有的不正常。
+
+**修复**（`bin/cardBase_.cs`）：改成 `Duplicate()` —— 既拿到独立实例（原来的意图），
+又保住外观，只覆盖 FontSize。
+
+```csharp
+LabelSettings settings = label.LabelSettings != null
+    ? (LabelSettings)label.LabelSettings.Duplicate()
+    : new LabelSettings();
+settings.Font = font;
+settings.FontSize = bestSize;
+label.LabelSettings = settings;
+```
+
+**注意**：`FindBestFontSizeForLabel` 里那个**一次性测量用的 `tempLabel`** 仍然
+`new LabelSettings()`——它只要字号，不需要外观，用完就 `QueueFree`。那里不改是对的。
+
+**谁守着**：`tests/verify_name_label_settings.py`（7 项）。
+
+**这条不是本轮引入的**：`git log -S` 追到 `83a67b3`（2026-04-05「变量 开发 抉择」），
+是早就埋下的。
