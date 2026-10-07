@@ -524,6 +524,32 @@ inplaceAndCaught` 三种状态——对 `placed` 的卡本来就是空操作，�
 
 ---
 
+## 守护（Guardian）
+
+位置：`battlefield_.cs` 的 `HasGuardianNeighbour(unit)`（**唯一实现**）、
+`IsGuardianAt(line, index)`（单格检查）
+
+规则：目标左右（**同一阵线内**相邻格）有活着的守护单位时，它不能被攻击。
+两条豁免——自身带烟幕的不受守护；自身带守护的不能被守护。
+另有一层在带攻击者的那层：`cardBase_.IgnoresGuardian(attacker.cardType)`
+（只有火炮与轰炸机，越顶火力）。
+
+两个对外名字，都是薄包装，**调用点不要各自再写一遍**：
+
+| 函数 | 用途 | 差别 |
+|---|---|---|
+| `IsTargetProtectedByGuardian(target, attacker)` | `Attack` 复检 + AI 选目标 | 多一层攻击者兵种检查 |
+| `IsUnitProtectedByGuardian(unit)` | 刷「被守护」浮标 | 不问攻击者 |
+
+**邻居必须过 `CanBeSelected`，不能只判 `leftCard != null`。** 阵亡单位会在
+场上停留一拍（`state` 已是 `destroyed`、却还绑在格子上，见 `ProcessDeadUnitAsync`），
+`HasTrait` 读的是托管字段照样返回 true——只判 null 的话，**尸体会继续保护隔壁**，
+而 `Attack` 撞上守护判定是直接 `return`，于是伤害被静默吞掉。详见 `docs/BUGS.md` #63。
+
+回归：`tests/verify_guardian_corpse.py`。
+
+---
+
 ## 单位卡选目标是两段式的
 
 位置：`battlefield_.cs` 的 `_Input`，两个分支

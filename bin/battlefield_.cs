@@ -2474,6 +2474,10 @@ InputState currentInputState = InputState.nil;
         // 检查目标是否被守护
         if (IsTargetProtectedByGuardian(to, from))
         {
+            // 这句日志不能省：上面烟幕那条失败**有**日志，守护这条原本是静默 return，
+            // 表现成「明明打中了却一点伤害都没有、控制台还什么都没说」——
+            // 排查时完全看不出发生过什么。见 BUGS #63。
+            GD.Print($"Attack failed: Target {to} is protected by a guardian");
             AllowControl();
             ResumeDeathCheck(); // 恢复死亡检查
             return;
@@ -3342,74 +3346,64 @@ InputState currentInputState = InputState.nil;
     }
     
     /// <summary>
-    /// 检查目标是否被守护单位保护
+    /// 检查目标是否被守护单位保护（需要攻击者上下文：火炮与轰炸机无视守护）。
+    ///
+    /// 这里只认攻击方兵种，所以玩家侧 `Attack()` 与敌方 AI 选目标两条路径天然一致。
+    /// 真正的判定在 `HasGuardianNeighbour`，本函数只负责「这个攻击者吃不吃守护」。
     /// </summary>
     private bool IsTargetProtectedByGuardian(cardBase_ target, cardBase_ attacker)
     {
         if (target == null || attacker == null) return false;
-
-        // 火炮与轰炸机越顶射击，守护拦不住它们。这里只认攻击方兵种，
-        // 所以玩家侧 Attack() 与敌方 AI 选目标两条路径天然一致。
         if (cardBase_.IgnoresGuardian(attacker.cardType)) return false;
+        return HasGuardianNeighbour(target);
+    }
+
+    /// <summary>
+    /// 守护判定的**唯一实现**：目标左右（同一阵线）有没有还活着的守护单位。
+    ///
+    /// 「被守护」这个规则原先在 `IsTargetProtectedByGuardian`（Attack 复检 + AI 选目标）
+    /// 和 `IsUnitProtectedByGuardian`（刷浮标）里各写了一遍，两份都只写了
+    /// `leftCard != null`——于是**阵亡但还没被收走的守护单位照样在保护隔壁**。
+    ///
+    /// 阵亡单位会在场上停留一拍（`DeathPresentationDelaySeconds`，见
+    /// `ProcessDeadUnitAsync`）：那一拍里 `state` 已经是 `destroyed`，却**还绑在
+    /// 格子上**，而 `HasTrait` 读的是托管字段、照样返回 true。表现就是老板报的
+    /// 「守护刚死，打隔壁总部却丢伤害」——`Attack` 撞上这句判定直接静默 return 了。
+    ///
+    /// 所以邻居必须过一遍 `CanBeSelected`（非 null + 节点存活 + 未阵亡），
+    /// 和项目里其余「这张卡还能不能用」的地方共用同一个判据（规范 E）。
+    /// </summary>
+    private bool HasGuardianNeighbour(cardBase_ unit)
+    {
+        if (unit == null) return false;
 
         // 具有烟幕的单位，守护不生效
-        if (target.HasSmokeScreenActive())
-        {
-            return false;
-        }
-        
-        // 具有守护的单位不能被守护
-        if (target.HasTrait(UnitTraits.Guardian))
-        {
-            return false;
-        }
-        
-        var targetPlace = target.GetMyPlace();
-        if (targetPlace == null) return false;
+        if (unit.HasSmokeScreenActive()) return false;
 
-        // 确定目标所在的阵线
-        List<place_> targetLine = null;
-        if (frontLine.Contains(targetPlace))
-        {
-            targetLine = frontLine;
-        }
-        else if (supportLine.Contains(targetPlace))
-        {
-            targetLine = supportLine;
-        }
-        else if (enemySupprotLine.Contains(targetPlace))
-        {
-            targetLine = enemySupprotLine;
-        }
-        
-        if (targetLine == null) return false;
-        
-        // 检查目标左侧是否有守护单位（在同一阵线中）
-        int targetIndex = targetLine.IndexOf(targetPlace);
-        if (targetIndex > 0)
-        {
-            var leftPlace = targetLine[targetIndex - 1];
-            var leftCard = leftPlace.GetMyCard();
-            if (leftCard != null && leftCard.HasTrait(UnitTraits.Guardian))
-            {
-                return true;
-            }
-        }
-        
-        // 检查目标右侧是否有守护单位（在同一阵线中）
-        if (targetIndex < targetLine.Count - 1)
-        {
-            var rightPlace = targetLine[targetIndex + 1];
-            var rightCard = rightPlace.GetMyCard();
-            if (rightCard != null && rightCard.HasTrait(UnitTraits.Guardian))
-            {
-                return true;
-            }
-        }
-        
-        return false;
+        // 具有守护的单位不能被守护
+        if (unit.HasTrait(UnitTraits.Guardian)) return false;
+
+        var myPlace = unit.GetMyPlace();
+        if (myPlace == null) return false;
+
+        List<place_> line = null;
+        if (frontLine.Contains(myPlace)) line = frontLine;
+        else if (supportLine.Contains(myPlace)) line = supportLine;
+        else if (enemySupprotLine.Contains(myPlace)) line = enemySupprotLine;
+        if (line == null) return false;
+
+        int index = line.IndexOf(myPlace);
+        return IsGuardianAt(line, index - 1) || IsGuardianAt(line, index + 1);
     }
-    
+
+    /// <summary>某个格子（越界返回 false）上有没有活着的守护单位。</summary>
+    private static bool IsGuardianAt(List<place_> line, int index)
+    {
+        if (index < 0 || index >= line.Count) return false;
+        var card = line[index].GetMyCard();
+        return CanBeSelected(card) && card.HasTrait(UnitTraits.Guardian);
+    }
+
     /// <summary>
     /// 获取指定位置左侧的位置
     /// </summary>
@@ -4105,41 +4099,13 @@ async Task enemySummonAsync()
     }
 
     /// <summary>
-    /// 检查单个单位是否被守护（左或右有守护单位）
+    /// 检查单个单位是否被守护（左或右有守护单位）。用于刷「被守护」浮标。
+    ///
+    /// 与 `IsTargetProtectedByGuardian` 的区别只有「有没有攻击者」这一层
+    /// （火炮/轰炸机无视守护），判定本身共用 `HasGuardianNeighbour`。
+    /// 原先两份各写一遍，缺陷也各有一份——见 `HasGuardianNeighbour` 的注释。
     /// </summary>
-    private bool IsUnitProtectedByGuardian(cardBase_ unit)
-    {
-        if (unit == null) return false;
-        if (unit.HasSmokeScreenActive()) return false;
-        if (unit.HasTrait(UnitTraits.Guardian)) return false;
-
-        var myPlace = unit.GetMyPlace();
-        if (myPlace == null) return false;
-
-        // 确定所在阵线
-        List<place_> line = null;
-        if (frontLine.Contains(myPlace)) line = frontLine;
-        else if (supportLine.Contains(myPlace)) line = supportLine;
-        else if (enemySupprotLine.Contains(myPlace)) line = enemySupprotLine;
-        if (line == null) return false;
-
-        int idx = line.IndexOf(myPlace);
-        // 检查左侧
-        if (idx > 0)
-        {
-            var leftCard = line[idx - 1].GetMyCard();
-            if (leftCard != null && leftCard.HasTrait(UnitTraits.Guardian))
-                return true;
-        }
-        // 检查右侧
-        if (idx < line.Count - 1)
-        {
-            var rightCard = line[idx + 1].GetMyCard();
-            if (rightCard != null && rightCard.HasTrait(UnitTraits.Guardian))
-                return true;
-        }
-        return false;
-    }
+    private bool IsUnitProtectedByGuardian(cardBase_ unit) => HasGuardianNeighbour(unit);
 
     public void RemoveCard(cardBase_ card)
     {

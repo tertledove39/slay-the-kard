@@ -1034,3 +1034,62 @@ public async Task<bool> PlayAsync(...)
 > 和触发时机（会话正在结束）都对得上，而且是全项目唯一一处 dispose-之后-再用，
 > 所以不管是与不是都该修。真要定位，需要 Godot 控制台那份带 C# 回溯的输出，
 > 而不是 VS 的「引发异常」一行。
+
+---
+
+### 63. 阵亡的守护单位尸体还在保护隔壁 —— 打总部会静默吞掉伤害（已修）
+
+**现象**（老板报的）：「敌方攻击我方刚失去被保护的总部的时候似乎会出现丢伤害的问题」。
+
+**先复现**（真起 `battleField.tscn`）：总部固定在 `supportLine[2]`（`_Ready` 里写死），
+把守护 `i25` 摆在左边的 `supportLine[1]`，敌方四号坦克摆到敌方前线（只有前线能打到
+友方支援阵线），然后让守护阵亡：
+
+    守护单位 state = destroyed，还绑在 supportLine[1] 上 = True
+    尸体还在时 总部受保护 = True
+    尸体还在时 攻击总部：防御 20 -> 20          <- 伤害被吞了
+    等尸体收走后：supportLine[1] 上的卡 = <空>，总部受保护 = False
+    尸体收走后 攻击总部：防御 20 -> 17          <- 正常
+
+**根因**：守护判定里邻居只判了 `leftCard != null`，**没有存活判定**：
+
+```csharp
+var leftCard = leftPlace.GetMyCard();
+if (leftCard != null && leftCard.HasTrait(UnitTraits.Guardian)) return true;
+```
+
+阵亡单位会在场上**停留一拍**（`DeathPresentationDelaySeconds` ≈1s，见
+`ProcessDeadUnitAsync` / `PlayDeathPresentationAsync`）：那一拍里 `state` 已经是
+`destroyed`，却**还绑在格子上**（`RemoveCard` 要等那一拍结束才解绑），而
+`HasTrait` 读的是**托管字段**、照样返回 true。于是尸体继续「保护」隔壁，
+`Attack` 撞上 2475 那句判定就直接 `return` 了。
+
+**为什么特别难查**：那句 `return` **完全静默**——连日志都没有。上面紧挨着的
+「烟幕失败」那条**是有日志的**，守护这条漏了。表现就是「明明打出去了、一点伤害
+都没有、控制台什么都不说」，老板只能描述成「似乎会丢伤害」。
+
+**顺带发现的重复实现**：同一份判定原先写了**两遍**——
+`IsTargetProtectedByGuardian(target, attacker)`（`Attack` 复检 + AI 选目标，
+多一层「火炮/轰炸机无视守护」）和 `IsUnitProtectedByGuardian(unit)`（刷「被守护」浮标）。
+两份的邻居扫描代码逐字相同，**缺陷也一模一样**。只修一处会留下另一半。
+
+**修复**（`bin/battlefield_.cs`）：
+1. 抽出唯一的守护判定 `HasGuardianNeighbour(unit)`，邻居过项目既有的
+   `CanBeSelected`（非 null + 节点存活 + 未阵亡）；左右两侧共用 `IsGuardianAt(line, index)`。
+2. 两个旧函数变成薄包装，**调用点一个都没动**：
+   - `IsTargetProtectedByGuardian` = 攻击者检查 + `HasGuardianNeighbour`
+   - `IsUnitProtectedByGuardian` = `HasGuardianNeighbour`（浮标那条本来就不问攻击者）
+3. `Attack` 里那句静默 `return` 补日志，与烟幕那句并列。
+
+**修复后实测**：
+
+    [PASS] 活着的时候守护照常拦得住（20 -> 20，应保持不变）
+    [PASS] 守护已阵亡，这一击应该打中总部（20 -> 17）
+    [PASS] 尸体收走后这一击打中了（17 -> 14）
+    Attack failed: Target <...> is protected by a guardian     <- 新日志，活着时确实响了
+
+**谁守着**：`tests/verify_guardian_corpse.py`（11 项）。
+
+**注意这与 BUGS #55 是同一类**：「阵亡的卡在场上停留一拍」这个中间态，凡是去枚举
+场上卡的功能都要问一句「这张是不是已经死了」。`CanBeSelected` 是唯一判据，
+本次是它第 5、6 个引用点（见 `docs/NOTICE.md` 的陷阱表）。
