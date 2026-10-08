@@ -69,11 +69,23 @@ public partial class battlefield_ : Control
         return allowControl;
     }
 
+    /// <summary>闸门被关上的时刻（毫秒）。只在 0→1 那一次打戳，嵌套暂停不会把它冲掉。</summary>
+    private ulong _deathCheckPausedSinceMsec;
+
+    /// <summary>关闸门的是哪个方法。卡死告警要靠它指名道姓（见 ReleaseDeathCheckGateIfStuck）。</summary>
+    private string _deathCheckPausedBy = "";
+
     /// <summary>
-    /// 暂停死亡检查
+    /// 暂停死亡检查。`reason` 由 `PauseDeathCheckScoped()` 用 `[CallerMemberName]` 自动填，
+    /// 调用方不用管——只有「闸门卡死」那条告警会读它。
     /// </summary>
-    void PauseDeathCheck()
+    void PauseDeathCheck(string reason = "")
     {
+        if (pauseDeathCheck == 0)
+        {
+            _deathCheckPausedSinceMsec = Time.GetTicksMsec();
+            _deathCheckPausedBy = reason;
+        }
         pauseDeathCheck = 1;
     }
 
@@ -106,16 +118,22 @@ public partial class battlefield_ : Control
     {
         private readonly battlefield_ _field;
 
-        public DeathCheckGuard(battlefield_ field)
+        public DeathCheckGuard(battlefield_ field, string reason)
         {
             _field = field;
-            _field.PauseDeathCheck();
+            _field.PauseDeathCheck(reason);
         }
 
         public void Dispose() => _field.ResumeDeathCheck();
     }
 
-    private DeathCheckGuard PauseDeathCheckScoped() => new DeathCheckGuard(this);
+    /// <summary>
+    /// 取一个「出作用域必恢复」的闸门守卫。`reason` 由编译器自动填成调用方方法名，
+    /// 闸门卡死时靠它定位。
+    /// </summary>
+    private DeathCheckGuard PauseDeathCheckScoped(
+        [System.Runtime.CompilerServices.CallerMemberName] string reason = "")
+        => new DeathCheckGuard(this, reason);
 
     /// <summary>
     /// 读取死亡检查状态
@@ -3786,6 +3804,39 @@ async Task enemySummonAsync()
     private const int DeathGateWarningIntervalMsec = 2000;
 
     /// <summary>
+    /// 闸门允许连续关闭的最长时间（秒）。超过就判定为「某个 await 永不返回」，强制开闸。
+    /// 正常的一次暂停最长也就几秒（入场/移动/攻击动画 + 时点效果），10 秒足够宽。
+    /// </summary>
+    private const int DeathCheckGateStuckSeconds = 10;
+
+    /// <summary>
+    /// 闸门关太久就强制打开。
+    ///
+    /// `using var guard = PauseDeathCheckScoped()` 只能覆盖「返回」和「抛异常」，
+    /// **覆盖不了「挂死」**：调用链里有任何一个 `await` 永远不返回，`Dispose` 就永远不会
+    /// 执行，`pauseDeathCheck` 从此停在 1。之后 `CheckIfAnyUnitDiedAsync()` 第一行就
+    /// return，玩家看到的是「打不死的总部」（BUGS #69 实测复现）。
+    ///
+    /// 最典型的那一个（`ToSignal(GetTree(), …)` 撞上已离树的节点）已经在
+    /// `AsyncWait` / `cardBase_.CanAnimate` 封掉了，但同族的挂死点不止一处
+    /// （BUGS #61 就是同族），逐个封堵永远会漏。所以在这里兜一道：
+    /// **宁可让死亡结算比动画早一步，也不能让总部永远死不掉**。
+    /// 开闸时把「是谁关的、关了多久」打进日志——下次再犯能直接定位。
+    /// </summary>
+    private void ReleaseDeathCheckGateIfStuck()
+    {
+        if (pauseDeathCheck == 0) return;
+
+        ulong heldMsec = Time.GetTicksMsec() - _deathCheckPausedSinceMsec;
+        if (heldMsec < (ulong)DeathCheckGateStuckSeconds * 1000UL) return;
+
+        pauseDeathCheck = 0;
+        GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} battlefield_.cs: 死亡检查闸门被 "
+                     + $"{_deathCheckPausedBy} 关了 {heldMsec / 1000} 秒仍未恢复，判定为某个 "
+                     + $"await 永不返回（见 BUGS #69），已强制开闸——死亡结算可能比动画早一步");
+    }
+
+    /// <summary>
     /// 闸门关着时**本该有人死**却跳过了，说明闸门被卡死——留一条日志。
     ///
     /// 这种情况完全静默：`CheckIfAnyUnitDiedAsync()` 第一行就 return，场上任何单位
@@ -3812,10 +3863,46 @@ async Task enemySummonAsync()
                      + $"漏一次恢复就会永久卡死——查 PauseDeathCheckScoped 的调用点");
     }
 
+    /// <summary>上一次「总部该死了却没死」告警的时间戳，用于限流。</summary>
+    private ulong _lastStuckHqWarningMsec;
+
+    /// <summary>
+    /// 友方总部已经血 ≤ 0 却还活着时，**把导致它没被结算的那个条件直接打出来**。
+    ///
+    /// 「总部死不掉」有三道门，任何一道卡住，玩家看到的都是同一件事，控制台却一声不响：
+    ///   1. 闸门关着     → `pauseDeathCheck == 1`（`CheckIfAnyUnitDiedAsync` 第一行就 return）
+    ///   2. 不被当成阵亡单位 → `IsDeadPlacedUnit` 要求 `state == placed`
+    ///   3. 已经不在场上 → `myHq` 不在 `cardInPlaces` 里（死亡检查枚举的是这个列表）
+    ///
+    /// 没有这条日志时只能靠人肉复现去猜是哪一个（BUGS #68 就是这么查的，太贵）。
+    /// 限流 2 秒。
+    /// </summary>
+    private void WarnIfHqShouldHaveDied()
+    {
+        if (myHq == null || !GodotObject.IsInstanceValid(myHq)) return;
+        if (myHq.ReadDefence() > 0) return;
+        if (myHq.getState() == CardState.destroyed) return;      // 已经在走死亡流程
+
+        ulong now = Time.GetTicksMsec();
+        if (now - _lastStuckHqWarningMsec < DeathGateWarningIntervalMsec) return;
+        _lastStuckHqWarningMsec = now;
+
+        GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} battlefield_.cs: 友方总部防御已 "
+                     + $"{myHq.ReadDefence()} 却没死 —— 闸门={pauseDeathCheck}"
+                     + $"(1=被挡) 状态={myHq.getState()}(要 placed) "
+                     + $"在cardInPlaces里={cardInPlaces.Contains(myHq)} "
+                     + $"已在失败转场={defeatTransitionStarted}");
+    }
+
     async Task CheckIfAnyUnitDiedAsync()
     {
+        // 先看闸门是不是被某个永不返回的 await 卡死了；是就强制打开（见该方法的注释）。
+        ReleaseDeathCheckGateIfStuck();
+
         if (pauseDeathCheck == 1)
         {
+            // 闸门还关着时也要报：这一条路径原本是彻底静默的，只有这里能说明白是谁挡的。
+            WarnIfHqShouldHaveDied();
             WarnIfDeathSkippedByGate();
             return;
         }
@@ -3834,6 +3921,9 @@ async Task enemySummonAsync()
                 deathCheckRequested = false;
                 await ProcessDeadUnitsOnceAsync();
             } while (deathCheckRequested && pauseDeathCheck == 0);
+
+            // 跑完一整轮之后总部还是 ≤ 0 且没死，说明三道门里有一道卡住了——报出来。
+            WarnIfHqShouldHaveDied();
         }
         finally
         {

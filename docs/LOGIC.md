@@ -444,6 +444,36 @@ cardsToShow = cardsToShow.Select(c => Copy(c)).Where(c => c != null).ToList();
 18. 恢复死亡检查+单位死亡判定
 19. 解锁控制
 
+### 死亡检查的闸门（`pauseDeathCheck`）
+
+`CheckIfAnyUnitDiedAsync()` 第一行是 `if (pauseDeathCheck == 1) return;`。
+暂停的用意是「动画/时点跑到一半时，别让半成品状态被结算掉」——
+`Attack` / `Move` / `AddCardToPlace` 从头到尾各持一个闸门。
+
+**闸门是个「`= 1` / `= 0`」的普通标志位，不是计数器**，所以只有两种关死方式，
+而它们的症状**完全一样**（场上任何单位，含总部，血 ≤ 0 都不死）：
+
+| 关死方式 | 典型成因 | 封堵 |
+|---|---|---|
+| 提前 `return` 忘了恢复 | `Move()` 里「手牌 → 非自己支援阵线」这条非法路径 | 作用域化：`using var guard = PauseDeathCheckScoped();`（BUGS #68） |
+| **`await` 永远不返回** | `ToSignal(GetTree(), …)` 撞上已离树的节点 | `AsyncWait.WaitFrameAsync` + `CanAnimate`（BUGS #69） |
+
+**第二种是 `using` 救不了的**：它只保证「正常返回」和「抛异常」会收尾，
+方法挂死在 `await` 上时 `Dispose` 同样永远不执行。
+
+三道诊断/兜底，都在 `battlefield_.cs`：
+
+| 名字 | 干什么 |
+|---|---|
+| `WarnIfDeathSkippedByGate()` | 闸门关着、场上却确实有血 ≤ 0 的单位 → 报警（2 秒限流） |
+| `WarnIfHqShouldHaveDied()` | 友方总部血 ≤ 0 却没死 → 把三道门（闸门值 / `state` / 是否在 `cardInPlaces`）全打出来 |
+| `ReleaseDeathCheckGateIfStuck()` | **看门狗**：闸门连续关闭超过 `DeathCheckGateStuckSeconds`（10 秒）就强制开闸，并报出「是谁关的、关了多久」 |
+
+看门狗的存在理由：挂死点不止一处（BUGS #61 是同族），逐个封堵永远会漏；
+漏一个，玩家看到的还是「总部死不掉」。原则是**宁可让死亡结算比动画早一步，
+也不能让总部永远死不掉**。「是谁关的」靠 `PauseDeathCheckScoped()` 的
+`[CallerMemberName]` 自动填，调用点不用改。
+
 ### 特性在战斗中的交互
 
 | 特性 | 攻击方 | 被攻击方 |

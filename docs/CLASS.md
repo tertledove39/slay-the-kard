@@ -294,6 +294,23 @@ id 不存在或新卡是总部时只报警、卡保持原样（翻面照常演�
 | 字体缓存 | `GetFont(path)` — 懒加载+缓存FontFile |
 | 空卡池 | `AcquireEmptyCard()`/`ReleaseEmptyCard(card)` — 对象池复用cardBase_ |
 
+### `AsyncWait` 静态类 (bin/AsyncWait.cs)
+
+**「等一帧」的唯一实现。** 不许在别处直接写 `await ToSignal(GetTree(), …)`。
+
+| 成员 | 说明 |
+|------|------|
+| `ProcessFrame` / `PhysicsFrame` | 信号名常量，免得各处再写裸字符串 |
+| `WaitFrameAsync(node, signalName)` | 等一帧。节点已释放、或已离场景树时**立即返回**，绝不挂死 |
+
+**为什么必须有它**：节点被摘出场景树后 `GetTree()` 返回 null，而 `ToSignal(null, …)`
+的 awaiter **永远不会完成**——挂在那句 `await` 上的协程就此永不返回，调用链里
+任何 `using` 作用域守卫也跟着永不 Dispose。死亡检查的闸门就是这样被永久关死的
+（`MoveToPosition` 挂在 `AddCardToPlace` / `Move` / `Attack` 中间）。详见 BUGS #69。
+
+判据顺序不能颠倒：先 `IsInstanceValid`（对已释放对象不抛）再 `IsInsideTree()`
+（走原生指针，会抛）。卡牌自己的同类判据是 `cardBase_.CanAnimate()`。
+
 ### `SceneLoader` 静态类 (bin/SceneLoader.cs)
 
 异步场景切换。

@@ -79,11 +79,13 @@ def main():
                              f"SetCardInformation 里对 {name} 调用了独占化"))
 
     # 改色前必须确认不是「共用资源 + 看不见的卡」
+    # 判据自 BUGS #69 起收成一个命名谓词 CanAnimate()（已释放 / 已离树），
+    # 本文件与 AnimateCostRoll、MoveToPosition 共用它，不再各写各的。
     flash = method(card, "private async void FlashAttributeWithColor(",
                    'if (targetLabel == null)')
-    results.append(check("if (!IsInsideTree())" in flash,
+    results.append(check("if (!CanAnimate())" in flash,
                          "FlashAttributeWithColor 对不在场景树上的卡直接返回"))
-    results.append(check(flash.index("IsInsideTree") < flash.index("GetNode<Label>"),
+    results.append(check(flash.index("CanAnimate()") < flash.index("GetNode<Label>"),
                          "这层保护在取节点之前"))
 
     # ==================== 待弃置单位不得被回合刷新复活 ====================

@@ -60,6 +60,7 @@
 | `iniHandler.cs` | ~806 | **INI解析器** — 通用的 INI 文件读写库，支持 `IniFile`/`IniSection`/`IniValue`，支持有序节。 |
 | `ResourceManager.cs` | ~333 | **资源管理器** — 单例节点。缓存 Texture/Scene/Font，维护空卡池（对象池）。 |
 | `SceneLoader.cs` | ~151 | **场景加载器** — 静态类。异步场景切换，支持后台预加载 `PackedScene`，带 Loading 覆盖层。 |
+| `AsyncWait.cs` | ~45 | **「等一帧」的唯一实现** — 静态类。`WaitFrameAsync(node)` 在节点已释放/已离树时立刻返回。直接写 `await ToSignal(GetTree(), …)` 会挂死：离树后 `GetTree()` 是 null，awaiter 永不完成（BUGS #69）。 |
 | `BattleStateManager` 类 | CardRestoration.cs (~167) | **跨场景状态管理** — 静态类。持久化卡组ID、选中的敌人、已完成的区域、卡牌数据缓存。 |
 | `MeterLabel.cs` | ~210 | **电表数字组件** — 机械式数字滚动显示（指挥点计数用）。 |
 | `WorldMap.cs` | ~645 | **世界地图场景** — 战役主界面。7个区域按钮，随递次解锁。点击弹出 ChooseMission。含调试控制台。 |

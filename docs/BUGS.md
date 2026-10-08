@@ -1391,3 +1391,103 @@ private DeathCheckGuard PauseDeathCheckScoped() => new DeathCheckGuard(this);
 烈度/商店），**不含任何运行时标志位**，重启后是全新战斗。所以那条复现要么是被
 #68 那条漏网路径击中的（旧包里还在），要么还需要他再给一次日志——补一的那条
 WARNING 正是为此准备的。
+
+---
+
+### 69. 闸门的另一半：**`await` 永远不返回**，`using` 也救不了（已修）
+
+老板的原话：**「不是你今天中午修复的那个问题 重新检查」**。他是对的。
+
+#### #68 修的是什么，这次不是它
+
+#68 修的是**提前 `return`** 漏掉 `ResumeDeathCheck()` —— 解法是把暂停作用域化，
+`using` 保证「离开作用域一定恢复」。但 `using` 的保证有个**前提**：
+**这个方法最终会以某种方式结束**（正常返回、或者抛异常）。
+
+`using` 覆盖不了**第三种结局：挂死**。方法卡在一个永远不返回的 `await` 上，
+`Dispose` 同样永远不会执行，`pauseDeathCheck` 一样停在 1。
+**症状一模一样，原因完全不同**，所以老板说「不是那个」是准确的。
+
+#### 挂死的那一句
+
+`cardBase_.MoveToPosition()` 的等待循环：
+
+```csharp
+while (moveTween == currentTween && currentTween.IsValid() && currentTween.IsRunning())
+{
+    await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+}
+```
+
+卡被摘出场景树之后 `GetTree()` 返回 **null**，而 **`ToSignal(null, …)` 的 awaiter
+永远不会完成**。日志里原样打出这两行：
+
+    ERROR: Parameter "data.tree" is null.
+    ERROR: Parameter "p_source" is null.
+
+`MoveToPosition` 于是永不返回 → 调用它的 `AddCardToPlace` / `Move` / `Attack`
+里的 `using var deathCheckGuard = PauseDeathCheckScoped();` **永不 Dispose**
+→ `pauseDeathCheck` 永远是 1 → `CheckIfAnyUnitDiedAsync()` 第一行就 `return`
+→ **总部血 -4 也不死**。
+
+**谁会把卡摘出场景树**：`ResourceManager.ReleaseEmptyCard()` 的第一步就是
+`GetParent().RemoveChild(card)`，而 `cardBase_.Dead()` / `RemoveCard` 会走到它
+（阵亡回收、弃置回收、`ShowCardChoice` 的临时剥离同理）。
+
+#### 实测：先复现，再下结论
+
+真起 `battleField`，拿一张手牌走 `AddCardToPlace`，动画途中把它 `RemoveChild`：
+
+    修复前：
+      起始：闸门=0
+      ERROR: Parameter "data.tree" is null.
+      ERROR: Parameter "p_source" is null.
+      已摘除。在树上=False
+      200 帧后：AddCardToPlace 完成了吗 = False   闸门=1
+      WARNING: 死亡检查被闸门挡住，2 个单位血已 ≤ 0 却没结算（第一个：预备役 防御=0）
+      总部 state=placed（没死）防御=-4          ← 老板看到的现象
+
+    修复后：
+      200 帧后：AddCardToPlace 完成了吗 = True    闸门=0
+      总部 state=destroyed（死了）
+
+#### 修法：两层
+
+**层一（治本）——把已证实的挂死源除掉。**
+「等一帧」收成唯一实现 `bin/AsyncWait.cs` 的 `WaitFrameAsync(Node)`：
+**不在场景树上就不等，立刻返回**。判据顺序不能颠倒（`IsInstanceTree()` 走原生指针，
+对已释放对象会抛，必须让 `IsInstanceValid` 先短路）。`cardBase_` 里同时收出一个
+命名判据 `CanAnimate()`，`MoveToPosition` **进循环前**和**循环体内**各挡一次。
+同一个坑的其它 4 个开口（`ResourceManager` ×3、`BattleEffectPool` ×1）一并收口。
+由白盒测试钉住：全项目不该再出现 `await ToSignal(GetTree(), …)` 这种等帧写法。
+
+**层二（兜底）——症状不许永久化。**
+挂死点不止一处（BUGS #61 就是同族：`await Move(...)` 挂死），逐个封堵永远会漏，
+而漏一个，老板看到的还是同一句话「总部死不掉」。所以加**闸门看门狗**
+`ReleaseDeathCheckGateIfStuck()`：闸门连续关闭超过 `DeathCheckGateStuckSeconds`（10 秒）
+就强制开闸，并把「**是谁关的、关了多久**」打进日志。`PauseDeathCheck` 因此多了一个
+`reason` 参数，由 `PauseDeathCheckScoped()` 的 `[CallerMemberName]` 自动填，
+调用点一个字都不用改。
+
+原则：**宁可让死亡结算比动画早一步，也不能让总部永远死不掉。**
+
+实测告警原文：
+
+    WARNING: 2026-10-08T21:52:39 battlefield_.cs: 死亡检查闸门被 AddCardToPlace
+    关了 11 秒仍未恢复，判定为某个 await 永不返回（见 BUGS #69），已强制开闸
+    ——死亡结算可能比动画早一步
+
+#### 谁守着
+
+- `tests/verify_death_gate_hang.py`（22 项，源码白盒）
+- `tests/DeathGateHangTest.cs` + `tests/death_gate_hang_test.tscn`（**真跑**的行为回归，
+  甲 基线 / 乙 挂死复现 / 丙 看门狗边界）
+
+丙那一段的边界是必需的：**只关 1 秒不能开闸**（否则正常的一次入场/攻击动画会被它
+打断），**关满 11 秒必须开闸**。只验后者的话，一个「无条件开闸」的实现也能过。
+
+#### 顺带纠正 #68-补 里的一句话
+
+#68-补 写了「需要重新导出再测」，那一半是对的（老板的包确实旧）。
+但**只靠重新导出并不能解决这个问题**——#69 这条路径在最新代码里同样存在，
+是这次才修掉的。

@@ -189,7 +189,7 @@ public partial class BattleEffectPool : Node
                 sprite.Modulate = new Color(1f, 1f, 1f, 0.01f);
         }
 
-        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        await AsyncWait.WaitFrameAsync(this);
 
         foreach (Bullet bullet in warmed)
         {

@@ -144,7 +144,7 @@ public partial class ResourceManager : Node
         foreach (var path in paths)
         {
             GetTexture(path);
-            await ToSignal(GetTree(), "physics_frame");
+            await AsyncWait.WaitFrameAsync(this, AsyncWait.PhysicsFrame);
         }
     }
 
@@ -189,7 +189,7 @@ public partial class ResourceManager : Node
             return;
 
         GetScene(path);
-        await ToSignal(GetTree(), "physics_frame");
+        await AsyncWait.WaitFrameAsync(this, AsyncWait.PhysicsFrame);
     }
 
     /// <summary>
@@ -321,7 +321,7 @@ public partial class ResourceManager : Node
             }
 
             // 让帧先渲染，避免卡顿
-            await ToSignal(GetTree(), "physics_frame");
+            await AsyncWait.WaitFrameAsync(this, AsyncWait.PhysicsFrame);
         }
     }
 

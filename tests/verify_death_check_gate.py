@@ -62,22 +62,25 @@ def main():
     results = []
 
     guard = body_of(code, "private readonly struct DeathCheckGuard : IDisposable")
-    scoped = body_of(code, "private DeathCheckGuard PauseDeathCheckScoped()")
+    scoped = body_of(code, "private DeathCheckGuard PauseDeathCheckScoped(")
 
     # --- 作用域守卫本身 ---
-    results.append(check("_field.PauseDeathCheck();" in guard,
-                         "DeathCheckGuard 构造时就暂停"))
+    results.append(check("_field.PauseDeathCheck(reason);" in guard,
+                         "DeathCheckGuard 构造时就暂停（reason 供卡死告警指名）"))
     results.append(check("Dispose() => _field.ResumeDeathCheck();" in guard,
                          "Dispose 一定恢复（using 覆盖提前 return 与抛异常）"))
-    results.append(check("PauseDeathCheckScoped() => new DeathCheckGuard(this);" in scoped,
+    results.append(check("new DeathCheckGuard(this, reason);" in scoped,
                          "工厂方法返回守卫"))
 
     # --- 三个暂停点全部改成作用域写法 ---
-    # 直接搜 "PauseDeathCheck();"——只应剩定义和第 112 行守卫内部那一句。
+    # 裸的 PauseDeathCheck(…) 调用只应剩守卫内部那一句。
+    # 定义行、工厂方法 PauseDeathCheckScoped 都不算。
     bare = [line for line in code.splitlines()
-            if "PauseDeathCheck();" in line and "void PauseDeathCheck()" not in line]
+            if "PauseDeathCheck(" in line
+            and "void PauseDeathCheck(" not in line
+            and "PauseDeathCheckScoped" not in line]
     results.append(check(len(bare) == 1,
-                         f"裸的 PauseDeathCheck() 只剩守卫内部那一句（实际 {len(bare)} 处）"))
+                         f"裸的 PauseDeathCheck(…) 只剩守卫内部那一句（实际 {len(bare)} 处）"))
 
     for sig, label in (("public async Task Attack(cardBase_ from,cardBase_ to)", "Attack"),
                        ("async Task Move(cardBase_ card, place_ position)", "Move"),

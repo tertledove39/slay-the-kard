@@ -2039,3 +2039,85 @@ shader 版能看到透视，代价是引 GLSL、还得赌它不会因为编译�
 
 **甲那一条是必需的**：只验「-4 时报警」的话，一个无条件报警的实现也能过；
 必须同时验「没人该死时不报」，才算真的按条件触发。
+
+---
+
+## 第三十五轮：闸门的另一半 —— `await` 永远不返回（BUGS #69）
+
+**为什么又做一轮**：老板说「不是你今天中午修复的那个问题 重新检查」。
+第三十三轮修的是「提前 `return` 忘了 `ResumeDeathCheck`」（作用域化即可），
+这一轮是同一句话的另一半：**`using` 覆盖不了挂死**。
+症状一模一样（总部血 -4 不死），原因完全不同。
+
+### 第一步：先复现，不许推理
+
+写了一个临时场景真起 `battleField`，拿一张手牌走 `AddCardToPlace`，
+在移动动画途中把卡 `RemoveChild`（与 `ResourceManager.ReleaseEmptyCard` 的第一步一致）：
+
+    修复前：AddCardToPlace 完成了吗=False  闸门=1  总部 state=placed 防御=-4（不死）
+    修复后：AddCardToPlace 完成了吗=True   闸门=0  总部 state=destroyed
+
+**没有这一步就不该动手**——「看起来像」的假设有三四条，只有这两行能定案。
+
+### 第二步：白盒（`tests/verify_death_gate_hang.py`，22 项）
+
+| 组 | 钉住的事 |
+|---|---|
+| 一 | `bin/AsyncWait.cs` 存在；`WaitFrameAsync` 先 `IsInstanceValid` 再 `IsInsideTree()`（顺序不能反）；不在树上时不走到 `await`；**全项目再没有 `await ToSignal(GetTree(), …)` 这种等帧写法** |
+| 二 | `MoveToPosition` 进循环前挡一次、循环体内再挡一次、等待走 `AsyncWait`；`CanAnimate()` 就是「已释放 / 已离树」这一个判据 |
+| 三 | 看门狗：阈值是命名常量；真的会 `pauseDeathCheck = 0`；告警带上「谁关的、关了多久」；在 `CheckIfAnyUnitDiedAsync()` 开头就被调用；闸门关着时也报总部 |
+| 四 | `PauseDeathCheck` 只在 0→1 打时间戳、记下方法名；`PauseDeathCheckScoped` 用 `CallerMemberName` |
+| 五 | 真跑的行为回归还在场 |
+
+`async Task CheckIfAnyUnitDiedAsync()` 的「开头」是用 `died[:died.index("if (pauseDeathCheck == 1)")]`
+切的——直接搜整段会连兜底分支一起算进去，那个写法第三十三轮已经踩过一次。
+
+### 第三步：真跑的行为回归（`tests/DeathGateHangTest.cs`）
+
+    godot --headless --path . res://tests/death_gate_hang_test.tscn
+
+| 段 | 验什么 |
+|---|---|
+| 甲 基线 | 没有异常情况时，总部血 -4 就该阵亡（别把没坏的东西修坏） |
+| 乙 挂死复现 | 卡在移动动画途中被摘出场景树 → `AddCardToPlace` 必须收束、闸门必须回到 0、总部照样死 |
+| 丙 看门狗边界 | **只关 1 秒不强制开闸**（正常暂停不受影响）+ 此期间总部保持存活；**关满 11 秒强制开闸**、开闸后总部立刻阵亡 |
+
+丙的**前半段是必需的**：只验「超时会开」的话，一个无条件开闸的实现也能过。
+实际输出：
+
+    [PASS] 甲 总部阵亡（实际 state=destroyed）
+    [PASS] 乙 卡已离开场景树（前提成立）
+    [PASS] 乙 AddCardToPlace 已收束（修复前永不完成）
+    [PASS] 乙 闸门已恢复为 0（修复前停在 1）
+    [PASS] 乙 总部仍然阵亡（实际 state=destroyed）
+    [PASS] 丙 只关 1 秒不强制开闸（正常暂停不受影响）
+    [PASS] 丙 此期间总部保持存活（暂停语义没坏）
+    WARNING: battlefield_.cs: 死亡检查闸门被 AddCardToPlace 关了 11 秒仍未恢复，
+             判定为某个 await 永不返回（见 BUGS #69），已强制开闸——死亡结算可能比动画早一步
+    [PASS] 丙 关满 11 秒强制开闸
+    [PASS] 丙 开闸后总部立刻阵亡（实际 state=destroyed）
+
+告警里点名 `AddCardToPlace` 是设计的一部分——下一次再犯，日志直接把**哪个方法**
+挂死了报出来，不用再靠人肉复现。
+
+### 第四步：改了两个受影响的既有测试（不是放宽，是跟上新写法）
+
+- `tests/verify_death_check_gate.py`：`PauseDeathCheck()` → `PauseDeathCheck(reason)`，
+  `PauseDeathCheckScoped()` → `PauseDeathCheckScoped(`。断言的意思没变
+  （构造即暂停 / Dispose 必恢复），只是签名变了。
+- `tests/verify_card_state_lifecycle.py`：`FlashAttributeWithColor` 的守卫从
+  裸的 `if (!IsInsideTree())` 收敛成 `if (!CanAnimate())`，断言跟着改成查新判据。
+
+### 第五步：全量回归 —— 先取干净基线再比
+
+光看「哪些红了」没有意义，得知道**基线是什么**。做法：把本轮改的 5 个文件备份后
+`git checkout` 回干净版，跑一遍全量存成基线，再恢复、再跑、`diff`：
+
+    diff /tmp/baseline.txt /tmp/after.txt
+    6d5
+    < FAIL  verify_death_gate_hang.py
+
+**唯一差异**：本轮新写的测试从 FAIL 变 PASS。其余 12 个红项**改动前后一模一样**
+（`verify_hq_instructions` / `verify_enemy_scripts_and_spawn` / `verify_battle_names_in_ini`
+等，成因是工作区里那份**未提交的 `cards/enemyTurn.ini`**，与本轮无关）。
+**零新增失败。**

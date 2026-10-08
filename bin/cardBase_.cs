@@ -782,7 +782,7 @@ public partial class cardBase_ : Control
         // 牌堆里的卡是「已实例化但不在场景树上」的对象（Player.deck），
         // 对它们改费用是合法的，但纯视觉的滚动动画做不了——`GetTree()` 会返回 null。
         // 不挡这一下，改牌堆费用的效果每张卡都会抛一次空引用。
-        if (!IsInsideTree()) return;
+        if (!CanAnimate()) return;
 
         var costLabel = GetNode<Label>("cost");
         if (costLabel == null) return;
@@ -1855,6 +1855,12 @@ public partial class cardBase_ : Control
     /// <returns></returns>
     async public Task MoveToPosition(Vector2 destination, float duration = 0.5f)
     {
+        // 不在场景树上就没有动画可等：`GetTree()` 会是 null，那句 await 永不返回，
+        // 而调用它的 AddCardToPlace / Move / Attack 各持一个 `using` 的 DeathCheckGuard
+        // ——挂死意味着**闸门永不恢复**，之后场上任何单位（含总部）血 ≤ 0 都不死。
+        // 详见 AsyncWait 的注释与 docs/BUGS.md #69。
+        if (!CanAnimate()) return;
+
         if (moveTween != null && moveTween.IsValid()) moveTween.Kill();
         Tween currentTween = CreateTween();
         moveTween = currentTween;
@@ -1864,9 +1870,22 @@ public partial class cardBase_ : Control
 
         while (moveTween == currentTween && currentTween.IsValid() && currentTween.IsRunning())
         {
-            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            // 动画途中被摘出场景树（阵亡回收 `ReleaseEmptyCard`、弃置），同样不能再等
+            if (!CanAnimate()) return;
+            await AsyncWait.WaitFrameAsync(this);
         }
     }
+
+    /// <summary>
+    /// 这张卡现在能不能播「走 `GetTree()` 的视觉动画」。
+    ///
+    /// 牌堆里的卡、已回收到对象池的卡都是「已实例化但不在场景树上」——
+    /// 改它们的数值合法，任何纯视觉的动画都不行。
+    ///
+    /// 判据顺序不能颠倒：`IsInsideTree()` 走原生指针，对已释放对象会抛
+    /// `ObjectDisposedException`，必须让 `IsInstanceValid` 先短路（见 docs/NOTICE.md）。
+    /// </summary>
+    private bool CanAnimate() => GodotObject.IsInstanceValid(this) && IsInsideTree();
 
     /// <summary>
     /// 弃置卡牌动画 - 从左侧进入、停留3s、旋转着向左侧飞出并删除
@@ -1925,7 +1944,7 @@ public partial class cardBase_ : Control
         // 不在场景树上的卡（牌堆里的卡就是这种）不做任何视觉动作。
         // 它们的数值照改不误，但改色是纯展示行为：既没人看得见，
         // 而 LabelSettings 又可能是跨卡共享的，改了只会连累别的卡。
-        if (!IsInsideTree())
+        if (!CanAnimate())
             return;
 
           // 根据属性名获取对应的Label节点
