@@ -2121,3 +2121,69 @@ shader 版能看到透视，代价是引 GLSL、还得赌它不会因为编译�
 （`verify_hq_instructions` / `verify_enemy_scripts_and_spawn` / `verify_battle_names_in_ini`
 等，成因是工作区里那份**未提交的 `cards/enemyTurn.ini`**，与本轮无关）。
 **零新增失败。**
+
+---
+
+## 第三十六轮：总部血 -4 却死不掉（BUGS #70）
+
+**老板的条件**：「保存 → 重启程序 → 读档 → 进战斗」才会出现；而且
+**能继续操作**、**别的单位死亡正常**。
+
+### 第一步：先把范围收死（不是先改代码）
+
+| 事实 | 推论 |
+|---|---|
+| 能继续操作 | 敌人回合走完了，死亡检查在跑 |
+| 别的单位正常死 | 闸门没被关死（不是 #68 / #69） |
+| 显示 -4 | `RefreshState()` 里 `defenceLabel.Text = defence.ToString()`，`ReadDefence()` 直接返回 `defence` —— 看到的 -4 就是内部真值 |
+| 总部还在场上 | 没走过 `RemoveCard`（会销毁节点） |
+
+四条合起来只剩：**总部的 `state` 不是 `placed`**。
+
+然后把全项目 `state` 的每一处写入过了一遍 —— `setState` 共 19 处调用 + `Dead()` 一处。
+能碰到**场上卡**的每一处都有总部守卫，**唯独 `AddCardToHand` 只有日志、没有 return**。
+
+### 第二步：真跑的行为回归（`tests/HqDeathTest.cs`）
+
+    godot --headless --path . res://tests/hq_death_test.tscn
+
+| 段 | 验什么 |
+|---|---|
+| 甲 基线 | 状态正常时，总部血 -4 正常阵亡 |
+| 乙 复现 | 把总部 `state` 强行改成 `inHand` → **仍然必须死** |
+| 丙 别修过头 | **普通单位** `state` 是 `inHand` 时血 ≤ 0 **不许**死（手牌也在 `cardInPlaces` 里） |
+
+**丙段不是凑数**：新判据如果被推广到所有卡，一张血被打到 0 的手牌就会被凭空杀掉。
+所以丙段先断言「手牌确实在 `cardInPlaces` 里」——前提不成立的话这条测试就是空的。
+
+**乙段必须能红**。实测把修复撤掉再跑：
+
+    撤掉修复：  [FAIL] 乙 总部照样阵亡（实际 state=inHand）   ← 老板看到的现象
+    装回修复：  Result: all passed
+
+一个在修复前后都绿的测试等于没测。
+
+### 第三步：全量回归
+
+与改动前的基线逐行 diff：
+
+    diff /tmp/baseline.txt /tmp/after2.txt
+    6d5
+    < FAIL  verify_death_gate_hang.py
+
+唯一差异是第三十五轮那条新测试从红转绿，**零新增失败**。
+
+### 没查实的部分（如实记）
+
+**总部 `state` 被改坏的**具体路径**没复现出来。** 按老板给的流程真跑了两次
+（战斗里保存 → 关进程 → 读档 → 继续 → 直接进战斗），总部都正常死亡。
+所以 `AddCardToHand` 是**唯一结论性的破口**，但不敢说一定是它。
+兜底是 `WarnIfHqShouldHaveDied()`：下次再犯，日志会直接打出 `state` 的数值与其它三道门。
+
+### 顺带查实：`ADD:` 是「每回合执行」，不是「执行一次」
+
+老板的 `cards/enemyTurn.ini` 里有 8 处 `ADD:myHq|damage(N)`。
+`bin/battlefield_.cs:3245` 的注释写着「添加到**每回合执行**的列表」，队列只增不减——
+**一旦触发就每回合重复扣总部的血**。日志实证：`moscow_battle` 只有 `t1/t3/t6/t12`，
+`t1` 是 `ADD:` 形式，它在第 1、2、3 回合各跑了一次，敌人单位从 `Found 2` → `Found 3` → `Found 4`。
+如果本意是「只打一次」，要把 `ADD:` 去掉。这不是 bug，是关卡配置的用法问题。

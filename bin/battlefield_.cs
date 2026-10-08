@@ -3889,8 +3889,9 @@ async Task enemySummonAsync()
 
         GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} battlefield_.cs: 友方总部防御已 "
                      + $"{myHq.ReadDefence()} 却没死 —— 闸门={pauseDeathCheck}"
-                     + $"(1=被挡) 状态={myHq.getState()}(要 placed) "
+                     + $"(1=被挡) 状态={myHq.getState()}={(int)myHq.getState()}(要 placed=2) "
                      + $"在cardInPlaces里={cardInPlaces.Contains(myHq)} "
+                     + $"还在场景树上={GodotObject.IsInstanceValid(myHq) && myHq.IsInsideTree()} "
                      + $"已在失败转场={defeatTransitionStarted}");
     }
 
@@ -4008,9 +4009,30 @@ async Task enemySummonAsync()
         RemoveCard(card);
     }
 
+    /// <summary>
+    /// 这张场上的卡该不该结算阵亡。
+    ///
+    /// **总部走单独一条判据**：项目的不变量是「总部只待在支援阵线上」
+    /// （`RetreatUnit` / `DiscardRandomly` / `_Input` 拖拽三处都按它写了守卫），
+    /// 唯独死亡判定漏了。总部的 `state` 一旦被哪条路径改成 `placed` 以外的东西，
+    /// 用 `state == placed` 去判就**永远不成立**——表现是：
+    ///
+    ///     总部血 -4 却死不掉，而其它单位的死亡完全正常，玩家也照常能操作。
+    ///
+    /// 这正是老板报的现象（BUGS #70）。所以总部不看 `state`：
+    /// 它只要能进到这个列表（= 还挂在 `cardInPlaces` 里、还没走死亡流程），
+    /// 血 ≤ 0 就必须死。`destroyed` 要排除，那是「已在走死亡流程」的那一拍。
+    ///
+    /// 普通单位仍旧要求 `state == placed`——它们会正常地进出手牌/牌堆，
+    /// `state` 是它们「在不在场上」的**唯一**依据，松不得。
+    /// </summary>
     private static bool IsDeadPlacedUnit(cardBase_ card)
     {
-        return card != null && card.getState() == CardState.placed && card.ReadDefence() <= 0;
+        if (card == null || card.ReadDefence() > 0) return false;
+
+        if (card.isHq == HQ.hq) return card.getState() != CardState.destroyed;
+
+        return card.getState() == CardState.placed;
     }
 
     /// <summary>
@@ -7125,13 +7147,20 @@ public class Player
     /// <param name="card"></param>
     public async Task AddCardToHand(cardBase_ card)
     {
-        // 总部不该出现在手牌里。这是「进手牌」的唯一入口，在这里喊一声，
-        // 任何把总部送进手牌的路径都会在控制台留下痕迹（含它当时的状态）。
+        // 总部绝不能进手牌 —— **这里必须真的拦住，不能只喊一声**。
+        //
+        // 这是「场上卡 → 手牌卡」的唯一出口，而它下面的 `setState(CardState.inHand)`
+        // 会让总部**永远脱离死亡检查**：`IsDeadPlacedUnit` 要求 `state == placed`，
+        // 总部人还杵在支援阵线上、血掉到负数，却再也不会被结算。
+        // 症状就是「总部死不掉，而别的单位死亡完全正常」（BUGS #70）。
+        //
+        // 从前这里只 `GD.Print` 一句就往下走了 —— 留痕是对的，但半拉子守卫拦不住任何东西。
         if (card != null && card.isHq == HQ.hq)
         {
-            GD.Print($"[AddCardToHand] 总部 {card.id} 被加入手牌！"
+            GD.Print($"[AddCardToHand] 总部 {card.id} 被加入手牌，已拒绝！"
                    + $"状态={card.getState()} 我方={card.GetIsFriend()}——"
                    + "总部只应待在支援阵线，请查调用方");
+            return;
         }
 
         // 如果手牌已满，直接弃掉（动画后台播放，不阻塞效果结算）

@@ -1491,3 +1491,104 @@ while (moveTween == currentTween && currentTween.IsValid() && currentTween.IsRun
 #68-补 写了「需要重新导出再测」，那一半是对的（老板的包确实旧）。
 但**只靠重新导出并不能解决这个问题**——#69 这条路径在最新代码里同样存在，
 是这次才修掉的。
+
+---
+
+### 70. 总部血 -4 却死不掉：阵亡判定不该依赖 `state`（已修）
+
+老板的原话：**「这个bug只有在保存 然后重启程序再读档之后进入战斗才会出现」**，
+以及三个关键事实：
+
+1. **能继续操作**（敌人回合没卡住）
+2. **除了总部，其它单位的死亡都正常**
+3. 截图里总部防御已经是 **-4**
+
+#### 排除法
+
+| 事实 | 推论 |
+|---|---|
+| 能继续操作 | 敌人回合走完了，死亡检查在跑 |
+| 别的单位正常死 | 闸门是开的（不是 #68 / #69 那两条） |
+| 显示 -4 | `RefreshState()` 里 `defenceLabel.Text = defence.ToString()`，`ReadDefence()` 直接返回 `defence` —— **看到的 -4 就是内部真值** |
+| 总部还在场上 | 没走过 `RemoveCard`（会销毁节点） |
+
+四条合起来只剩一个可能：**总部的 `state` 不是 `placed`**。
+
+#### 全项目核对 `state` 的每一处写入
+
+`state` 只在 `cardBase_.Dead()`（置 `destroyed`）和 `cardBase_.setState()` 里被写，
+而 `setState` 一共 19 处调用，逐个核对谁能碰到**场上的卡**：
+
+- 拖拽那一路（`_Input`）两处都有 `card.isHq == HQ.hq` 守卫，直接 `return`
+- `RetreatUnit` 有总部守卫
+- `ShuffleIntoDeck` 有总部守卫（`target.isHq == HQ.hq` → `continue`）
+- `Dead()` 会连节点一起摘掉（总部的 `myPlace` 会解绑，肉眼可见它消失）
+
+**只有一处没有：`Player.AddCardToHand()`。** 它的总部判断**只打日志、没有 return**，
+紧接着就是 `card.setState(CardState.inHand)`：
+
+```csharp
+if (card != null && card.isHq == HQ.hq)
+{
+    GD.Print($"[AddCardToHand] 总部 {card.id} 被加入手牌！状态={card.getState()} ...");
+}                                   // ← 只喊一声，拦不住
+...
+card.setState(CardState.inHand);    // ← 走到这里，总部永远进不了死亡检查
+```
+
+#### 两个修法
+
+**① 把半拉子守卫补完**：`AddCardToHand` 里的总部判断改成 `return`。
+留痕是对的，但留痕拦不住任何东西。
+
+**② 总部走独立的阵亡判据**（`IsDeadPlacedUnit`）：
+
+```csharp
+if (card == null || card.ReadDefence() > 0) return false;
+if (card.isHq == HQ.hq) return card.getState() != CardState.destroyed;  // 总部不看 state
+return card.getState() == CardState.placed;                             // 其它单位照旧
+```
+
+依据是项目**自己的不变量**：「总部只待在支援阵线上」——
+`RetreatUnit`、`DiscardRandomly`、`_Input` 拖拽三处都按它写了守卫，**只有死亡判定漏了**。
+补上之后，总部只要能进到 `cardInPlaces` 这个列表（= 还挂在场上、还没走死亡流程），
+血 ≤ 0 就必须死。**从此不管 `state` 被谁改坏，「总部死不掉」都不可能再出现。**
+
+> 普通单位**不能**放松：手牌也在 `cardInPlaces` 里（`AddCardToHand` 会调
+> `AddToBattleField`），松掉 `state == placed` 会把牌堆/手牌里的卡凭空杀掉。
+> 回归 `tests/HqDeathTest.cs` 的丙段专门盯着这条。
+
+#### 实测
+
+`tests/HqDeathTest.cs`（真起 battleField，三段）：
+
+    撤掉修复：  [FAIL] 乙 总部照样阵亡（实际 state=inHand）   ← 老板看到的现象
+                （甲 基线 / 丙 手牌不误杀 两段仍 PASS）
+    装回修复：  Result: all passed
+
+**乙段是必需的**：它把总部的 `state` 强行改成 `inHand` 来模拟那条破口——
+不这么写，测试在修复前后都会绿，等于没测。
+
+#### 还没查实的部分（如实记录）
+
+**导致总部 `state` 被改坏的那条具体路径，没有复现出来。** 我按老板给的流程
+（战斗里保存 → 关进程 → 读档 → 继续 → 直接进战斗）真跑了两次，总部都正常死亡。
+所以 ① 是**唯一结论性的破口**，但不敢说一定是它。
+
+兜底靠 `WarnIfHqShouldHaveDied()`：总部 ≤ 0 却没死时，会把
+「闸门 / `state`（含数值）/ 是否在 `cardInPlaces` / 是否还在场景树上 / 是否已在失败转场」
+全部打进日志。**下次再犯，日志会直接点名。**
+
+#### 顺带发现（不是 bug，是关卡设计问题）
+
+`ADD:` 前缀的语义是**「从此刻起每回合都执行」**（`bin/battlefield_.cs:3245`
+的注释就写着「添加到每回合执行的列表」，注释也说明了这个队列只增不减）。
+老板的 `cards/enemyTurn.ini` 里有 8 处写成 `ADD:myHq|damage(N)`：
+
+    Bryansk t11=8   Baranovichi t3=4   TractorFactory t8=4   Oboyan t4=4
+    Oryol t6=4      Izyum t5=3         VolgaCrossing t15=3   none t3=4
+
+**它们一旦触发就会每回合重复扣总部的血**，正好能解释截图里的 -4。
+如果本意是「只打一次」，要把 `ADD:` 去掉。已实测确认：
+`moscow_battle` 只有 `t1/t3/t6/t12` 四条，`t1` 是 `ADD:` 形式，
+日志里它在第 1、2、3 回合各跑了一次，敌人单位从 `Found 2` → `Found 3` → `Found 4`。
