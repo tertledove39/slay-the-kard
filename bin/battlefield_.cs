@@ -3779,10 +3779,44 @@ async Task enemySummonAsync()
 /// <summary>
 /// 检查场上是否有没血的单位 如果有就让它去死!!!
 /// </summary>
+    /// <summary>上一次「闸门关着却有单位该死」告警的时间戳（毫秒），用于限流。</summary>
+    private ulong _lastDeathGateWarningMsec;
+
+    /// <summary>同类告警的最小间隔，避免刷屏。</summary>
+    private const int DeathGateWarningIntervalMsec = 2000;
+
+    /// <summary>
+    /// 闸门关着时**本该有人死**却跳过了，说明闸门被卡死——留一条日志。
+    ///
+    /// 这种情况完全静默：`CheckIfAnyUnitDiedAsync()` 第一行就 return，场上任何单位
+    /// （**包括总部**）血降到 0 以下都不会死，玩家只看到「打不死的总部」，
+    /// 控制台一个字都没有。BUGS #68 就是靠人肉复现才查到的，太贵了。
+    ///
+    /// 只在「确实有单位血 ≤ 0 却被跳过」时记录——正常的暂停（拖拽中、入场动画中）
+    /// 场上是没有待死单位的，不会误报。带 2 秒限流，因为死亡检查调用很频繁。
+    /// </summary>
+    private void WarnIfDeathSkippedByGate()
+    {
+        ulong now = Time.GetTicksMsec();
+        if (now - _lastDeathGateWarningMsec < DeathGateWarningIntervalMsec) return;
+
+        var stuck = ReadCardInPlaces()
+            .Where(c => c != null && IsDeadPlacedUnit(c))
+            .ToList();
+        if (stuck.Count == 0) return;
+
+        _lastDeathGateWarningMsec = now;
+        GD.PushWarning($"{Time.GetDatetimeStringFromSystem()} battlefield_.cs: 死亡检查被闸门挡住，"
+                     + $"{stuck.Count} 个单位血已 ≤ 0 却没结算（第一个：{stuck[0].id} "
+                     + $"防御={stuck[0].ReadDefence()}）。闸门是标志位不是计数器，"
+                     + $"漏一次恢复就会永久卡死——查 PauseDeathCheckScoped 的调用点");
+    }
+
     async Task CheckIfAnyUnitDiedAsync()
     {
         if (pauseDeathCheck == 1)
         {
+            WarnIfDeathSkippedByGate();
             return;
         }
 

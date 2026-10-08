@@ -1346,3 +1346,48 @@ private DeathCheckGuard PauseDeathCheckScoped() => new DeathCheckGuard(this);
 就会顺手把死亡检查一起废掉。`using` 之后这条也堵住了。
 
 **谁守着**：`tests/verify_death_check_gate.py`（11 项）。
+
+---
+
+### 68-补. 闸门卡死时现在是**有日志**的 + 老板复现不了修复的原因（导出包是旧的）
+
+**补一：静默故障要留痕。**
+`CheckIfAnyUnitDiedAsync()` 第一行 `if (pauseDeathCheck == 1) return;` 是**完全静默**的
+——玩家只看到「打不死的总部」，控制台一个字都没有。#68 是靠人肉复现才查到的，太贵。
+现在补了 `WarnIfDeathSkippedByGate()`：
+
+- **只在「确实有单位血 ≤ 0 却被跳过」时记录**。正常的暂停（拖拽中、入场动画中）
+  场上是没有待死单位的，所以不会误报。
+- 带 2 秒限流（`DeathGateWarningIntervalMsec`），死亡检查调用很频繁，不能刷屏。
+- 日志里带上第一个待死单位的 id 与防御值，以及「闸门是标志位不是计数器」这句提示。
+
+实测（临时场景，跑完即删）：
+
+    甲：无人待死 + 闸门关 —— 不报警          ✅
+    乙：总部 -4 + 闸门关 —— WARNING: 死亡检查被闸门挡住，1 个单位血已 ≤ 0 却没结算（第一个：moscow 防御=-4）  ✅
+    丙：开闸 —— state = destroyed            ✅
+
+**补二：老板报「保存并退出 → 关程序 → 重新进战役 → 再进战斗，总部死不掉」，
+复现不出修复的验证，原因是他在跑的导出包是旧的。**
+
+直接查导出目录里的程序集：
+
+    data_road_to_berlin_windows_x86_64/road_to_berlin.dll   2026-10-07 21:50
+    修复提交 ec2f2e6                                        2026-10-08 13:18
+
+`grep -a` 那个 DLL：**`DeathCheckGuard` / `PauseDeathCheckScoped` 都搜不到**，
+即「不含本次修复」。（`CanBeSelected` / `IsInstanceValid` 能搜到——那是更早就有的。）
+
+**结论：需要重新导出一次再测。**
+
+**另外**：我按他给的路径做了模拟——战役模式（`IsCampaignMode = true`）+ 指定关卡
+（`SelectedEnemy = berlin`）直接起一场战斗，全程盯闸门：
+
+    [启动后第 0 帧] 闸门 = 1
+    [启动后第 40 帧 ~ 第 360 帧] 闸门 = 0
+    打到 -4 → 跑过死亡检查 → state = destroyed（正常阵亡）
+
+**战役模式的启动路径本身不会关死闸门**。存档里也只存进度（敌人/区域/hp/物资/卡组/
+烈度/商店），**不含任何运行时标志位**，重启后是全新战斗。所以那条复现要么是被
+#68 那条漏网路径击中的（旧包里还在），要么还需要他再给一次日志——补一的那条
+WARNING 正是为此准备的。
