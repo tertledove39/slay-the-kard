@@ -1899,3 +1899,87 @@ shader 版能看到透视，代价是引 GLSL、还得赌它不会因为编译�
 - 复制之后仍然设置 Font + bestSize（自适应没改坏）
 - 场景里 name 的那份仍然是 `outline_size = 2` + 黑色描边（就是要保住的东西）
 - 临时测量标签照旧 `new` + `QueueFree`
+
+---
+
+## 第三十三轮：死亡检查的闸门被关死（BUGS #68）
+
+老板报的：「友方总部被攻击后血量变为 0 却没有死亡」，截图里 Moscow 防御是 **-4**。
+
+### 先排除判据本身
+
+`IsDeadPlacedUnit` = `state == placed && ReadDefence() <= 0`——**没有排除总部**，
+`ReadDefence()` 也是原样返回 `defence` 不 clamp。所以不是"总部被豁免了"。
+
+### 再锁闸门
+
+`CheckIfAnyUnitDiedAsync()` 第一行 `if (pauseDeathCheck == 1) return;`。
+实测（手动把 `pauseDeathCheck` 置 1）：
+
+    甲 闸门关死时：总部防御 -4，跑过死亡检查后 state 仍是 placed（活着）   <- 复现截图
+    乙 手动开闸后：同一个总部立刻 state = destroyed
+
+### 最后找出哪条路径把闸门关死的
+
+写了个脚本，把 `Attack` / `Move` / `AddCardToPlace` 三个暂停点内部的**每个 `return;`
+都列出来**，看前面有没有配对的 `ResumeDeathCheck()`：
+
+    ===== Attack (Pause 1 / Resume 5) =====
+      行 2419 有  行 2461 有  行 2471 有  行 2483 有
+    ===== Move (Pause 1 / Resume 6) =====
+      行 2659 有  行 2672 有  行 2678 有
+      行 2684 <<< 前面 6 行内没有 Resume      <- 就是它
+      行 2699 有  行 2705 有
+    ===== AddCardToPlace (Pause 1 / Resume 1) =====   （平衡）
+
+`Move` 里「手牌 → 非自己支援阵线的落点」这条非法路径直接 `return`，没恢复闸门。
+
+**「逐个 return 检查配对」这个脚本值得留着**：闸门是标志位不是计数器，
+漏一处就是永久性故障，靠人眼扫 230 行的 `Attack` 是扫不出来的。
+
+### 修法：作用域化，而不是逐个补
+
+补一条 `ResumeDeathCheck()` 只能堵住当下这一处，下次再加 `return` 又会漏；
+而且**异常路径**根本补不了（`Move` 中间要 `await MoveToPosition(...)` 和
+`await TriggerUnitEffects(...)`，后者会跑任意卡效果，抛异常完全可能）。
+所以改成：
+
+    using var deathCheckGuard = PauseDeathCheckScoped();   // 离开作用域一定恢复
+
+**已有的显式 `ResumeDeathCheck()` 一处都没删**——它们紧紧跟着自己的
+`await CheckIfAnyUnitDiedAsync();`，刻意把恢复安排在「动画播完、自查死亡之前」，
+那是有意义的时机，不是随手写的。`ResumeDeathCheck()` 是幂等的（置 0），
+和 `using` 共存无副作用。测试里专门有一条守着这个「先恢复、再自查」的顺序。
+
+### 实测确认修复
+
+    [PASS] 取到一张手牌
+    [PASS] 那条提前返回确实被走到了（卡没有被移动，仍不占位）   <- 证明路径真的走到了
+    [PASS] 走完那条提前返回后，死亡检查闸门是开的（0）
+    [PASS] 总部防御 -4 时正常阵亡（闸门没有被卡死）
+
+第二条是特意加的：只验「闸门是 0」的话，万一那条 `return` 根本没被走到，
+测试会假绿。**先证明路径走到了，再证明结果是好的。**
+
+### 结构回归 `tests/verify_death_check_gate.py`（11 项）
+
+- `DeathCheckGuard` 构造暂停、`Dispose` 恢复
+- 裸的 `PauseDeathCheck()` 只剩守卫内部那一句（3 个调用点全部改成作用域写法）
+- 三个方法末尾仍「先 `ResumeDeathCheck()`、再 `await CheckIfAnyUnitDiedAsync()`」
+- `Pause/Resume` 仍是置 1 / 置 0 的标志位语义
+
+### 一个副作用：本轮回归多出一条失败，但不是本轮的改动引起的
+
+`tests/verify_hq_instructions.py` 转红了。查明：它读的是 `cards/card.ini` 与
+`cards/enemyTurn.ini`，而后者**工作区里有未提交的改动**（老板在填 `[Baranovichi]`
+的战斗内容）。已提交版本里 `[Baranovichi]` 只有 `name=巴拉诺维奇` 一行。
+
+违规项是：
+
+    t2=enemyHq|GetAttack(20)|GetEffect("EnemyUnitDead:enemyHq|damage(2)|GetAttack(-1)")
+       description=敌方总部获得20攻击力,每击败一个敌方单位,敌方总部获得-1-2
+
+**总部的攻击力是死数据**：`EnemyAttackPhaseAsync` 第一件事就是
+`if (attacker.isHq == HQ.hq) continue;`（日志里那行 `Skipped: Is HQ`），
+玩家侧也不允许拖总部攻击。所以这条效果不会产生任何可观察的结果。
+**这条没有改**——它是老板正在编辑的内容，要改也是老板决定意图（是想让总部能攻击？）。

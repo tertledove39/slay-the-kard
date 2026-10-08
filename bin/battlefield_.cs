@@ -86,6 +86,38 @@ public partial class battlefield_ : Control
     }
 
     /// <summary>
+    /// 「暂停死亡检查」的作用域化写法。**用在 `PauseDeathCheck()` 的地方一律改用它。**
+    ///
+    /// `pauseDeathCheck` 是个**普通标志位**（`= 1` / `= 0`），不是计数器：一旦某条
+    /// 路径忘了恢复、或者中途抛了异常，闸门就**永久关死**——之后所有
+    /// `CheckIfAnyUnitDiedAsync()` 都在第一行直接 `return`，场上任何单位（**包括总部**）
+    /// 血降到 0 以下都不会死。表现就是老板报的「友方总部血量变 0 却没有死亡」。
+    ///
+    /// 实测（真起 battleField）：
+    ///     闸门关死时：总部防御 -4，跑过死亡检查后 state 仍是 placed（活着）
+    ///     手动开闸后：同一个总部立刻 state = destroyed
+    ///
+    /// `using` 保证离开作用域时一定恢复（**包括提前 return 和抛异常**）。因为
+    /// `ResumeDeathCheck()` 是幂等的，它和已有的显式恢复调用**共存没有副作用**——
+    /// 那几处仍要保留：它们刻意把恢复安排在「动画播完、自己的死亡检查之前」，
+    /// 那是个有意义的时机，不是随手写的。
+    /// </summary>
+    private readonly struct DeathCheckGuard : IDisposable
+    {
+        private readonly battlefield_ _field;
+
+        public DeathCheckGuard(battlefield_ field)
+        {
+            _field = field;
+            _field.PauseDeathCheck();
+        }
+
+        public void Dispose() => _field.ResumeDeathCheck();
+    }
+
+    private DeathCheckGuard PauseDeathCheckScoped() => new DeathCheckGuard(this);
+
+    /// <summary>
     /// 读取死亡检查状态
     /// </summary>
     int ReadDeathCheckState()
@@ -439,7 +471,7 @@ public partial class battlefield_ : Control
     async Task AddCardToPlace(cardBase_ card, place_ place)
     {
         if (place.GetMyCard()!= null) return;
-        PauseDeathCheck(); // 暂停死亡检查
+        using var deathCheckGuard = PauseDeathCheckScoped(); // 见 DeathCheckGuard
         if (!cardInPlaces.Contains(card))
         {
             AddToBattleField(card);
@@ -2411,7 +2443,7 @@ InputState currentInputState = InputState.nil;
         lastOverflowDamage = 0;
         lastDamage = 0;
         ForbidControl();
-        PauseDeathCheck(); // 暂停死亡检查
+        using var deathCheckGuard = PauseDeathCheckScoped(); // 见 DeathCheckGuard：抛异常也不会把闸门锁死
         if (!from.CheckIfCanAttack())
         {
             AllowControl();
@@ -2651,7 +2683,7 @@ InputState currentInputState = InputState.nil;
         {
             return;
         }
-        PauseDeathCheck(); // 暂停死亡检查
+        using var deathCheckGuard = PauseDeathCheckScoped(); // 见 DeathCheckGuard
 
         if(position.GetMyCard()!= null)
         {

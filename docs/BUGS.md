@@ -1273,3 +1273,76 @@ label.LabelSettings = settings;
 
 **这条不是本轮引入的**：`git log -S` 追到 `83a67b3`（2026-04-05「变量 开发 抉择」），
 是早就埋下的。
+
+---
+
+### 68. 死亡检查的闸门被关死 —— 总部血降到 -4 也不死（已修）
+
+**现象**（老板报的 + 截图）：「友方总部被攻击后血量变为 0 却没有死亡」。
+截图里 Moscow 的防御明确是 **-4**，游戏还在正常进行。
+
+**判据本身没问题**：`IsDeadPlacedUnit` = `state == placed && ReadDefence() <= 0`，
+没有排除总部，`ReadDefence()` 也是原样返回（不 clamp）。
+
+**问题在闸门**。`CheckIfAnyUnitDiedAsync()` 的第一行是：
+
+```csharp
+if (pauseDeathCheck == 1) return;
+```
+
+而 `pauseDeathCheck` 是个**普通标志位**（`PauseDeathCheck()` 置 1、`ResumeDeathCheck()`
+置 0），**不是计数器**——只要有一条路径忘了恢复、或者中途抛了异常，
+闸门就**永久关死**，之后场上任何单位（**包括总部**）血降到 0 以下都不会死。
+
+**实测确认**（真起 `battleField.tscn`）：
+
+    闸门关死时：总部防御 -4 → 跑过死亡检查后 state 仍是 placed（活着）
+    手动开闸后：同一个总部 → 立刻 state = destroyed
+
+**具体那一条漏网的路径**：`Move()` 里「手牌 → 非自己支援阵线的落点」这条非法落点：
+
+```csharp
+PauseDeathCheck();                       // 关闸
+...
+else if (card.GetMyPlace() == null)
+{
+    if (!supportLine.Contains(position))
+    {
+        return;                          // ← 直接返回，没有 ResumeDeathCheck()
+    }
+```
+
+**修法**：不是逐个补 `ResumeDeathCheck()`（补漏永远治标——下次再加一条
+`return` 又会漏），而是**把暂停作用域化**：
+
+```csharp
+private readonly struct DeathCheckGuard : IDisposable
+{
+    public DeathCheckGuard(battlefield_ field) { _field = field; _field.PauseDeathCheck(); }
+    public void Dispose() => _field.ResumeDeathCheck();
+}
+private DeathCheckGuard PauseDeathCheckScoped() => new DeathCheckGuard(this);
+```
+
+三个暂停点（`Attack` / `Move` / `AddCardToPlace`）全部改成
+`using var deathCheckGuard = PauseDeathCheckScoped();`——离开作用域一定恢复，
+**提前 return 和抛异常都覆盖**。
+
+**已有的显式 `ResumeDeathCheck()` 一处都没删**：它们刻意把恢复安排在
+「动画播完、自己的死亡检查之前」，那是有意义的时机（`ResumeDeathCheck();` 紧跟着
+`await CheckIfAnyUnitDiedAsync();`）。因为 `ResumeDeathCheck()` 是幂等的
+（直接置 0），和 `using` 共存没有副作用。
+
+**实测确认修复**（真起 battleField，走那条非法落点）：
+
+    [PASS] 那条提前返回确实被走到了（卡没有被移动，仍不占位）
+    [PASS] 走完那条提前返回后，死亡检查闸门是开的（0）
+    [PASS] 总部防御 -4 时正常阵亡（闸门没有被卡死）
+
+**另一条可能的触发路径（同样被这次修复覆盖）**：任何异常。`Move()` 中间要
+`await card.MoveToPosition(...)` 和 `await TriggerUnitEffects(...)`（会跑任意卡效果），
+抛异常的话旧写法会跳过 `ResumeDeathCheck()`。**上一轮修的 BUGS #60
+（`ObjectDisposedException`）正是这一类**——如果它当时发生在 `Move` 中间，
+就会顺手把死亡检查一起废掉。`using` 之后这条也堵住了。
+
+**谁守着**：`tests/verify_death_check_gate.py`（11 项）。
