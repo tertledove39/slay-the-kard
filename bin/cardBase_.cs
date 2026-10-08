@@ -655,11 +655,36 @@ public partial class cardBase_ : Control
 /// 失去防御力
 /// </summary>
 /// <param name="n"></param>
-    public async Task LoseDefence(int n)
+    public async Task LoseDefence(int n, [System.Runtime.CompilerServices.CallerMemberName] string caller = "")
     {
         // 只累计真正扣掉的部分，避免溢出伤害（残血吃大伤害）虚增统计
         if (n > 0) totalDefenceLost += Math.Min(n, Math.Max(0, defence));
         defence -= n;
+
+        // **总部血降到 0 以下的那一瞬，把现场全部打出来。**
+        //
+        // 这一行是本轮唯一的目的：老板报「总部血变成负数却不死」，而之前在
+        // `CheckIfAnyUnitDiedAsync` 里的那条告警是**事后**喊的——如果那一刻根本没跑到
+        // 那句（或被闸门挡在门外），日志里就一个字都没有，排查只能靠猜。
+        // 扣血这一行是**必经之路**：任何来源（攻击、指令卡、`myHq|damage(N)` 效果）
+        // 都要走它，跑不掉。打出来的是「这一瞬间」的三道门 + 是谁调用的。
+        if (isHq == HQ.hq && defence <= 0)
+        {
+            // `battleField` 是 _Ready 时按「Root 下有个叫 BattleField 的节点」查出来的，
+            // 正常跑没问题；但快照里也可能还没查到（或正好在拆除）。兜一手拿父节点，
+            // 否则这条日志最该说的两件事（闸门、在不在 cardInPlaces 里）会变成问号。
+            battlefield_ field = battleField ?? GetParent() as battlefield_;
+            string inPlaces = field == null ? "无战场引用"
+                : field.ReadCardInPlaces().Contains(this).ToString();
+            string gate = field == null ? "?" : field.ReadDeathCheckState().ToString();
+            GD.Print($"[HQ-LETHAL] {Time.GetDatetimeStringFromSystem()} cardBase_.LoseDefence "
+                   + $"(被 {caller} 调用)：总部 {id} 的血变成 {defence}（本次 -{n}）"
+                   + $"  状态={state}={(int)state}(placed=2)"
+                   + $"  在cardInPlaces里={inPlaces}"
+                   + $"  闸门={gate}(1=被挡)"
+                   + $"  还在场景树上={GodotObject.IsInstanceValid(this) && IsInsideTree()}");
+        }
+
         // 触发闪烁效果
         if(defence > 0 )FlashAttributeWithColor("defence", defence, initialDefence, maxHistoryDefence, isInverted: false);
         RefreshState();

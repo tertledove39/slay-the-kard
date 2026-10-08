@@ -136,9 +136,10 @@ public partial class battlefield_ : Control
         => new DeathCheckGuard(this, reason);
 
     /// <summary>
-    /// 读取死亡检查状态
+    /// 读取死亡检查状态。cardBase_ 在「总部血降到 0 以下」时要把这个值打出来，
+    /// 所以是 public（见 `cardBase_.LoseDefence` 的 HQ-LETHAL 日志）。
     /// </summary>
-    int ReadDeathCheckState()
+    public int ReadDeathCheckState()
     {
         return pauseDeathCheck;
     }

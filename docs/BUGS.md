@@ -1592,3 +1592,21 @@ return card.getState() == CardState.placed;                             // 其�
 如果本意是「只打一次」，要把 `ADD:` 去掉。已实测确认：
 `moscow_battle` 只有 `t1/t3/t6/t12` 四条，`t1` 是 `ADD:` 形式，
 日志里它在第 1、2、3 回合各跑了一次，敌人单位从 `Found 2` → `Found 3` → `Found 4`。
+
+#### 70-补. 诊断挪到「扣血那一行」——事后喊话抓不到现场
+
+#70 里那条 `WarnIfHqShouldHaveDied()` 是挂在 `CheckIfAnyUnitDiedAsync()` 里的，
+也就是**事发之后**才喊。老板两次给的日志里一个字都没出现，有两种可能：
+那一刻根本没跑到那句，或者被闸门挡在了门外——**两种都查不出来**。
+
+现在改成在 `cardBase_.LoseDefence()` 里喊：**总部血降到 0 以下的那一瞬间**
+（这条是必经之路，攻击、指令卡、`myHq|damage(N)` 效果，任何来源都要走它）：
+
+    [HQ-LETHAL] 2026-10-08T22:59:33 cardBase_.LoseDefence (被 KillAsync 调用)：
+      总部 moscow 的血变成 -4（本次 -24）  状态=placed=2(placed=2)
+      在cardInPlaces里=True  闸门=0(1=被挡)  还在场景树上=True
+
+带 `[CallerMemberName]`，所以「是谁调用的」也一并记下来。四个值一出来，三道门
+（闸门 / `state` / 是否在列表）里到底是哪一道卡住，就是明摆着的。
+
+配套把 `battlefield_.ReadDeathCheckState()` 从 `private` 改成 `public`（一个纯读取器）。
